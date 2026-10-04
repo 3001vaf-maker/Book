@@ -9,7 +9,7 @@ const pdnGuard = read('server/src/online-booking/booking-pdn-consent.guard.ts');
 const bookingUi = read('online-booking/booking.js');
 const peopleUi = read('core/people/people.js');
 const consentCache = read('settings/documents/consents.js');
-const documentMigration = read('tenant-document-archive.js');
+const documentRuntime = read('core/runtime/tenant-document-archive.js');
 const schema = read('server/prisma/schema.prisma');
 const dropMigration = read('server/prisma/migrations/20260919132000_drop_booking_account_consents/migration.sql');
 
@@ -34,7 +34,7 @@ assert.doesNotMatch(bookingService, /consents:\s*\[\]\s+as Prisma\.InputJsonValu
 assert.match(dropMigration, /ALTER TABLE "BookingAccount" DROP COLUMN "consents"/);
 
 // Profile-side Person consent markers must be projected from canonical server ConsentEvent data.
-assert.match(documentMigration, /hydrateConsentsFromServer\(normalized\.consents\)/);
+assert.match(documentRuntime, /hydrateConsentsFromServer\(value\.consents\)/);
 assert.match(consentCache, /export function getConsents\(\)/);
 assert.match(peopleUi, /getConsents/);
 assert.match(peopleUi, /fact\?\.subjectType\s*===\s*'ACCOUNT'/);

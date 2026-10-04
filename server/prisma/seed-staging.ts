@@ -226,9 +226,8 @@ async function main() {
         experience: '10+ лет',
         professionAbout: '',
         customProfessions: json([]),
-        migrationVerifiedAt: now,
       },
-      update: { migrationVerifiedAt: now },
+      update: {},
     });
 
     await tx.workplace.upsert({
@@ -255,11 +254,6 @@ async function main() {
       update: { profileId: profile.id, position: 0 },
     });
 
-    await tx.businessStateMeta.upsert({
-      where: { tenantId },
-      create: { tenantId, migrationVerifiedAt: now },
-      update: { migrationVerifiedAt: now },
-    });
     await tx.ueiState.upsert({
       where: { tenantId },
       create: { tenantId, data: json({ entities: {}, relations: {}, revoked: [] }) },
@@ -293,18 +287,18 @@ async function main() {
 
     await tx.businessOperationalState.upsert({
       where: { tenantId },
-      create: { tenantId, data: json(operational), migrationVerifiedAt: now },
-      update: { data: json(operational), migrationVerifiedAt: now },
+      create: { tenantId, data: json(operational) },
+      update: { data: json(operational) },
     });
     await tx.tenantDocumentArchive.upsert({
       where: { tenantId },
-      create: { tenantId, data: json({ documents, history: [] }), migrationVerifiedAt: now },
-      update: { data: json({ documents, history: [] }), migrationVerifiedAt: now },
+      create: { tenantId, data: json({ documents, history: [] }) },
+      update: { data: json({ documents, history: [] }) },
     });
     await tx.businessAuxiliaryState.upsert({
       where: { tenantId },
-      create: { tenantId, data: json(auxiliary), migrationVerifiedAt: now },
-      update: { data: json(auxiliary), migrationVerifiedAt: now },
+      create: { tenantId, data: json(auxiliary) },
+      update: { data: json(auxiliary) },
     });
   });
 

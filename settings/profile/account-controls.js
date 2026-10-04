@@ -163,7 +163,7 @@ export async function renderAccountControlsPanel(root){
 
 export function openAccountControlsModal() {
   const layer = mountModal(document.body, modal('<div data-profile-account-controls-panel></div>', {
-    variant: 'standard',
+    variant: 'q',
     title: 'Согласия / Уведомления',
     className: 'modal--account-controls',
   }));

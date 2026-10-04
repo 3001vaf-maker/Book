@@ -257,20 +257,20 @@ for (const path of financeUiFiles) {
   if (/<select\b/.test(text)) errors.push(`${path}: Finance user UI must not use raw select elements`);
   if (/\b(?:alert|confirm|prompt)\s*\(/.test(text)) errors.push(`${path}: Finance user UI must not use browser dialogs`);
   for (const form of text.match(/<form\b[^>]*>/g) || []) {
-    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared TOP notices`);
+    if (!/\bnovalidate\b/.test(form)) errors.push(`${path}: Finance forms must disable native browser validation UI and surface validation through shared S notices`);
   }
 }
 
 const modalUI = source('ui/modals/index.js');
 if (!/openNotice\(\{ title = 'Внимание', message = '', surface = 'app'/.test(modalUI)
-  || !/modal\(content, \{ variant: 'top', surface, title \}\)/.test(modalUI)) {
-  errors.push('Shared user notices must be locked to the top modal');
+  || !/modal\(content, \{ variant: 's', surface, title \}\)/.test(modalUI)) {
+  errors.push('Shared user notices must be locked to canonical S');
 }
 if (/data-notice-close|action = 'ОК'/.test(modalUI)) {
-  errors.push('Top shared notices must contain information only and close by gesture');
+  errors.push('S notices must contain information only and close by gesture');
 }
-if (!/resolvedVariant === 'bottom' \|\| resolvedVariant === 'top' \|\| resolvedVariant === 'compact'/.test(modalUI)) {
-  errors.push('Top shared modals must not render a close button');
+if (!/resolvedVariant === 'x' \|\| resolvedVariant === 's'/.test(modalUI)) {
+  errors.push('Shared X/S modals must not render a close button');
 }
 
 const cashUI = source('core/finance/cash/cash.js');
@@ -287,8 +287,8 @@ if (!/data-cash-create/.test(cashUI)
 for (const label of ['+ Добавить кошелек', '+ Добавить инвестицию', '+ Добавить займ']) {
   if (!cashUI.includes(label)) errors.push(`Cash C create modal missing action: ${label}`);
 }
-if (!/variant:\s*'quick'/.test(cashUI)) {
-  errors.push('Cash C entity choice must use the shared bottom quick modal');
+if (!/variant:\s*'x'/.test(cashUI)) {
+  errors.push('Cash C entity choice must use canonical X');
 }
 if (/entityCardStack/.test(cashUI)) {
   errors.push('Cash Z1 must not fall back to the old vertical entity card stack');
@@ -378,10 +378,10 @@ const financeOperationsUI = source('core/finance/operations/index.js');
 for (const group of ['Доход / Расход', 'Займы', 'Инвестиции', 'Переводы']) {
   if (!financeOperationsUI.includes(group)) errors.push(`Shared Finance operation picker missing group: ${group}`);
 }
-if (!/variant: 'quick'/.test(financeOperationsUI)
+if (!/variant: 'x'/.test(financeOperationsUI)
   || !/openFinanceOperations/.test(financeOperationsUI)
   || !/mountV2ZLayer/.test(financeOperationsUI)) {
-  errors.push('Shared Finance operation launcher must own the bottom picker and stacked operation form');
+  errors.push('Shared Finance operation launcher must own X picker and stacked Z operation form');
 }
 if (!/data-cash-settings/.test(cashUI)
   || !/financial-operations/.test(cashUI)

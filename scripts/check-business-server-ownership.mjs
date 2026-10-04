@@ -14,16 +14,19 @@ const serverRecord = read('server/src/record/record.service.ts');
 const app = read('server/src/app.module.ts');
 const schema = read('server/prisma/schema.prisma');
 
-if (!core.includes('await initializeBusinessState(authenticatedAccount)')) failures.push('Authenticated Book must hydrate People/UEI/Record from server before rendering.');
+if (!core.includes('await loadBusinessState()')) failures.push('Authenticated runtime must hydrate People/UEI/Record from server before rendering.');
 if (!people.includes('hydratePeopleFromServer') || !people.includes('queuePersonUpsert')) failures.push('Person owner must use server-hydrated runtime state and server writes.');
 if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) failures.push('UEI owner must use server-hydrated runtime state and server writes.');
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');
 if (!online.includes('this.personIdentity.bindFirstAccess(') || !online.includes('this.records.create(')) failures.push('Online booking must resolve canonical Person and call canonical RecordService on the server.');
 if (!serverRecord.includes('export class RecordService') || !serverRecord.includes('this.prisma.record.')) failures.push('RecordService must own canonical server Record persistence.');
 if (!app.includes('BusinessStateModule')) failures.push('Nest application must register BusinessStateModule.');
-for (const model of ['BusinessStateMeta', 'Person', 'UeiState', 'Record', 'RecordEvent']) {
+const businessServer = read('server/src/business-state/business-state.service.ts');
+if (/migrationVerifiedAt|verifyMigration|\/migrate|bootstrap/.test(businessServer)) failures.push('Business state runtime transition bridge must not return.');
+for (const model of ['Person', 'UeiState', 'Record', 'RecordEvent']) {
   if (!schema.includes(`model ${model}`)) failures.push(`Prisma schema is missing ${model}.`);
 }
+if (/BusinessStateMeta|businessStateMeta/.test(schema + businessServer + serverRecord)) failures.push('BusinessStateMeta must stay removed; canonical owners do not need a readiness table.');
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));

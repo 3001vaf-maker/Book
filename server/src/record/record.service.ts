@@ -52,11 +52,6 @@ export class RecordService {
     private readonly procedures: ProcedureService,
   ) {}
 
-  private async requireVerified(tenantId: string) {
-    const meta = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (!meta?.migrationVerifiedAt) throw new ConflictException('Хранилище Record ещё не подтверждено');
-  }
-
   private subject(person: JsonObject) {
     return {
       personId: text(person?.id),
@@ -115,7 +110,6 @@ export class RecordService {
         return id
           && id !== excludeRecordId
           && !cancelled.has(id)
-          && text(record?.status) !== 'cancelled'
           && text(record?.workplaceId) === workplaceId
           && dateValue(record?.date) === date;
       })
@@ -140,7 +134,6 @@ export class RecordService {
   }
 
   async create(tenantId: string, input: JsonObject, position?: number, { createHistory = true } = {}) {
-    await this.requireVerified(tenantId);
     const id = text(input.id) || randomUUID();
     const sourceRequestId = text(input.sourceRequestId);
     if (sourceRequestId) {
@@ -234,7 +227,6 @@ export class RecordService {
   }
 
   async publicOccupancy(tenantId: string) {
-    await this.requireVerified(tenantId);
     const [rows, eventRows] = await Promise.all([
       this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.recordEvent.findMany({ where: { tenantId } }),
@@ -246,7 +238,7 @@ export class RecordService {
       .map((row) => objectValue(row.data))
       .filter((record) => {
         const id = text(record.id);
-        return id && !cancelled.has(id) && text(record.status) !== 'cancelled';
+        return id && !cancelled.has(id);
       })
       .map((record) => ({
         id: text(record.id),
@@ -260,12 +252,12 @@ export class RecordService {
   }
 
   private projectLifecycle(record: JsonObject, events: JsonObject[]) {
-    let status = text(record?.status) === 'cancelled' ? 'cancelled' : 'active';
-    let confirmed = Boolean(record?.confirmed);
-    let attendance = ['arrived', 'no-show'].includes(text(record?.attendance)) ? text(record.attendance) : '';
-    let confirmedAt = text(record?.confirmedAt);
-    let attendanceAt = text(record?.attendanceAt);
-    let cancelledAt = text(record?.cancelledAt);
+    let status = 'active';
+    let confirmed = false;
+    let attendance = '';
+    let confirmedAt = '';
+    let attendanceAt = '';
+    let cancelledAt = '';
     const ordered = events.slice().sort((left, right) => String(left?.at || '').localeCompare(String(right?.at || '')));
     for (const event of ordered) {
       const type = text(event?.type);
@@ -294,7 +286,6 @@ export class RecordService {
   }
 
   async listForPeople(tenantId: string, people: JsonObject[]) {
-    await this.requireVerified(tenantId);
     const personKeys = new Set(people.map((person) => text(person?.key)).filter(Boolean));
     const personIds = new Set(people.map((person) => text(person?.id)).filter(Boolean));
     if (!personKeys.size && !personIds.size) return [];
@@ -325,7 +316,7 @@ export class RecordService {
         tenantId,
         'record',
         text(record.id),
-        objectValue(record.finance).items ? record.finance : fallbackSettlement,
+        fallbackSettlement,
       ) || fallbackSettlement;
       const payment = await this.finance.recordSettlementPaymentState(tenantId, text(record.id), settlement);
       result.push({
@@ -344,7 +335,6 @@ export class RecordService {
   }
 
   async upsertFromOwner(tenantId: string, recordId: string, body: unknown) {
-    await this.requireVerified(tenantId);
     const source = objectValue(body);
     const incoming = clone(objectValue(source.record ?? source));
     const id = text(recordId);
@@ -412,7 +402,7 @@ export class RecordService {
       tenantId,
       'record',
       id,
-      objectValue(current.finance).items ? current.finance : currentFallbackSettlement,
+      currentFallbackSettlement,
     ) || currentFallbackSettlement;
 
     const nextSettlementSources = [

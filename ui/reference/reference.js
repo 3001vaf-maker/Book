@@ -383,7 +383,7 @@ function settingsMarkup() {
 function openSettingsReference() {
   if (document.querySelector('[data-reference-settings-menu]')) return;
   const host = mountModal(document.body, modal(`<div data-reference-settings-menu>${settingsMarkup()}</div>`, {
-    variant: 'bottom',
+    variant: 'x',
     surface: 'app',
     title: 'Настройки профиля',
     className: 'modal--profile-settings-sheet',
@@ -423,7 +423,7 @@ function openConsentReference() {
     ${settingToggle({ label: 'Согласие 1', checked: true })}
     ${settingToggle({ label: 'Согласие 2', checked: false })}
   </div>`;
-  mountModal(document.body, modal(content, { variant: 'standard', surface: 'app', title: 'Согласия / Уведомления' }));
+  mountModal(document.body, modal(content, { variant: 'q', surface: 'app', title: 'Согласия / Уведомления' }));
 }
 
 function openPasswordReference() {
@@ -436,13 +436,13 @@ function openPasswordReference() {
       ${button('Сохранить')}
     </div>
   </div>`;
-  mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app', title: 'Изменить пароль' }));
+  mountModal(document.body, modal(content, { variant: 'x', surface: 'app', title: 'Изменить пароль' }));
 }
 
 function openInfoReference() {
   mountModal(document.body, modal('<div class="modal-title"><h2>Информация</h2><p>Нейтральный информационный текст без бизнес-логики.</p></div>', {
     title: 'Информация',
-    variant: 'compact',
+    variant: 'x',
     surface: 'app',
   }));
 }

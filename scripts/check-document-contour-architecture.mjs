@@ -17,7 +17,7 @@ const files = {
   inviteCss: readFileSync('invite/invite.css','utf8'),
   admin: readFileSync('admin/document-registry/view.js','utf8'),
   adminCss: readFileSync('admin/admin.css','utf8'),
-  archive: readFileSync('tenant-document-archive.js','utf8'),
+  archive: readFileSync('core/runtime/tenant-document-archive.js','utf8'),
   registryService: readFileSync('server/src/document-registry/document-registry.service.ts','utf8'),
   tenantController: readFileSync('server/src/tenant-document-archive/tenant-document-archive.controller.ts','utf8'),
 };
@@ -84,8 +84,8 @@ const peopleDocumentInfo = files.people.slice(
 );
 assert.match(peopleDocumentTile,/documentTile\(/,'People documents must use shared documentTile');
 assert.match(peopleDocumentsSheet,/documentTiles\(/,'People documents must use shared documentTiles');
-assert.match(peopleDocumentsSheet,/variant: 'bottom'/,'People Documents / consents must open from A in the shared bottom modal');
-assert.match(peopleDocumentInfo,/variant: 'top'/,'People document details must use the shared top informational modal');
+assert.match(peopleDocumentsSheet,/variant: 'x'/,'People Documents / consents must open from A in canonical X');
+assert.match(peopleDocumentInfo,/variant: 's'/,'People document details must use canonical S');
 assert.doesNotMatch(files.people,/miniCard\(\{[\s\S]*?data-person-(?:consent|document)/,'People document surfaces must not use Mini Card');
 
 for (const [name, source] of Object.entries({

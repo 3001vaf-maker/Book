@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
-const v2 = readFileSync(new URL('../ui/v2/index.js', import.meta.url), 'utf8');
+const v2 = ['z-stack.js','modal-portal.js','swipe.js','workspace-navigation.js'].map((file) => readFileSync(new URL(`../ui/v2/${file}`, import.meta.url), 'utf8')).join('\n');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const selectors = readFileSync(new URL('../ui/selectors/index.js', import.meta.url), 'utf8');
 const selectorCss = readFileSync(new URL('../ui/selectors/selectors.css', import.meta.url), 'utf8');
@@ -28,7 +28,7 @@ assert.match(people, /button\('Из контактов', \{ variant: 'secondary'
 assert.match(people, /button\('Ввести вручную', \{ variant: 'secondary'/);
 assert.match(people, /personCreateForm\(preset\)/);
 
-assert.match(people, /variant:\s*'quick'/);
+assert.match(people, /variant:\s*'x'/);
 assert.match(people, /Выгрузить/);
 assert.match(people, /Загрузить/);
 assert.match(people, /Шаблон/);
@@ -46,10 +46,10 @@ assert.match(people, /openSharedProfileSettingsMenu\(\{/);
 assert.match(people, /id: 'code', label: 'Код'/);
 assert.match(people, /id: 'documents', label: 'Документы \/ согласия'/);
 assert.match(people, /id: 'history', label: 'История'/);
-assert.match(people, /variant: 'bottom'/);
+assert.match(people, /variant: 'x'/);
 assert.match(people, /variant: 'q'/);
 assert.match(people, /documentTiles\(documents\.map/);
-assert.match(people, /variant: 'top'/);
+assert.match(people, /variant: 's'/);
 assert.match(people, /openEntityCardAppearanceQ\(root/);
 assert.match(people, /allowPhoto: false/);
 assert.match(people, /entityVisualCard\(\{/);
@@ -88,7 +88,7 @@ assert.doesNotMatch(people, /surface:\s*'photo'/);
 assert.doesNotMatch(people, /actionLabel:\s*person\.photo/);
 
 assert.match(selectors, /import \{ modal, mountModal \} from '\.\.\/modals\/index\.js'/);
-assert.match(selectors, /variant: 'quick'/);
+assert.match(selectors, /variant: 'x'/);
 assert.doesNotMatch(selectors, /document\.body\.appendChild\(surface\)/);
 assert.doesNotMatch(selectorCss, /\.ui-selector\{[^}]*position:fixed/s);
 

@@ -270,7 +270,7 @@ function openCashCreateMenu(root) {
   const content = actionBlock(actions.join(''));
   const layer = mountModal(document.body, modal(content, {
     title: 'Добавить',
-    variant: 'quick',
+    variant: 'x',
     surface: 'app',
   }));
   if (!layer) return null;
@@ -470,7 +470,7 @@ function openWalletForm(root, existing = null) {
     ${field({ label: 'Наименование кошелька', name: 'walletName', value: wallet.name || '', placeholder: 'Наименование', required: true })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
-  const layer = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк' }));
+  const layer = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк', variant: 'q' }));
   if (!layer) return;
   initPhotoField(layer);
   layer.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
@@ -531,7 +531,7 @@ function openCashEntityForm(root, kind) {
     ${field({ label: fieldLabel, name: dataName, value: '', placeholder: 'Наименование', required: true })}
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
-  const layer = mountModal(root, modal(html, { title }));
+  const layer = mountModal(root, modal(html, { title, variant: 'q' }));
   if (!layer) return;
   initPhotoField(layer);
   const form = layer.querySelector(`[${formData}]`);

@@ -79,7 +79,6 @@ async function pull(scopes = ALL_SCOPES) {
 
     if (responses.has('business')) {
       const business = await responseJson(responses.get('business'), 'Не удалось обновить рабочие данные');
-      if (business.verified) {
         const peopleChanged = hasChanged('business.people', business.people || []);
         const ueiChanged = hasChanged('business.uei', business.uei || {});
         const recordsChanged = hasChanged('business.records', {
@@ -96,12 +95,11 @@ async function pull(scopes = ALL_SCOPES) {
           notify('book:records-changed', { action: 'server-refresh' });
           notify('book:time-usage-changed', { action: 'server-refresh' });
         }
-      }
+
     }
 
     if (responses.has('operational')) {
       const operational = await responseJson(responses.get('operational'), 'Не удалось обновить График, процедуры и онлайн-запись');
-      if (operational.verified) {
         const daysChanged = hasChanged('operational.days', operational.days || []);
         const breaksChanged = hasChanged('operational.breaks', operational.breaks || []);
         const proceduresChanged = hasChanged('operational.procedures', {
@@ -121,13 +119,13 @@ async function pull(scopes = ALL_SCOPES) {
         if (daysChanged || breaksChanged) notify('book:time-usage-changed', { action: 'server-refresh' });
         if (proceduresChanged) notify('book:procedures-changed', { action: 'server-refresh' });
         if (bookingSettingsChanged) notify('book:booking-settings-changed', { action: 'server-refresh' });
-      }
+
     }
 
     if (responses.has('documents')) {
       const documents = await responseJson(responses.get('documents'), 'Не удалось обновить документы');
       const documentData = documents?.data || {};
-      if (documents.verified && hasChanged('documents', documentData)) {
+      if (hasChanged('documents', documentData)) {
         hydrateDocumentsFromServer(documentData.documents || []);
         hydrateConsentsFromServer(documentData.consents || []);
         hydrateDocumentHistoryFromServer(documentData.history || []);
@@ -153,7 +151,6 @@ async function pull(scopes = ALL_SCOPES) {
 
     if (responses.has('auxiliary')) {
       const auxiliary = await responseJson(responses.get('auxiliary'), 'Не удалось обновить связанные данные');
-      if (auxiliary.verified) {
         const walletsChanged = hasChanged('auxiliary.wallets', auxiliary.wallets || []);
         const tagsChanged = hasChanged('auxiliary.tags', auxiliary.tags || []);
         const productsChanged = hasChanged('auxiliary.products', {
@@ -169,7 +166,7 @@ async function pull(scopes = ALL_SCOPES) {
         if (walletsChanged) notify('book:wallets-changed', { action: 'server-refresh' });
         if (tagsChanged) notify('book:tags-changed', { action: 'server-refresh' });
         if (productsChanged) notify('book:products-changed', { action: 'server-refresh' });
-      }
+
     }
 
     if (responses.has('finance')) {

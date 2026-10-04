@@ -61,12 +61,6 @@ export class OnlineBookingController {
     return this.booking.syncOwnerAccounts(request.auth!.tenantId, body?.accounts || []);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post('owner/reconcile-legacy-people')
-  reconcileLegacyPeople(@Req() request: OwnerRequest) {
-    return this.personIdentity.reconcileLegacyAccountDuplicates(request.auth!.tenantId);
-  }
-
   @Get('account-terms')
   accountTerms() {
     return this.accountDocuments.publicTerms();

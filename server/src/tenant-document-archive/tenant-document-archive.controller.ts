@@ -72,19 +72,9 @@ export class TenantDocumentArchiveController {
     return this.consentPolicy.revokeAccountConsent(request.auth!.tenantId, accountId, documentId, 'owner');
   }
 
-  @Post('migrate')
-  migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.documents.migrate(request.auth!.tenantId, body);
-  }
-
-  @Post('migrate/verify')
-  verify(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.documents.verifyMigration(request.auth!.tenantId, body);
-  }
-
-  @Post('bootstrap')
-  bootstrap(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.documents.bootstrap(request.auth!.tenantId, body);
+  @Post('initialize')
+  initialize(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.documents.initialize(request.auth!.tenantId, body);
   }
 
   @Put(':dataset')

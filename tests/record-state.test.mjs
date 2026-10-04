@@ -41,6 +41,8 @@ assert.equal(recordActivityTime(record, payment, { completed: true }), Date.pars
 const createdEvent = { type: 'created', at: '2026-09-01T12:00:00.000Z' };
 const movedEvent = { type: 'rescheduled', at: '2026-09-05T12:00:00.000Z' };
 const cancelledEvent = { type: 'cancelled', at: '2026-09-06T12:00:00.000Z' };
+const arrivedEvent = { type: 'arrived', at: '2026-09-10T10:00:00.000Z' };
+const noShowEvent = { type: 'no-show', at: '2026-09-10T10:05:00.000Z' };
 
 assert.deepEqual(
   projectRecordStatuses(record, [createdEvent], { due: 5000, paid: 0 }),
@@ -51,19 +53,19 @@ assert.deepEqual(
   { action: 'rescheduled', visit: 'expected', payment: 'due' },
 );
 assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'arrived' }, [createdEvent], { due: 5000, paid: 0 }),
+  projectRecordStatuses(record, [createdEvent, arrivedEvent], { due: 5000, paid: 0 }),
   { action: 'booked', visit: 'arrived', payment: 'debt' },
 );
 assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'arrived' }, [createdEvent], { due: 0, paid: 5000 }),
+  projectRecordStatuses(record, [createdEvent, arrivedEvent], { due: 0, paid: 5000 }),
   { action: 'booked', visit: 'arrived', payment: 'paid' },
 );
 assert.deepEqual(
-  projectRecordStatuses({ ...record, attendance: 'no-show' }, [createdEvent], { due: 5000, paid: 0 }),
+  projectRecordStatuses(record, [createdEvent, noShowEvent], { due: 5000, paid: 0 }),
   { action: 'booked', visit: 'no-show', payment: '' },
 );
 assert.deepEqual(
-  projectRecordStatuses(record, [createdEvent, { type: 'no-show', at: '2026-09-10T10:05:00.000Z' }], { due: 5000, paid: 0 }),
+  projectRecordStatuses(record, [createdEvent, noShowEvent], { due: 5000, paid: 0 }),
   { action: 'booked', visit: 'no-show', payment: '' },
 );
 assert.deepEqual(

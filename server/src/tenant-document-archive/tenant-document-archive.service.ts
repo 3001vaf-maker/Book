@@ -105,51 +105,27 @@ export class TenantDocumentArchiveService {
 
   private async snapshot(tenantId: string) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    const stored = normalize(state?.data || {});
-    const consents = state?.migrationVerifiedAt ? await this.canonicalConsentEvents(tenantId) : [];
-
-    return {
-      migrated: Boolean(state),
-      verified: Boolean(state?.migrationVerifiedAt),
-      migrationVerifiedAt: state?.migrationVerifiedAt || null,
-      data: { ...stored, consents },
-    };
+    if (!state) throw new NotFoundException('Архив документов не найден');
+    const stored = normalize(state.data || {});
+    const consents = await this.canonicalConsentEvents(tenantId);
+    return { data: { ...stored, consents } };
   }
 
-  get(tenantId: string) {
-    return this.snapshot(tenantId);
-  }
+  get(tenantId: string) { return this.snapshot(tenantId); }
 
-  async migrate(tenantId: string, body: unknown) {
-    const existing = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.tenantDocumentArchive.create({ data: { tenantId, data: json(normalize(body)) } });
-    }
-    return this.snapshot(tenantId);
-  }
-
-  async verifyMigration(tenantId: string, body: unknown) {
-    const current = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!current) throw new ConflictException('Документы ещё не перенесены');
-    if (canonical(current.data) !== canonical(body)) throw new ConflictException('Проверка переноса документов не пройдена');
-    await this.prisma.tenantDocumentArchive.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
-    return this.snapshot(tenantId);
-  }
-
-  async bootstrap(tenantId: string, body: unknown) {
-    const existing = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.tenantDocumentArchive.create({
-        data: { tenantId, data: json(normalize(body)), migrationVerifiedAt: new Date() },
-      });
-    }
+  async initialize(tenantId: string, body: unknown) {
+    await this.prisma.tenantDocumentArchive.upsert({
+      where: { tenantId },
+      create: { tenantId, data: json(normalize(body)) },
+      update: {},
+    });
     return this.snapshot(tenantId);
   }
 
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     if (!MUTABLE_DATASETS.has(dataset)) throw new BadRequestException('Неизвестный раздел Архива документов');
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Перенос документов ещё не подтверждён');
+    if (!state) throw new NotFoundException('Архив документов не найден');
     const current = normalize(state.data);
     const source = objectValue(body);
     const value = source.value;
@@ -160,7 +136,7 @@ export class TenantDocumentArchiveService {
 
   async rememberRknGuideState(tenantId: string, inputValue: unknown) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+    if (!state) throw new NotFoundException('Архив документов не найден');
     const current = normalize(state.data);
     const input = objectValue(inputValue);
     current.helpers = objectValue(current.helpers);
@@ -178,32 +154,9 @@ export class TenantDocumentArchiveService {
 
   async saveRknGuide(tenantId: string, inputValue: unknown) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+    if (!state) throw new NotFoundException('Архив документов не найден');
 
     const current = normalize(state.data);
-
-    let legacyChanged = false;
-    current.documents = current.documents.map((item: any) => {
-      const attachment = objectValue(item?.attachment);
-      if (
-        attachment.type === 'RKN_GUIDE_PDF'
-        && !isCanonicalRknGuide(item)
-        && !attachment.legacyFormat
-      ) {
-        legacyChanged = true;
-        return {
-          ...item,
-          title: item?.title || 'Старая инструкция РКН',
-          documentClass: 'FILE',
-          signable: false,
-          attachment: {
-            ...attachment,
-            legacyFormat: 'PRE_REGISTRY_TEMPLATE',
-          },
-        };
-      }
-      return item;
-    });
 
     const input = objectValue(inputValue);
     const snapshot = objectValue(input.snapshot);
@@ -224,12 +177,6 @@ export class TenantDocumentArchiveService {
       && item?.attachment?.sourceHash === sourceHash
     ));
     if (existing) {
-      if (legacyChanged) {
-        await this.prisma.tenantDocumentArchive.update({
-          where: { tenantId },
-          data: { data: json(current) },
-        });
-      }
       return clone(existing);
     }
 
@@ -283,25 +230,20 @@ export class TenantDocumentArchiveService {
 
   async rknGuideDocument(tenantId: string, documentId: string) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Архив документов ещё не готов');
+    if (!state) throw new NotFoundException('Архив документов не найден');
     const document = normalize(state.data).documents.find((item: any) => (
       String(item?.id || '') === documentId
       && item?.attachment?.type === 'RKN_GUIDE_PDF'
     ));
     if (!document) throw new NotFoundException('Инструкция РКН не найдена');
     const attachment = objectValue(document?.attachment);
-    if (
-      attachment.legacyFormat === 'PRE_REGISTRY_TEMPLATE'
-      || !isCanonicalRknGuide(document)
-    ) {
-      throw new ConflictException('Это старый тестовый PDF-помощник РКН. Он не относится к текущему формату файлов.');
-    }
+    if (!isCanonicalRknGuide(document)) throw new ConflictException('Файл инструкции имеет неподдерживаемый формат');
     return clone(document);
   }
 
   async publicDocuments(tenantId: string) {
     const state = await this.prisma.tenantDocumentArchive.findUnique({ where: { tenantId } });
-    if (!state?.migrationVerifiedAt) throw new ConflictException('Документы для онлайн-записи ещё не готовы');
+    if (!state) throw new NotFoundException('Архив документов не найден');
     return normalize(state.data).documents.filter((document: any) => (
       !document?.hidden
       && String(document?.documentClass || '') !== 'FILE'

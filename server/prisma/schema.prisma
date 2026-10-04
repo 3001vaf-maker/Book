@@ -58,7 +58,6 @@ model Tenant {
   createdAccounts          Account[]                   @relation("AccountCreatedViaTenant")
   accountLinks             AccountTenantLink[]
   bookingRequests          BookingRequest[]
-  businessStateMeta        BusinessStateMeta?
   people                   Person[]
   ueiState                 UeiState?
   records                  Record[]
@@ -143,7 +142,6 @@ model Profile {
   professionAbout     String      @default("")
   cardAppearance      Json        @default("{}")
   customProfessions   Json
-  migrationVerifiedAt DateTime?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
@@ -312,16 +310,6 @@ model BookingRequest {
   @@index([accountId])
 }
 
-model BusinessStateMeta {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  migrationVerifiedAt DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
 model Person {
   id        String   @id @default(cuid())
   tenantId  String
@@ -385,7 +373,6 @@ model BusinessOperationalState {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
   data                Json
-  migrationVerifiedAt DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -396,7 +383,6 @@ model TenantDocumentArchive {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
   data                Json
-  migrationVerifiedAt DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -407,7 +393,6 @@ model BusinessAuxiliaryState {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
   data                Json
-  migrationVerifiedAt DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

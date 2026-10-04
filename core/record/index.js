@@ -21,7 +21,6 @@ export {
 } from './service.js';
 export {
   appendRecordEvent,
-  ensureLegacyRecordEvents,
   getAllRecordEvents,
   getRecordEvents,
   hasRecordEvent,

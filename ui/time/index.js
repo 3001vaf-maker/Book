@@ -41,7 +41,7 @@ function openPicker({
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
   const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'bottom',title,className:'modal--time-picker-sheet'}));
+  const modalRoot=mountModal(document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet'}));
   if(!modalRoot)return null;
 
   const nearestItem=(viewport)=>{
@@ -157,7 +157,7 @@ export function openTimeRangeAction({ from = '09:00', to = '18:00', title = 'Г�
     ${button('Сохранить', { type: 'submit' })}
   </form>`;
   const layer = mountModal(document.body, modal(content, {
-    variant: 'bottom',
+    variant: 'x',
     title,
     className: 'modal--time-range-sheet',
   }));

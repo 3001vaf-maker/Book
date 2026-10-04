@@ -102,7 +102,6 @@ function currentProfileDocuments() {
   const grouped = new Map();
   getDocuments().forEach((item) => {
     if (item?.hidden) return;
-    if (item?.attachment?.legacyFormat === 'PRE_REGISTRY_TEMPLATE') return;
     const key = String(item.id || '');
     if (!key) return;
     const current = grouped.get(key);
@@ -315,7 +314,7 @@ function openDocumentDetailSettings(root, layer, item) {
     `<div class="compact-form">${actions.join('')}</div>`,
     {
       title: 'Настройки документа',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },
@@ -340,7 +339,7 @@ function openDocumentDetailSettings(root, layer, item) {
       </div>`,
       {
         title: rkn ? 'Убрать документ' : 'Удалить документ',
-        variant: 'bottom',
+        variant: 'x',
         surface: 'app',
         className: 'modal--form-sheet',
       },
@@ -411,7 +410,7 @@ function openSigningDetail(item) {
     </div>`,
     {
       title: 'Информация о подписании',
-      variant: 'top',
+      variant: 's',
       surface: 'app',
       className: 'documents-signing-info-sheet',
     },
@@ -633,7 +632,7 @@ function openAddDocumentMenu(root) {
     </div>`,
     {
       title: 'Добавить документ',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },
@@ -659,7 +658,7 @@ function openSettingsMenu(root) {
     </div>`,
     {
       title: 'Документы',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },

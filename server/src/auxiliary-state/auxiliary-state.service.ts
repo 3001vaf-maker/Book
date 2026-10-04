@@ -62,55 +62,17 @@ export class AuxiliaryStateService {
     private readonly access: SaasAccessService,
   ) {}
 
-  private async bundle(tenantId: string) {
-    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    return {
-      migrated: Boolean(row),
-      verified: Boolean(row?.migrationVerifiedAt),
-      migrationVerifiedAt: row?.migrationVerifiedAt || null,
-      ...normalize(row?.data || {}),
-    };
+  private async ensureState(tenantId: string) {
+    return this.prisma.businessAuxiliaryState.upsert({
+      where: { tenantId },
+      create: { tenantId, data: json(normalize({})) },
+      update: {},
+    });
   }
 
-  get(tenantId: string) {
-    return this.bundle(tenantId);
-  }
-
-  private async requireVerified(tenantId: string) {
-    const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    if (!row?.migrationVerifiedAt) throw new ConflictException('Перенос связанных данных ещё не подтверждён');
-    return row;
-  }
-
-  async migrate(tenantId: string, body: unknown) {
-    const expected = normalize(body);
-    const existing = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.businessAuxiliaryState.create({ data: { tenantId, data: json(expected) } });
-    }
-    return this.bundle(tenantId);
-  }
-
-  async verifyMigration(tenantId: string, body: unknown) {
-    const expected = normalize(body);
-    const current = await this.bundle(tenantId);
-    if (!current.migrated) throw new ConflictException('Связанные данные ещё не перенесены');
-    const actual = normalize(current);
-    if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Проверка переноса связанных данных не пройдена');
-    }
-    await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
-    return this.bundle(tenantId);
-  }
-
-  async bootstrap(tenantId: string) {
-    const existing = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.businessAuxiliaryState.create({
-        data: { tenantId, data: json(normalize({})), migrationVerifiedAt: new Date() },
-      });
-    }
-    return this.bundle(tenantId);
+  async get(tenantId: string) {
+    const row = await this.ensureState(tenantId);
+    return normalize(row.data);
   }
 
   private investmentRole(value: unknown) {
@@ -208,7 +170,7 @@ export class AuxiliaryStateService {
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     const key = text(dataset);
     if (!DATASETS.has(key)) throw new BadRequestException('Неизвестный набор связанных данных');
-    const row = await this.requireVerified(tenantId);
+    const row = await this.ensureState(tenantId);
     const current = normalize(row.data);
     const value = objectValue(body).value;
     const requested = Array.isArray(value) ? clone(value) : [];

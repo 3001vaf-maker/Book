@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BusinessStateService } from './business-state.service';
@@ -13,21 +13,6 @@ export class BusinessStateController {
   @Get()
   get(@Req() request: AuthenticatedRequest) {
     return this.businessState.get(request.auth!.tenantId);
-  }
-
-  @Post('migrate')
-  migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.businessState.migrate(request.auth!.tenantId, body);
-  }
-
-  @Post('migrate/verify')
-  verify(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.businessState.verifyMigration(request.auth!.tenantId, body);
-  }
-
-  @Post('bootstrap')
-  bootstrap(@Req() request: AuthenticatedRequest) {
-    return this.businessState.bootstrap(request.auth!.tenantId);
   }
 
   @Put('people/:key')
@@ -68,21 +53,6 @@ export class BusinessStateController {
   @Get('operational')
   operational(@Req() request: AuthenticatedRequest) {
     return this.businessState.getOperational(request.auth!.tenantId);
-  }
-
-  @Post('operational/migrate')
-  migrateOperational(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.businessState.migrateOperational(request.auth!.tenantId, body);
-  }
-
-  @Post('operational/migrate/verify')
-  verifyOperational(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.businessState.verifyOperationalMigration(request.auth!.tenantId, body);
-  }
-
-  @Post('operational/bootstrap')
-  bootstrapOperational(@Req() request: AuthenticatedRequest) {
-    return this.businessState.bootstrapOperational(request.auth!.tenantId);
   }
 
   @Put('operational/:dataset')

@@ -8,7 +8,7 @@ import {
 } from '../settings/documents/data.js';
 
 const activeData = readFileSync(new URL('../settings/documents/data.js', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../tenant-document-archive.js', import.meta.url), 'utf8');
+const runtime = readFileSync(new URL('../core/runtime/tenant-document-archive.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(activeData, /DEFAULT_DOCUMENTS|getDefaultDocuments/);
 assert.doesNotMatch(activeData, /Шаблон для адаптации под вашу работу/);
@@ -16,9 +16,9 @@ assert.doesNotMatch(activeData, /getBookDocumentBases|configureBookDocumentBases
 assert.match(activeData, /platform-registry/);
 assert.doesNotMatch(activeData, /admin-template/);
 
-assert.match(migration, /tenant-document-archive\/platform-bases/);
-assert.doesNotMatch(migration, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
-assert.doesNotMatch(migration, /getWorkplaces|workplaces/);
+assert.match(runtime, /tenant-document-archive\/platform-bases/);
+assert.doesNotMatch(runtime, /admin\/document-registry\/catalog\.js|getPlatformDocumentBases/);
+assert.doesNotMatch(runtime, /getWorkplaces|workplaces/);
 
 const config = {
   'user-document-pdn-policy': { documentId: 'pdn-agreement', kind: 'agreement', personConsent: false, required: false },

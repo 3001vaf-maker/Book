@@ -1050,7 +1050,7 @@ export class OnlineBookingService {
     if (!link) throw new BadRequestException('Связь с проектом не найдена');
 
     const row = await this.prisma.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    if (!row?.migrationVerifiedAt) throw new BadRequestException('Инвестиция недоступна');
+    if (!row) throw new BadRequestException('Инвестиция недоступна');
     const data = objectValue(row.data);
     const investments = arrayValue(data.investments).map((value) => clone(objectValue(value)));
     const index = investments.findIndex((entity) => text(entity.id) === investmentId && !text(entity.deletedAt));

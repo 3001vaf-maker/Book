@@ -118,7 +118,7 @@ function defaultCost(item, workplaceId) {
 
 function confirmCancel(record, onCancelled) {
   const content = `<div class="modal-title"><h2>Отменить запись?</h2><p>Запись останется в истории как отменённая и освободит это время.</p></div><div class="modal-actions">${button('Нет', { data: 'data-record-cancel-no', variant: 'secondary' })}${button('Отменить запись', { data: 'data-record-cancel-yes', variant: 'danger' })}</div>`;
-  const m = mountModal(document.body, modal(content, { variant: 'bottom', surface: 'app', className: 'modal--form-sheet' }));
+  const m = mountModal(document.body, modal(content, { variant: 'x', surface: 'app', className: 'modal--form-sheet' }));
   if (!m) return;
   m.querySelector('[data-record-cancel-no]')?.addEventListener('click', () => m.v2Close?.());
   m.querySelector('[data-record-cancel-yes]')?.addEventListener('click', async (event) => {
@@ -244,7 +244,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         ],
         aria: 'Выберите этап переноса записи',
       })}</div>`,
-      { variant: 'bottom', surface: 'app', title: 'Перенос', className: 'modal--form-sheet' },
+      { variant: 'x', surface: 'app', title: 'Перенос', className: 'modal--form-sheet' },
     ));
     const input = layer?.querySelector('input[name="recordEditStep"]');
     input?.addEventListener('change', () => {
@@ -279,7 +279,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const layer = mountModal(document.body, modal(
       `<div class="modal-title"><h2>Удалить запись полностью?</h2><p>Запись, её история и связанные данные оплаты будут удалены без восстановления.</p></div>
       <div class="modal-actions">${button('Удалить', { variant: 'critical', data: 'data-record-hard-delete-confirm' })}</div>`,
-      { variant: 'bottom', surface: 'app', title: 'Удалить запись', className: 'modal--form-sheet' },
+      { variant: 'x', surface: 'app', title: 'Удалить запись', className: 'modal--form-sheet' },
     ));
     layer?.querySelector('[data-record-hard-delete-confirm]')?.addEventListener('click', async (event) => {
       const submit = event.currentTarget;

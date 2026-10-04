@@ -116,7 +116,7 @@ if (/journal\//.test(graph)) fail('timetable/timetable.js', 'Graph page must not
 if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Graph Header Workplace List must not receive time-correction callbacks');
 
 if (!/export function openTimetableDayEditor/.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable must own one canonical working-day editor');
-if (!/variant:\s*['"]medium['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use the shared medium Modal');
+if (!/variant:\s*['"]q['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use shared Q');
 if (!/time-range-fields/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateFrom/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateTo/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use shared TimePicker fields');
 if (!/getWorkingTimeUsageConflicts/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must ask Core for occupied-time conflicts');
 if (!/usageLabel\(conflict\)/.test(dayEditor) || !/usage\?\.type\s*===\s*['"]break['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must preserve Record/Break conflict semantics');
@@ -129,7 +129,7 @@ if (!/openJournalWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Jo
 if (!/openTimetableDayEditor/.test(journal) || !/timetable\/day-editor\.js/.test(journal)) fail('journal/journal.js', 'Journal must call the Timetable-owned working-day editor instead of recreating it');
 if (/getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime|updateDayTime|hasScheduleConflict|createDay|saveDays/.test(journal)) fail('journal/journal.js', 'Journal must not own working-day mutation or validation');
 if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
-if (!/mountModal/.test(journalWorkplaceControl) || !/select\(\{/.test(journalWorkplaceControl) || !/variant:\s*['"]bottom['"]/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse Shared Select in the canonical bottom Modal');
+if (!/mountModal/.test(journalWorkplaceControl) || !/select\(\{/.test(journalWorkplaceControl) || !/variant:\s*['"]x['"]/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse Shared Select in canonical X');
 if (!/График дня/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only the Journal day-schedule aggregate semantics');
 if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');

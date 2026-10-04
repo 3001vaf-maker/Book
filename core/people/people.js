@@ -201,7 +201,7 @@ function openPersonDocumentInfo(root, person, documentId) {
       ${scope}
     </div>
     ${fact ? '' : '<p class="muted">Подтверждение отсутствует.</p>'}`;
-  return mountModal(root, modal(html, { title: documentItem.title || 'Документ', variant: 'top', surface: 'app' }));
+  return mountModal(root, modal(html, { title: documentItem.title || 'Документ', variant: 's', surface: 'app' }));
 }
 
 function openPersonDocuments(root, person) {
@@ -209,7 +209,7 @@ function openPersonDocuments(root, person) {
   const body = documents.length
     ? documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' })
     : emptyState('Документов пока нет', 'Документы и согласия этого человека появятся здесь.');
-  const layer = mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'bottom', surface: 'app' }));
+  const layer = mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'x', surface: 'app' }));
   layer?.querySelectorAll('[data-person-document]').forEach((node) => {
     node.addEventListener('click', () => openPersonDocumentInfo(root, person, node.dataset.personDocument));
   });
@@ -299,12 +299,12 @@ export function renderPeople(root, options = {}) {
   const count = getPeople().length;
   root.innerHTML = page([
     listContext(count),
-    `<section class="people-z1">
+    `<section>
       <div class="people-search ui-search-field">
         ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
       </div>
       <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
-      <div class="people-list-host" data-people-list-host></div>
+      <div data-people-list-host></div>
     </section>`,
     button('+', {
       className: 'v2-primary-source-only',
@@ -320,9 +320,9 @@ export function renderPeople(root, options = {}) {
 
 function openListSettings(root, options = {}) {
   const allowReal = canUseRealPersonalData();
-  const content = `<div class="people-list-settings">
+  const content = `<div class="form-grid">
     ${select({ label: 'Сортировка', value: getPeopleSortMode(), options: sortOptions(), aria: 'Сортировка', data: 'data-people-sort-settings' })}
-    <div class="people-list-settings__actions">
+    <div class="modal-actions">
       ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
       ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
       ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
@@ -331,7 +331,7 @@ function openListSettings(root, options = {}) {
     </div>
     ${allowReal ? '' : '<p class="muted">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
   </div>`;
-  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'quick', surface: 'app' }));
+  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'x', surface: 'app' }));
   if (!layer) return;
   layer.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
     setPeopleSortMode(event.target.value);
@@ -417,13 +417,13 @@ function importCsv(file, onDone) {
 function openAddMenu(root, options = {}) {
   const allowReal = canUseRealPersonalData();
   const layer = mountModal(root, modal(`<div class="modal-title"><h2>Добавить клиента</h2></div>
-    <div class="modal-actions people-add-choice">
+    <div class="modal-actions">
       ${button('Из контактов', { variant: 'secondary', data: 'data-add-from-contacts' })}
       ${button('Ввести вручную', { variant: 'secondary', data: 'data-add-manual' })}
     </div>
     <div class="form-error" data-add-choice-error></div>`, {
     title: 'Добавить клиента',
-    variant: 'quick',
+    variant: 'x',
     surface: 'app',
   }));
   if (!layer) return null;
@@ -459,7 +459,7 @@ function openCreateZ2(root, options = {}, preset = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer(page([
     workspaceHeaderContext({ title: 'Новый клиент', hideD: true }),
     personCreateForm(preset),
-  ]), { className: 'people-create-layer' }), { stack: true });
+  ]), { className: '' }), { stack: true });
   if (!layer) return null;
   const submit = layer.querySelector('[data-person-create-form] button[type="submit"]');
   if (submit) {
@@ -530,7 +530,7 @@ function renderPersonOverview(layer, baseRoot, key, options = {}) {
   }
   layer.innerHTML = page([
     personContext(person),
-    `<section class="people-overview"><div class="people-card-wrap">${overviewCard(person)}</div></section>`,
+    `<section>${overviewCard(person)}</section>`,
   ]);
   bindPersonContext(layer, person, options, {
     onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
@@ -636,9 +636,9 @@ function openPersonUeiQuick(root, key, onChanged = () => {}) {
   if (!person) return;
   const current = person.uei || getUEI('person', person.key) || '';
   const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
-  const layer = mountModal(root, modal(`<div class="people-uei-sheet">${uei(ueiData(person, all))}<div class="form-error" data-uei-error></div></div>`, {
+  const layer = mountModal(root, modal(`<div class="form-grid">${uei(ueiData(person, all))}<div class="form-error" data-uei-error></div></div>`, {
     title: 'UEI',
-    variant: 'quick',
+    variant: 'x',
     surface: 'app',
   }));
   if (!layer) return;
@@ -808,7 +808,7 @@ function confirmDelete(root, person, onDeleted) {
     <div class="modal-actions">
       ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete' })}
       ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete' })}
-    </div>`, { title: 'Удалить', variant: 'compact', surface: 'app' }));
+    </div>`, { title: 'Удалить', variant: 'x', surface: 'app' }));
   if (!layer) return;
   layer.querySelector('[data-cancel-delete]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelector('[data-confirm-delete]')?.addEventListener('click', () => {
@@ -824,7 +824,7 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   const all = getAllPeople();
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(page([
     personContext(person),
-    `<form class="people-edit-form" data-person-edit-form>
+    `<form data-person-edit-form>
       ${personDataFields(person, all)}
       ${button('Удалить', {
         type: 'button',

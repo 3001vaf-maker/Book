@@ -1,61 +1,33 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 
-const storage = {};
-Object.defineProperties(storage, {
-  getItem: { enumerable: false, value(key) { return Object.hasOwn(storage, String(key)) ? storage[String(key)] : null; } },
-  setItem: { enumerable: false, value(key, value) { storage[String(key)] = String(value); } },
-  removeItem: { enumerable: false, value(key) { delete storage[String(key)]; } },
-  clear: { enumerable: false, value() { Object.keys(storage).forEach((key) => delete storage[key]); } },
-  key: { enumerable: false, value(index) { return Object.keys(storage)[index] ?? null; } },
-  length: { enumerable: false, get() { return Object.keys(storage).length; } },
-});
-globalThis.localStorage = storage;
+const guard = readFileSync(new URL('../scripts/check-browser-storage-ownership.mjs', import.meta.url), 'utf8');
+const core = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 
-const { clearLegacyBusinessStorage } = await import('../core/legacy-browser-business.js');
+assert.equal(existsSync(new URL('../core/legacy-browser-business.js', import.meta.url)), false);
+assert.equal(existsSync(new URL('../core/workspace-sync.js', import.meta.url)), false);
 
-const businessKeys = [
+for (const key of [
   'book.profile',
-  'book.profile.customProfessions',
   'book.workplaces',
   'book.people',
   'book.uei',
   'book.records',
   'book.recordEvents',
-  'book:timetable-state',
-  'book.journalBreaks',
   'book.procedures',
-  'book.procedures.history',
-  'book.booking-settings.v1',
-  'book.documents.templates.v1',
   'book.documents.consents.v1',
-  'book.documents.consents.legacy-migrated.v1',
-  'book.documents.history.v1',
   'book.dds',
-  'book.payments',
   'book.wallets',
-  'book.tags',
   'book.products',
-  'book.products.history',
-];
-for (const key of businessKeys) localStorage.setItem(key, `legacy:${key}`);
-
-const technical = new Map([
-  ['book.account.token.tenant-a', 'public-session-token'],
-  ['book.account.email.tenant-a', 'person@example.com'],
-  ['book.people.sort', 'lastDesc'],
-  ['book.onboarding.step.v3', '3'],
-  ['book:workplace-context:journal', '{"workplaceId":"wp-1"}'],
-]);
-for (const [key, value] of technical) localStorage.setItem(key, value);
-
-clearLegacyBusinessStorage();
-
-for (const key of businessKeys) {
-  assert.equal(localStorage.getItem(key), null, `legacy business key must be removed after server verification: ${key}`);
-}
-for (const [key, value] of technical) {
-  assert.equal(localStorage.getItem(key), value, `technical/session/UI state must survive cleanup: ${key}`);
+]) {
+  assert.equal(core.includes(key), false, 'business browser key must not return to core runtime');
 }
 
-assert.ok(businessKeys.length >= 20, 'test must cover the complete migrated business dataset set');
+assert.match(guard, /browser storage is forbidden outside technical\/UI owners/);
+assert.match(guard, /core\/auth\.js/);
+assert.match(guard, /core\/account\/index\.js/);
+assert.match(guard, /core\/workplace-context\.js/);
+assert.match(guard, /core\/people\/view-state\.js/);
+assert.doesNotMatch(core, /clearLegacyBusinessStorage|workspace-sync/);
+
 console.log('browser storage autonomy tests: OK');

@@ -58,12 +58,15 @@ assert.equal(getRecords().find((item) => item.id === record.id)?.finance?.planTo
 
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
 assert.doesNotMatch(recordViewSource, /data-record-settings-sale|data-record-sale-product|button\('Продажа'|initMultiSelect/);
 assert.match(recordViewSource, /\.\.\.state\.products\.map/);
 assert.match(recordViewSource, /name:\s*item\.name\s*\|\|\s*''/);
 assert.match(recordPaymentSource, /products:\s*sourcesFromSettlement/);
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
-assert.match(modalCss, /modal--bottom\{[^}]*height:88px[^}]*max-height:88px/);
+// Payment uses the shared Z flow; product support must not restore the retired 88px sheet.
+assert.match(recordPaymentSource, /mountV2ZLayer\(/);
+assert.match(recordPaymentSource, /className: 'record-payment-z'/);
+assert.match(recordPaymentSource, /paymentForm\(/);
+assert.doesNotMatch(recordPaymentSource, /modal-bottom-action/);
 
 console.log('record product sale tests: OK');

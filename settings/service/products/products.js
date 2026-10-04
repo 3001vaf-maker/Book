@@ -129,7 +129,7 @@ function productWorkplaceCards(product) {
 
 function confirmDeleteProduct(product, onDeleted) {
   const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(product.name || 'Товар')} будет удалён.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
-    variant: 'bottom',
+    variant: 'x',
     title: 'Удаление товара',
   }));
   if (!layer) return;

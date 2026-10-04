@@ -127,7 +127,7 @@ export function startPlatformNotices({
       shown.add(item.id);
       const layer = mountModal(document.body, modal(noticeModal(item), {
         title: item.title || 'Системное уведомление',
-        variant: 'compact',
+        variant: 's',
         surface: 'app',
       }));
       if (!layer) return;

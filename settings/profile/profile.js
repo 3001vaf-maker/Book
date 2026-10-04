@@ -101,12 +101,12 @@ function formSnapshot(form){
 }
 
 function showProfileError(message){
-  mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'compact',title:'Не удалось сохранить'}));
+  mountModal(document.body,modal(`<div class="modal-title"><h2>Не удалось сохранить</h2><p>${escapeHtml(message||'Ошибка сервера')}</p></div>`,{variant:'s',title:'Не удалось сохранить'}));
 }
 
 function openWorkplaceLimitModal(root,limit){
   const current=Number.isFinite(limit)?String(limit):'текущий лимит';
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'compact',title:'Рабочие пространства'}));
+  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'s',title:'Рабочие пространства'}));
   m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.v2Close?.());
 }
 

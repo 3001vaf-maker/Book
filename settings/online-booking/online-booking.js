@@ -63,7 +63,7 @@ function bookingLink(profileSlug, workplaceSlug = '') {
 }
 
 function copyLinkField(label, value, kind) {
-  return `<div class="field"><span>${escapeHtml(label)}</span><div class="array-row online-booking-copy-row"><input type="text" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(label)}">${copyIconButton({ data: `data-copy-booking-link="${escapeHtml(kind)}"`, aria: `Скопировать: ${label}` })}</div></div>`;
+  return `<div class="field"><span>${escapeHtml(label)}</span><div class="input-action-row"><input type="text" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(label)}">${copyIconButton({ data: `data-copy-booking-link="${escapeHtml(kind)}"`, aria: `Скопировать: ${label}` })}</div></div>`;
 }
 
 function bindCopyButtons(root) {
@@ -177,7 +177,7 @@ function openPushInfo() {
   const content = `<div class="modal-title"><h2>Push</h2><p>Push — дополнительное уведомление. Если выбран режим «По очереди», успешный Push не останавливает отправку: основной результат определяется Telegram или Email.</p></div>`;
   return mountModal(document.body, modal(content, {
     title: 'О Push',
-    variant: 'top',
+    variant: 's',
     surface: 'app',
   }));
 }
@@ -186,7 +186,7 @@ async function openNotificationSettings() {
   const items = await getNotificationRouting();
   const policy = notificationPolicy(items);
   const channels = channelValues(policy);
-  const pushInfo = `<div class="online-booking-inline-label"><span>Push</span>${smallActionButton({
+  const pushInfo = `<div class="field-inline-label"><span>Push</span>${smallActionButton({
     icon: 'info',
     data: 'data-online-booking-push-info',
     aria: 'О Push',
@@ -209,7 +209,7 @@ async function openNotificationSettings() {
   </div>`;
   const layer = mountModal(document.body, modal(body, {
     title: 'Настройки уведомлений',
-    variant: 'bottom',
+    variant: 'x',
     className: 'modal--form-sheet',
   }));
   if (!layer) return null;
@@ -259,7 +259,7 @@ function openSlotStepInfo() {
   const content = '<div class="modal-title"><h2>Шаг записи</h2><p>Шаг определяет, как часто человеку показываются возможные начала записи. Он не ограничивает произвольное время специалиста и не меняет длительность процедуры.</p></div>';
   return mountModal(document.body, modal(content, {
     title: 'О шаге записи',
-    variant: 'top',
+    variant: 's',
     surface: 'app',
   }));
 }
@@ -272,7 +272,7 @@ function mountScreen(root, body) {
       data: 'data-online-booking-settings',
       aria: 'Настройки онлайн-записи',
     },
-  })}<div class="online-booking-workspace-screen">${body}</div>`;
+  })}<div class="form-grid form-grid--relaxed">${body}</div>`;
   root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => openOnlineBookingSettings(root));
 }
 
@@ -299,7 +299,7 @@ function renderReady(root) {
     aria: 'О шаге записи',
   });
 
-  mountScreen(root, `<div class="online-booking-link-stack">
+  mountScreen(root, `<div class="form-grid form-grid--relaxed">
     ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
     ${select({
       label: 'Рабочее пространство',
@@ -309,8 +309,8 @@ function renderReady(root) {
       aria: 'Выбрать рабочее пространство для онлайн-записи',
     })}
     <div data-workplace-booking-link></div>
-    <div class="online-booking-setting">
-      <div class="online-booking-inline-label"><span>Шаг записи</span>${stepInfo}</div>
+    <div class="field">
+      <div class="field-inline-label"><span>Шаг записи</span>${stepInfo}</div>
       ${stepControl}
     </div>
   </div>`);

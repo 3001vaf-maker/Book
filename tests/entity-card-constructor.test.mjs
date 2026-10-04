@@ -48,7 +48,7 @@ const profileSource=fs.readFileSync(new URL('../settings/profile/profile.js',imp
 const workplaceSource=fs.readFileSync(new URL('../settings/profile/workplaces/workplaces.js',import.meta.url),'utf8');
 const constructorSource=fs.readFileSync(new URL('../ui/cards/entity-card-constructor.js',import.meta.url),'utf8');
 const appearanceQSource=fs.readFileSync(new URL('../ui/cards/appearance-q.js',import.meta.url),'utf8');
-const v2Source=fs.readFileSync(new URL('../ui/v2/index.js',import.meta.url),'utf8');
+const v2Source=['index.js','shell.js','swipe.js','workspace-navigation.js'].map((file)=>fs.readFileSync(new URL(`../ui/v2/${file}`,import.meta.url),'utf8')).join('\n');
 const inputCss=fs.readFileSync(new URL('../ui/inputs/inputs.css',import.meta.url),'utf8');
 const colorSource=fs.readFileSync(new URL('../ui/colors/index.js',import.meta.url),'utf8');
 
@@ -84,6 +84,6 @@ assert.match(inputCss,/background:#ffff00/);
 assert.match(inputCss,/::-webkit-slider-thumb/);
 assert.match(colorSource,/#FFFF00/);
 assert.match(colorSource,/#FF1111/);
-assert.match(colorSource,/variant: 'bottom'/);
+assert.match(colorSource,/variant: 'x'/);
 
 console.log('entity card constructor tests passed');

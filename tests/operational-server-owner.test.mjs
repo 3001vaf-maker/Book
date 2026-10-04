@@ -23,7 +23,7 @@ globalThis.fetch = async (url, options = {}) => {
 };
 
 const persistence = await import('../core/business-persistence.js');
-await import('../operational-migration.js');
+await import('../core/runtime/operational-state.js');
 const day = await import('../core/day/index.js');
 const breaks = await import('../journal/break-data.js');
 const procedures = await import('../settings/service/procedures/data.js');

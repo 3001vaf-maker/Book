@@ -1,6 +1,18 @@
 import fs from 'node:fs';
 
-const ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const ui = [
+  'ui/v2/index.js',
+  'ui/v2/header.js',
+  'ui/v2/card-deck.js',
+  'ui/v2/shell.js',
+  'ui/v2/sticker.js',
+  'ui/v2/z-stack.js',
+  'ui/v2/modal-portal.js',
+  'ui/v2/swipe.js',
+  'ui/v2/workspace-navigation.js',
+  'ui/v2/lifecycle.js',
+  'ui/v2/geometry.js',
+].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 const css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const documentUi = fs.readFileSync('ui/documents/index.js', 'utf8');
@@ -32,7 +44,6 @@ const cardAppearanceTemplates = fs.readFileSync('core/card-appearance-templates.
 const journal = fs.readFileSync('journal/journal.js', 'utf8');
 const settings = fs.readFileSync('settings/settings.js', 'utf8');
 const onlineBookingSettings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
-const onlineBookingSettingsCss = fs.readFileSync('settings/online-booking/online-booking.css', 'utf8');
 const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 const timeCss = fs.readFileSync('ui/time/time.css', 'utf8');
@@ -115,7 +126,7 @@ for (const file of sharedCssFiles) {
   }
 }
 for (const file of runtimeJsFiles) {
-  if (file === 'ui/v2/index.js' || file === 'ui/modals/index.js') continue;
+  if (file === 'ui/v2/index.js' || file === 'ui/v2/modal-portal.js' || file === 'ui/modals/index.js') continue;
   const source = fs.readFileSync(file, 'utf8');
   expect(!/\b(?:v2Layer|mountV2Layer)\s*\(/.test(source), `Runtime code must use canonical modal()/mountModal() instead of parallel V2 modal primitives: ${file}.`);
 }
@@ -189,20 +200,34 @@ expect(ui.includes("deck.addEventListener('scroll', refresh, { passive: true })"
 expect(ui.includes("setActiveIndex(index)") && ui.includes("setActiveCard(cards, index)") && ui.includes("if (id) onSelect?.(id)") && !ui.includes("if (index !== activeIndex)"), 'Any clean CardDeck tap must select and navigate exactly once; only drag may suppress action.');
 expect(ui.includes('Math.hypot(dx, dy) >= 9') && ui.includes('suppressClick = pointer.dragged'), 'CardDeck must distinguish tap from drag geometrically so a drag never opens a card.');
 expect(!ui.includes('const projected = current.dx + velocity') && !ui.includes('const projected = current.dy + velocity') && !ui.includes('data-v2-e-step') && !ui.includes('--v2-e-active-offset') && !ui.includes('deck.scrollLeft = clampScroll'), 'Legacy transform-by-index, velocity projection and manual F carry must be absent.');
-expect(ui.includes("const eDown = (event) =>") && ui.includes("if (!secondaryOpen || !eDeck?.contains(event.target)) return;") && ui.includes("Math.abs(dy) >= Math.abs(dx) * 1.05 || dx <= 0"), 'E right-collapse must be determined by gesture geometry and may start anywhere on E.');
+expect(ui.includes("const eDown = (event) =>") && ui.includes("if (!secondaryIsOpen() || !eDeck?.contains(event.target)) return;") && ui.includes("Math.abs(dy) >= Math.abs(dx) * 1.05 || dx <= 0"), 'E right-collapse must be determined by gesture geometry and may start anywhere on E.');
 expect(ui.includes("const currentX = Math.max(0, current.dx)") && ui.includes("const exitX = Math.max(Number(stage.clientWidth || 0), currentX)") && ui.includes("eDeck.style.setProperty('--v2-e-dismiss-x', `${exitX}px`)") && ui.includes("eDismissTimer = window.setTimeout"), 'Committed E collapse must continue from the finger to the right edge instead of snapping back before closing.');
 expect(ui.includes("const metrics = cards.map((card, index) =>") && ui.includes("metrics.forEach((metric) =>"), 'CardDeck live geometry must batch layout reads before visual writes to avoid per-card layout thrash.');
 expect(!ui.includes('const ownerFrames = new Set()') && !ui.includes('const queueOwnerFrame = (callback) =>'), 'Opening F/E must not depend on deferred owner frames that can race with a user-started native scroll.');
 expect(ui.includes('setActiveCard(fCards, fActiveIndex);') && ui.includes('setActiveCard(eCards, eActiveIndex);'), 'Semantic activeId/eActiveId must be applied immediately even while F/E are hidden.');
-expect(ui.includes('onSelect, isEnabled = () => true') && ui.includes('if (!isEnabled()) return;') && ui.includes('() => open && !secondaryOpen') && ui.includes('() => secondaryOpen'), 'Hidden F/E scroll events and background F under E must never overwrite the semantic active card or own pointer interaction.');
-const workspaceOwner = ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe'));
+expect(ui.includes('onSelect, isEnabled = () => true') && ui.includes('if (!isEnabled()) return;') && ui.includes("() => deckIsOpen() && !secondaryIsOpen() && !app.classList.contains('has-v2-modal')") && ui.includes("() => secondaryIsOpen() && !app.classList.contains('has-v2-modal')"), 'Hidden F/E scroll events, background F under E, and modal-covered decks must never own interaction.');
+const workspaceOwner = fs.readFileSync('ui/v2/workspace-navigation.js', 'utf8');
 expect(workspaceOwner.includes("centerCard(fCards[fActiveIndex], 'x')") && workspaceOwner.includes("centerCard(eCards[eActiveIndex], 'y')") && !workspaceOwner.includes('scrollIntoView({'), 'F/E centering must be synchronous and scoped to the deck itself, never a delayed scrollIntoView race.');
 expect(workspaceOwner.includes("const previousSnap = deck.style.scrollSnapType") && workspaceOwner.includes("deck.style.scrollSnapType = 'none'") && workspaceOwner.includes("deck.style.scrollSnapType = previousSnap"), 'Semantic F/E state restore must temporarily bypass native snap so the browser cannot redirect a programmatic centre jump to a neighbour.');
 expect(ui.includes("const edgeHost = app.querySelector('[data-v2-edge-swipe]') || stage;") && ui.includes("if (edgeHost === stage)") && ui.includes("if (Number(event.clientX || 0) > rect.left + edgeWidth) return;"), 'Root Z->F must be owned by the dedicated shared left screen-edge zone with a stage-bound fallback only.');
 expect(!ui.includes('inNavigationGutter') && !ui.includes('horizontalGestureContext') && !ui.includes('forceNavigation'), 'Middle-of-Z gesture arbitration and old special navigation-gutter owners must be removed.');
-const sharedSwipe = ui.slice(ui.indexOf('export function initV2Swipe'), ui.indexOf('export function setV2DeckOpen'));
+const sharedSwipe = fs.readFileSync('ui/v2/swipe.js', 'utf8');
 expect(sharedSwipe.includes("const edgeHost = onRight ? app?.querySelector?.('[data-v2-edge-swipe]') : null") && sharedSwipe.includes('const gestureHost = edgeHost || stage || surface') && sharedSwipe.includes('const leftEdge = Number(stageRect?.left || 0) + Number(edgeWidth || 36)') && sharedSwipe.includes('const wantsRight = Boolean(onRight)') && !sharedSwipe.includes('nestedHorizontalScroller'), 'Z2/Z3 must share the same dedicated screen-edge owner and never inspect inner horizontal rails.');
 expect(ui.includes("disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 })"), 'Mounted Z2/Z3 must close one top layer with the same responsive shared edge swipe.');
+expect(ui.includes('function syncV2ZStackInteraction(app, host)')
+  && ui.includes('surface.inert = blocked')
+  && ui.includes("surface.classList.toggle('is-v2-obscured', blocked)")
+  && css.includes('.v2-z.is-v2-obscured{pointer-events:none}'),
+  'Obscured Z surfaces must be inert and pointer-dead; only the top Z layer may own interaction.');
+expect(ui.includes('function lockV2StageInteraction(app)')
+  && ui.includes('stage.inert = true')
+  && ui.includes("app.classList.add('has-v2-modal')")
+  && ui.includes("if (app.classList.contains('has-v2-modal')) return;")
+  && css.includes('.v2-app.has-v2-modal > .v2-app__stage{pointer-events:none}'),
+  'Any open shared modal must hard-lock FEZ interaction until it closes.');
+expect(css.includes('.v2-app.is-revealing-deck .v2-fe-deck{opacity:1}')
+  && !/\.v2-app\.is-revealing-deck \.v2-fe-deck\{[^}]*pointer-events\s*:\s*auto/.test(css),
+  'Partially revealed F may be visible during Z drag but must never become interactive before commit.');
 expect(ui.includes("if (next) app.classList.remove('is-z-entering');"), 'Opening F after any selected Z must cancel the transient Z-entry class before applying the deck-open transform.');
 expect(css.includes('.v2-app.is-z-entering > .v2-app__stage > .v2-front{animation:v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1)}') && !css.includes('v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1) both') && !css.includes('v2-z-enter-from-right .30s cubic-bezier(.16,1,.3,1) forwards'), 'Z entry animation must release transform ownership after it finishes.');
 expect(!css.includes('--v2-z-nav-peek') && css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-front{transform:translate3d(100%,0,0)}'), 'Opening FE navigation must move the unchanged Z/front fully offscreen right.');
@@ -293,14 +318,14 @@ expect(!core.includes("if (section === 'journal') return journalNavigationItems(
 expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
 expect(onlineBookingSettings.includes('workspaceHeaderContext({') && !onlineBookingSettings.includes('data-online-booking-back') && onlineBookingSettings.includes('data-online-booking-welcome-save') && onlineBookingSettings.includes("variant: 'q'"), 'Online booking settings must feed Welcome Save through Shared Q Header C while return navigation remains gesture-owned.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
-expect(!/(?:min-|max-)?height\s*:\s*(?:var\(--visual-vh\s*,\s*)?100dvh|position\s*:\s*fixed|touch-action\s*:/.test(onlineBookingSettingsCss), 'Online booking settings CSS must stay content-only inside Shared Z.');
+expect(!fs.existsSync('settings/online-booking/online-booking.css'), 'Online booking settings must not own a local stylesheet.');
 expect(!core.includes("contextRoot.querySelector('[data-workspace-back-source]')"), 'Shared workspace must not consume retired local Back sources; navigation is gesture-owned.');
 expect(!core.includes('.app-header__'), 'Legacy app-header compatibility selectors must not return.');
 expect(!journalList.includes('getBoundingPersonRect') && journalList.includes('getBoundingClientRect()'), 'Journal List scroll must use the real DOM geometry API.');
 expect(financeDds.includes('openFinanceOperation(root, movements, element.dataset.financeOperation)') && !financeDds.includes('navigateBack') && !financeDds.includes('onBack'), 'Finance DDS detail/cancel refresh must remain gesture-owned with no retired Back callback.');
 expect(financeCash.includes('openCashAppearanceQ(root)') && financeCash.includes("{ value: 'wallet', label: 'Кошелёк' }") && financeCash.includes("{ value: 'loan', label: 'Займ' }") && financeCash.includes("{ value: 'investment', label: 'Инвестиция' }") && financeCash.includes("{ value: 'all', label: labels[type] || 'Все карты' }") && financeCash.includes("id: 'appearance', label: 'Вид', onSelect: () => openCashAppearanceQ(root)") && !financeCash.includes('openWalletAppearance(') && !financeCash.includes('openFinanceEntityAppearance(') && !financeCash.includes('mountEntityCardConstructor('), 'Cash must own one centralized Wallet/Loan/Investment View Q and individual finance cards must not own appearance editors.');
 expect(cardAppearanceTemplates.includes("new Set(['person', 'workplace', 'wallet', 'loan', 'investment', 'procedure', 'product'])") && cardAppearanceTemplates.includes("queueAuxiliaryDataset('cardAppearanceTemplates'") && profile.includes("saveCardAppearanceTemplate('workplace'") && financeCash.includes('saveCardAppearanceTemplate(type'), 'All-card View must persist one reusable appearance template per card type for current and future cards.');
-expect(modals.includes("'technical', 'q'") && modals.includes('data-v2-q="true"') && ui.includes("const qLayer = node.dataset.v2Q === 'true'") && ui.includes("kind === 'standard' && !qLayer") && core.includes("document.querySelectorAll('[data-v2-q=\"true\"] .v2-layer')") && appearanceQ.includes('workspaceHeaderContext({') && appearanceQ.includes('hideD: true') && appearanceQ.includes('data-card-q-save') && appearanceQ.includes('controller?.save?.()'), 'Q must reuse Shared standard-modal geometry, cover active Z, hide D and keep Header C as the direct Save owner instead of becoming a Z2/Z3 layer.');
+expect(modals.includes("MODAL_VARIANTS = new Set(['q', 'x', 's', 'technical'])") && modals.includes('data-v2-q="true"') && ui.includes("const qLayer = node.dataset.v2Q === 'true'") && ui.includes("kind === 'standard' && !qLayer") && core.includes("document.querySelectorAll('[data-v2-q=\"true\"] .v2-layer')") && appearanceQ.includes('workspaceHeaderContext({') && appearanceQ.includes('hideD: true') && appearanceQ.includes('data-card-q-save') && appearanceQ.includes('controller?.save?.()'), 'Q must reuse Shared standard-modal geometry, cover active Z, hide D and keep Header C as the direct Save owner instead of becoming a Z2/Z3 layer.');
 
 expect(profile.includes('workspaceHeaderContext({') && profile.includes("kind:'avatar'") && !profile.includes("hideD:true"), 'Professional Profile must feed A/B and keep Shared D=Chat enabled instead of hiding D.');
 expect(profile.includes("function profileContext(p,title=fullName(p))"), 'Professional Profile root B must use the profile name while nested layers may use contextual titles.');
@@ -336,7 +361,7 @@ expect(infoUi.includes('export function infoUI') && infoUi.includes('export func
 expect(infoUi.includes("import { smallActionButton } from '../buttons/index.js';") && infoUi.includes("smallActionButton({") && buttonCss.includes('.small-action-button{box-sizing:border-box;width:24px') && buttonCss.includes('border:1px solid #111') && buttonCss.includes('background:#fff;color:#111') && !infoCss.includes('.ui-info__trigger{'), 'Info and copy must share the one approved 24px black/white small action UI owner instead of duplicating button geometry.');
 expect(inputsCss.includes('.field input,.field select,.field textarea') && !inputsCss.includes('border-radius:12px') && listCss.includes('border-radius:0') && listEntryCss.includes('border-radius:0'), 'Shared working inputs, selects and list rows must remain straight.');
 expect(!listCss.includes('border-radius:0 17px') && listCss.includes('.ui-list__item.is-first:not(.is-last){border-radius:0}'), 'Shared List must keep the approved fully straight row geometry without the legacy rounded first row.');
-expect(selectorsUi.includes("import { modal, mountModal } from '../modals/index.js';") && selectorsUi.includes("variant: 'quick'") && !selectorsUi.includes('document.body.appendChild(surface)'), 'Shared Select must manifest through the canonical bottom Modal owner instead of a fixed body overlay.');
+expect(selectorsUi.includes("import { modal, mountModal } from '../modals/index.js';") && selectorsUi.includes("variant: 'x'") && !selectorsUi.includes('document.body.appendChild(surface)'), 'Shared Select must manifest through canonical X instead of a fixed body overlay.');
 expect(!/\.ui-selector\s*\{[^}]*position\s*:\s*fixed/s.test(selectorsCss), 'Shared Select must not own a parallel fixed overlay.');
 expect(miniCardUi.includes('export function miniCardRail') && miniCardCss.includes('--mini-card-width:238px') && miniCardCss.includes('--mini-card-height:144px') && miniCardCss.includes('border:2px solid #111') && miniCardCss.includes('border-radius:16px') && miniCardCss.includes('padding:16px'), 'Shared Mini Card must keep one fixed 238x144 geometry with 2px black frame, 16px radius and 16px inner padding.');
 expect(miniCardCss.includes('word-break:normal') && miniCardCss.includes('overflow-wrap:normal') && miniCardCss.includes('hyphens:none'), 'Shared Mini Card text must wrap only between whole words.');
@@ -364,14 +389,14 @@ expect(core.includes('activeWorkspaceSurface(surface)') && core.includes("contex
 expect(modals.includes("import { mountV2Layer, v2Layer } from '../v2/index.js';")
   && modals.includes('v2Layer(content')
   && modals.includes('mountV2Layer(html, { root })')
-  && modals.includes("MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical', 'q'])")
+  && modals.includes("MODAL_VARIANTS = new Set(['q', 'x', 's', 'technical'])")
   && modals.includes("openNotice({ title = 'Внимание', message = '', surface = 'app'")
   && !modals.includes('<div class="modal-backdrop"'),
-  'ui/modals must remain the sole public modal owner, route user notices to swipe-only TOP, and reserve technical overlays for exceptional system cases.');
-expect(timeUi.includes("variant:'bottom'") && timeUi.includes("className:'modal--time-picker-sheet'"), 'Time Picker must use the Shared BOTTOM action modal; TOP/technical/native variants are forbidden for this ordinary picker.');
+  'ui/modals must remain the sole public modal owner, expose only Q/X/S/technical, route user notices to swipe-only S, and reserve technical overlays for exceptional system cases.');
+expect(timeUi.includes("variant:'x'") && timeUi.includes("className:'modal--time-picker-sheet'"), 'Time Picker must use Shared X; S/technical/native variants are forbidden for this ordinary picker.');
 expect(ui.includes("const allowed = new Set(['top', 'standard', 'bottom', 'technical'])") && ui.includes("const technical = kind === 'technical'") && ui.includes('activeV2ModalSurface(root)'), 'Internal V2 modal geometry must expose exactly the approved top/standard/bottom/technical model.');
-expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve X for technical overlays only.');
-expect(ui.includes("app.querySelector('[data-v2-z-layer]')") && ui.includes("if (!bindZ || open || zGesture"), 'Shared workspace Z-edge owner must yield completely while any stacked Z2/Z3 is active.');
+expect(ui.includes('function initV2LayerDismissGesture') && ui.includes("kind === 'top' ? Math.min(0, raw) : Math.max(0, raw)") && ui.includes('stopPointerPropagation') && ui.includes("resolved === 'technical'"), 'Shared Modal must own origin-directed dismissal, isolate pointer gestures from lower Z/F/E, and reserve technical overlays for exceptional system cases.');
+expect(ui.includes("app.querySelector('[data-v2-z-layer]')") && ui.includes("if (!bindZ || deckIsOpen() || zGesture"), 'Shared workspace Z-edge owner must yield completely while any stacked Z2/Z3 is active.');
 expect(ui.includes('const topLayer = layers.at(-1)') && ui.includes('if (topLayer) return topLayer') && ui.includes('if (explicit) return explicit'), 'Shared modal/Q owner must attach to the top active Z layer so dismissing Q returns to the exact source surface instead of exposing F/E.');
 expect(ui.includes("const locksHeader = Boolean(app && kind === 'standard' && !qLayer)") && ui.includes("header.inert = true") && ui.includes("header.classList.add('is-modal-locked')"), 'Shared standard modal-Z must keep Header A-D visible but inactive, while Q is the explicit exception that leaves Header C interactive.');
 expect(css.includes('.v2-header.is-modal-locked{pointer-events:none}'), 'Shared Header must expose one modal-lock visual interaction state.');
@@ -413,9 +438,13 @@ expect(chatRuntime.includes("attachmentTrigger: 'external'") && chatRuntime.incl
 expect(!account.includes('accountBottomNavigation') && !account.includes('bindBottomNavigation'), 'End-user V2 must not contain bottom navigation.');
 expect(!account.includes('<style>') && !booking.includes('<style>'), 'Feature code must not create local V2 style owners.');
 
+const globalFeatureCss = /\.(?:bottom-nav|nav-item|entity-list|color-picker|cost-field|duration-picker|workplace-selector|journal-list-|record-status-controls|work-time-row|app-content)/;
+expect(!globalFeatureCss.test(style), 'Global style.css must remain foundation-only; component styling belongs to Shared UI owners.');
+
 if (failures.length) {
   failures.forEach((message) => console.error(`ui v2 architecture: ${message}`));
   process.exit(1);
 }
 
 console.log('ui v2 architecture check: OK');
+

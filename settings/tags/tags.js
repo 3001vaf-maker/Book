@@ -64,7 +64,7 @@ function openForm(root, existing = null) {
   </form>`;
   const layer = mountModal(document.body, modal(html, {
     title,
-    variant: 'bottom',
+    variant: 'x',
     surface: 'app',
     className: 'modal--form-sheet',
   }));

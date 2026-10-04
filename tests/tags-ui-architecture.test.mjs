@@ -8,7 +8,7 @@ assert.match(tags, /workspaceHeaderContext\(\{[\s\S]*title: 'Ярлыки'[\s\S]
 assert.match(tags, /miniCardRail\(items\.map\(tagCard\)\)/);
 assert.match(tags, /miniCard\(\{/);
 assert.match(tags, /data-tag-edit/);
-assert.match(tags, /variant: 'bottom'/);
+assert.match(tags, /variant: 'x'/);
 assert.match(tags, /className: 'modal--form-sheet'/);
 assert.doesNotMatch(tags, /modal--tag-editor/);
 assert.match(tags, /colorPicker\(\{/);

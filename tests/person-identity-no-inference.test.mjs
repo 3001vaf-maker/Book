@@ -6,13 +6,10 @@ const onlineBooking = await readFile(new URL('../server/src/online-booking/onlin
 const controller = await readFile(new URL('../server/src/online-booking/online-booking.controller.ts', import.meta.url), 'utf8');
 const sync = await readFile(new URL('../online-booking/server-sync.js', import.meta.url), 'utf8');
 
-assert.match(service, /reconcileLegacyAccountDuplicates\(tenantId: string\)/, 'Legacy review service must remain available for historical data inspection');
-assert.match(service, /requiresManualReview:\s*candidates > 0/, 'Legacy account-* candidates must be surfaced for explicit review');
-assert.match(service, /return \{ repaired: 0, candidates, requiresManualReview: candidates > 0 \}/, 'Legacy review must never report an automatic repair');
 assert.doesNotMatch(service, /peopleSharePhone\(/, 'Shared phone must not be used as an automatic Person/UEI merge rule');
 assert.doesNotMatch(service, /sameNamedPerson\(/, 'Matching names must not be used as an automatic Person/UEI merge rule');
-assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Code must not assign a legacy Person to a UEI by inference');
-assert.doesNotMatch(service, /await this\.reconcileLegacyAccountDuplicates\(tenantId\)/, 'Account login/access must not run identity reconciliation automatically');
+assert.doesNotMatch(service, /identity\.relations\[relationKey\]\s*=\s*uei/, 'Person must not be assigned to a UEI by inference');
+assert.doesNotMatch(service, /reconcileLegacyAccountDuplicates|legacy/i, 'Retired identity reconciliation runtime must not return');
 
 const findOrAttach = service.slice(service.indexOf('async findOrAttachExistingPerson('), service.indexOf('async bindFirstAccess('));
 assert.match(findOrAttach, /const contacts = await this\.contactsForAccount\(account\)/, 'Account contact set must be resolved before Person matching');
@@ -34,15 +31,12 @@ const tenantBinding = onlineBooking.slice(
   onlineBooking.indexOf('private async bindAccountTenant'),
   onlineBooking.indexOf('private async globalAccountView'),
 );
-assert.match(tenantBinding, /personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Canonical tenant binding helper must delegate to PersonIdentityService.');
+assert.match(tenantBinding, /personIdentity\.bindFirstAccess\(tenantId, account as any\)/, 'Canonical tenant binding helper must delegate to PersonIdentityService');
 assert.match(myRecords, /bookingIdentityForAccount\(tenantId, accountId\)/, 'Account Record history must resolve canonical identity after Person attachment');
 assert.match(myRecords, /identity\?\.memberPeople/, 'Account Record history must include all canonical UEI member People');
-assert.match(myRecords, /this\.records\.listForPeople\(tenantId, people\)/, 'Pre-existing and online-created Records must be read from the one canonical Record owner');
-assert.doesNotMatch(service, /manualRecordViews\(/, 'Legacy Record-to-BookingRequest adapter must remain removed');
+assert.match(myRecords, /this\.records\.listForPeople\(tenantId, people\)/, 'All Records must be read from the canonical Record owner');
 
-assert.match(controller, /owner\/reconcile-legacy-people/, 'Owner-only legacy review route is retained for compatibility');
-assert.match(controller, /@UseGuards\(JwtAuthGuard\)[\s\S]*reconcileLegacyPeople/, 'Legacy review route must require owner authentication');
-assert.doesNotMatch(sync, /legacyPeopleReconciled/, 'Book startup must not keep automatic legacy reconciliation state');
-assert.doesNotMatch(sync, /\/online-booking\/owner\/reconcile-legacy-people/, 'Book startup must never trigger legacy Person/UEI reconciliation');
+assert.doesNotMatch(controller, /reconcile-legacy-people|reconcileLegacyPeople/i, 'Retired owner reconciliation route must not return');
+assert.doesNotMatch(sync, /reconcile-legacy-people|legacyPeopleReconciled/i, 'Runtime sync must not contain identity reconciliation state');
 
-console.log('legacy-person-identity-reconciliation.test.mjs: ok');
+console.log('person identity no-inference tests: OK');

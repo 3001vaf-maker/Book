@@ -24,8 +24,8 @@ function monthDayKey(date) {
 function parseMonthDay(value = '') {
   const text = String(value || '').trim();
   const direct = text.match(/^(\d{2})-(\d{2})$/);
-  const legacy = text.match(/^\d{4}-(\d{2})-(\d{2})$/);
-  const match = direct || legacy;
+  const fullDate = text.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const match = direct || fullDate;
   if (!match) return null;
   const month = Number(match[1]);
   const day = Number(match[2]);
@@ -385,7 +385,7 @@ function openMonthDayPicker(host) {
   if (!hidden) return;
   const current = parseMonthDay(hidden.value);
   const content = `<div class="modal-title"><h2>${escapeHtml(host.querySelector(':scope > span')?.textContent || 'Дата')}</h2></div><div data-month-day-calendar></div>${hidden.value ? `<div class="modal-actions">${button('Очистить', { data: 'data-month-day-clear', variant: 'secondary' })}</div>` : ''}`;
-  const modalRoot = mountModal(document.body, modal(content, { variant: 'medium' }));
+  const modalRoot = mountModal(document.body, modal(content, { variant: 'x' }));
   if (!modalRoot) return;
   const calendarRoot = modalRoot.querySelector('[data-month-day-calendar]');
   if (!calendarRoot) return;

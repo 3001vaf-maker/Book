@@ -62,13 +62,13 @@ export function headerControlGroup(items = []) {
 
 /**
  * Canonical manifestation of Header Control.
- * Every Header Control opens the same medium modal shell; the caller only
+ * Every Header Control opens the same canonical bottom action shell; the caller only
  * supplies the UI content placed inside that shell.
  */
 export function openHeaderControl(content = '', { title = '', className = '' } = {}) {
   return mountModal(document.body, modal(String(content || ''), {
     title,
     className,
-    variant: 'medium',
+    variant: 'x',
   }));
 }
