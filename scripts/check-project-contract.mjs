@@ -116,7 +116,11 @@ if(fs.existsSync(path.join(root,'UI_ALPHABET.md'))){
   }
   if(!alphabet.includes('`ui/ui.js`')) failures.push('ui/ui.js: UI facade is missing from UI_ALPHABET.md');
 }
-const branch=String(process.env.GITHUB_REF_NAME||'');
+const branch=String(
+  process.env.GITHUB_EVENT_NAME==='pull_request'
+    ? process.env.GITHUB_BASE_REF||''
+    : process.env.GITHUB_REF_NAME||''
+);
 if(branch && branch!=='main' && branch!=='staging') failures.push(`branch ${branch}: only main/staging are allowed`);
 if(failures.length){
   console.error('project contract check: FAILED');
