@@ -43,7 +43,12 @@ assert.match(
 
 assert.match(
   timetable,
-  /function\s+openTimetableSettingsMenu\(\)[\s\S]*?data-timetable-settings-time[\s\S]*?Время работы/,
+  /function\s+openTimetableSettingsMenu\(\)/,
+  'Graph A must own the quick bottom settings menu',
+);
+assert.match(
+  timetable,
+  /button\('Время работы',[\s\S]*?data-timetable-settings-time/,
   'Graph A settings must expose a quick bottom working-time action for selected working dates',
 );
 assert.match(
