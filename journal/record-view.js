@@ -16,7 +16,7 @@ import { getRecordPaymentState, recordSettlementItems, repriceSettlement, refres
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
-import { getRecords } from '../core/record/index.js';
+import { getRecords, normalizeRecordGroup, recordCapacity, recordParticipantCount, recordParticipants } from '../core/record/index.js';
 import { updateRecord, cancelRecord, deleteRecord, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../settings/profile/data.js';
@@ -76,6 +76,7 @@ const stateSnapshot = (state) => JSON.stringify({
   from: String(state.from || ''),
   to: String(state.to || ''),
   person: state.person || null,
+  group: state.group || null,
   procedures: Array.isArray(state.procedures) ? state.procedures : [],
   products: Array.isArray(state.products) ? state.products : [],
   confirmed: Boolean(state.confirmed),
@@ -87,6 +88,7 @@ const stateFromRecord = (record, { paid = false } = {}) => ({
   from: record.from,
   to: record.to,
   person: record.person ? { ...record.person } : null,
+  group: record.group ? { ...record.group, participants: recordParticipants(record).map((person) => ({ ...person })) } : null,
   procedures: Array.isArray(record.procedures) ? record.procedures.map((item) => ({ ...item })) : [],
   products: Array.isArray(record.products) ? record.products.map((item) => ({ ...item })) : [],
   finance: record.finance ? {
@@ -180,6 +182,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       from: state.from,
       to: state.to,
       person: state.person,
+      group: state.group,
       procedures: state.procedures,
       products: state.products,
       confirmed: Boolean(state.confirmed),
