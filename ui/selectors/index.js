@@ -130,7 +130,7 @@ function openSelector(trigger) {
     </div>
   </div>`;
 
-  const modalRoot = mountModal(trigger, modal(content, { variant: 'bottom', title: 'Выбор' }));
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор' }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
   surface.dataset.options = JSON.stringify(options);
