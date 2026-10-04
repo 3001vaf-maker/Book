@@ -708,7 +708,7 @@ function openDDSSettings(root, movements) {
   })).join(''));
   const settings = mountModal(root, modal(content, {
     title: 'Настройки ДДС',
-    variant: 'quick',
+    variant: 'bottom',
     surface: 'app',
   }));
   if (!settings) return;

@@ -3,7 +3,7 @@ import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['list', 'large', 'medium', 'compact', 'quick', 'top', 'standard', 'bottom', 'technical', 'q']);
+const MODAL_VARIANTS = new Set(['q', 'bottom', 'top', 'technical']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
@@ -13,8 +13,8 @@ function v2Kind(variant = '') {
   return 'standard';
 }
 
-export function modal(content, { title = '', className = '', variant = '', surface = '' } = {}) {
-  const resolvedVariant = MODAL_VARIANTS.has(variant) ? variant : '';
+export function modal(content, { title = '', className = '', variant = 'q', surface = '' } = {}) {
+  const resolvedVariant = MODAL_VARIANTS.has(variant) ? variant : 'q';
   const variantClass = resolvedVariant ? `modal--${resolvedVariant}` : '';
   const surfaceClass = MODAL_SURFACES.has(surface) ? `modal--surface-${surface}` : '';
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
@@ -28,7 +28,7 @@ export function modal(content, { title = '', className = '', variant = '', surfa
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
-  if (resolvedVariant === 'bottom' || resolvedVariant === 'top' || resolvedVariant === 'compact') {
+  if (resolvedVariant === 'bottom' || resolvedVariant === 'top') {
     html = html.replace(/<button type="button" class="v2-layer__close modal-close"[^>]*>×<\/button>/, '');
   }
   return html;

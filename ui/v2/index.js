@@ -272,10 +272,8 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
 }
 
 export function v2Layer(content = '', { kind = 'standard', title = '', className = '' } = {}) {
-  const aliases = { quick: 'bottom', system: 'top' };
   const allowed = new Set(['top', 'standard', 'bottom', 'technical']);
-  const candidate = aliases[kind] || kind;
-  const resolved = allowed.has(candidate) ? candidate : 'standard';
+  const resolved = allowed.has(kind) ? kind : 'standard';
   const closeControl = resolved === 'technical'
     ? '<button type="button" class="v2-layer__close" data-v2-layer-close aria-label="Закрыть">×</button>'
     : '';
