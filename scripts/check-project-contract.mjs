@@ -46,7 +46,7 @@ for(const file of walk(root)){
 }
 for(const retired of [
   'business-migration.js','operational-migration.js','auxiliary-migration.js',
-  'tenant-document-archive.js','core/legacy-browser-business.js','settings/profile/migration.js',
+  'tenant-document-archive.js','core/legacy-browser-business.js','settings/profile/migration.js','core/people/people.css',
 ]){
   if(fs.existsSync(path.join(root,retired))) failures.push(`${retired}: retired runtime bridge must not exist`);
 }

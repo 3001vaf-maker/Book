@@ -23,7 +23,7 @@ export function uei({ value = '', existing = [], detachable = [], linkValue = ''
     : '';
   const countMarkup = memberCount > 1 ? `<span class="ui-uei__count" aria-label="Количество профилей">${escapeHtml(memberCount)}</span>` : '';
   const applyMarkup = showApply ? button('Применить', { data: 'data-uei-apply' }) : '';
-  return `<section class="ui-uei" data-uei>
+  return `<section class="ui-uei form-grid" data-uei>
     <label class="field ui-uei__value">
       <span>UEI</span>
       <span class="ui-uei__value-row"><input name="uei" value="${escapeHtml(value)}" maxlength="4" pattern="${UEI_PATTERN}" inputmode="text" autocomplete="off" data-uei-field="uei" aria-label="UEI">${countMarkup}</span>
