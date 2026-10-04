@@ -29,6 +29,19 @@ for (const file of featureRoots.flatMap((dir) => walk(join(root, dir)))) {
   }
 }
 
+const modalPortalSource = readFileSync(join(root, 'ui/v2/modal-portal.js'), 'utf8');
+if (!/const\s+nativeRemove\s*=\s*node\.remove\.bind\(node\)/.test(modalPortalSource)
+  || !/if\s*\(node\.isConnected\)\s*nativeRemove\(\)/.test(modalPortalSource)
+  || !/node\.v2Close\s*=\s*close/.test(modalPortalSource)
+  || !/node\.remove\s*=\s*close/.test(modalPortalSource)) {
+  errors.push('ui/v2/modal-portal.js: every mounted V2 layer must route remove() through the canonical close lifecycle');
+}
+
+const durationSource = readFileSync(join(root, 'ui/duration/index.js'), 'utf8');
+if (/modalRoot\.remove\s*\(/.test(durationSource) || !/modalRoot\.v2Close\?\.\(\)/.test(durationSource)) {
+  errors.push('ui/duration/index.js: duration picker must close through v2Close()');
+}
+
 const coreSource = readFileSync(join(root, 'core.js'), 'utf8');
 if (!/let\s+disposeView\s*=/.test(coreSource) || !/disposeView\(\);/.test(coreSource)) {
   errors.push('core.js: route render lifecycle must dispose the previous view before replacement');

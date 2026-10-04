@@ -84,6 +84,8 @@ function open(host){
     const hours=Number(modalRoot.querySelector('[data-time-wheel-type="duration-hours"].is-selected')?.dataset.value)||0;
     const minutes=Number(modalRoot.querySelector('[data-time-wheel-type="duration-minutes"].is-selected')?.dataset.value)||0;
     const total=hours*60+minutes;
-    hidden.value=String(total);host.querySelector('[data-duration-open]').textContent=durationText(total);modalRoot.remove();
+    hidden.value=String(total);
+    host.querySelector('[data-duration-open]').textContent=durationText(total);
+    modalRoot.v2Close?.();
   });
 }

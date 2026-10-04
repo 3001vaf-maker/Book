@@ -110,9 +110,13 @@ export function mountV2Layer(html, { root = null } = {}) {
     node.addEventListener(type, stopPointerPropagation);
   });
 
+  const nativeRemove = node.remove.bind(node);
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
     disposeGesture();
-    if (node.isConnected) node.remove();
+    if (node.isConnected) nativeRemove();
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
     if (!technical) unlockV2StageInteraction(app, lockedStage);
@@ -126,6 +130,7 @@ export function mountV2Layer(html, { root = null } = {}) {
     }
   };
   node.v2Close = close;
+  node.remove = close;
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,
     onDismiss: () => node.v2Close?.(),
