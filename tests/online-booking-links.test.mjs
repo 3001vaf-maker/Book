@@ -79,5 +79,5 @@ assert.match(bookingSource, /value: 'PUSH', label: 'Push'/);
 assert.doesNotMatch(bookingSource, /Внешний вид|renderAppearance|BOOKING_SHAPES|BOOKING_CHOICE_STYLES|bookingThemePreview/);
 assert.doesNotMatch(settingsSource, /'communications', 'Уведомления'/);
 
-assert.match(bookingSource, /online-booking-inline-label/);
-assert.match(bookingSource, /online-booking-copy-row/);
+assert.match(bookingSource, /field-inline-label/);
+assert.match(bookingSource, /input-action-row/);
