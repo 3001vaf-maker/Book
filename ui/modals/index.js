@@ -3,7 +3,7 @@ import { mountV2Layer, v2Layer } from '../v2/index.js';
 
 let modalLevel = 0;
 
-const MODAL_VARIANTS = new Set(['q', 'bottom', 'top', 'technical']);
+const MODAL_VARIANTS = new Set(['q', 'x', 's', 'technical']);
 const MODAL_SURFACES = new Set(['app']);
 
 function v2Kind(variant = '') {
@@ -15,11 +15,12 @@ function v2Kind(variant = '') {
 
 export function modal(content, { title = '', className = '', variant = 'q', surface = '' } = {}) {
   const resolvedVariant = MODAL_VARIANTS.has(variant) ? variant : 'q';
-  const variantClass = resolvedVariant ? `modal--${resolvedVariant}` : '';
+  const kind = v2Kind(resolvedVariant);
+  const variantClass = `modal--${kind}`;
   const surfaceClass = MODAL_SURFACES.has(surface) ? `modal--surface-${surface}` : '';
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
   let html = v2Layer(content, {
-    kind: v2Kind(resolvedVariant),
+    kind,
     title: '',
     className: classes,
   });
@@ -28,7 +29,7 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
-  if (resolvedVariant === 'bottom' || resolvedVariant === 'top') {
+  if (resolvedVariant === 'x' || resolvedVariant === 's') {
     html = html.replace(/<button type="button" class="v2-layer__close modal-close"[^>]*>×<\/button>/, '');
   }
   return html;
@@ -66,5 +67,5 @@ export function mountModal(root, html) {
 
 export function openNotice({ title = 'Внимание', message = '', surface = 'app' } = {}) {
   const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
-  return mountModal(document.body, modal(content, { variant: 'top', surface, title }));
+  return mountModal(document.body, modal(content, { variant: 's', surface, title }));
 }
