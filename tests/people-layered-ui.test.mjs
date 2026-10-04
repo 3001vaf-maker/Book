@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
-const v2 = readFileSync(new URL('../ui/v2/index.js', import.meta.url), 'utf8');
+const v2 = ['z-stack.js','modal-portal.js','swipe.js','workspace-navigation.js'].map((file) => readFileSync(new URL(`../ui/v2/${file}`, import.meta.url), 'utf8')).join('\n');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const selectors = readFileSync(new URL('../ui/selectors/index.js', import.meta.url), 'utf8');
 const selectorCss = readFileSync(new URL('../ui/selectors/selectors.css', import.meta.url), 'utf8');
