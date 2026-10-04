@@ -136,19 +136,21 @@ export class BusinessStateService {
     private readonly records: RecordService,
   ) {}
 
+  private async ensureState(tenantId: string) {
+    await this.prisma.$transaction([
+      this.prisma.businessStateMeta.upsert({ where: { tenantId }, create: { tenantId }, update: {} }),
+      this.prisma.ueiState.upsert({ where: { tenantId }, create: { tenantId, data: json(normalizeUEI({})) }, update: {} }),
+    ]);
+  }
+
   private async bundle(tenantId: string) {
-    const [meta, people, identity, records, recordEvents] = await Promise.all([
-      this.prisma.businessStateMeta.findUnique({ where: { tenantId } }),
+    const [people, identity, records, recordEvents] = await Promise.all([
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.ueiState.findUnique({ where: { tenantId } }),
       this.prisma.record.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.recordEvent.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
     ]);
-
     return {
-      migrated: Boolean(meta),
-      verified: Boolean(meta?.migrationVerifiedAt),
-      migrationVerifiedAt: meta?.migrationVerifiedAt || null,
       people: people.map((row) => clone(row.data)),
       uei: normalizeUEI(identity?.data || {}),
       records: records.map((row) => clone(row.data)),
@@ -156,64 +158,13 @@ export class BusinessStateService {
     };
   }
 
-  get(tenantId: string) {
-    return this.bundle(tenantId);
-  }
-
-  private async requireVerified(tenantId: string) {
-    const meta = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (!meta?.migrationVerifiedAt) throw new ConflictException('Перенос People, UEI и Записей ещё не подтверждён');
-  }
-
-  async migrate(tenantId: string, body: unknown) {
-    const expected = normalizeBundle(body);
-    const existing = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (existing) return this.bundle(tenantId);
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.businessStateMeta.create({ data: { tenantId } });
-      await tx.ueiState.create({ data: { tenantId, data: json(expected.uei) } });
-      for (const [position, person] of expected.people.entries()) {
-        await tx.person.create({ data: { tenantId, key: text(person.key), position, data: json(person) } });
-      }
-      for (const [position, record] of expected.records.entries()) {
-        await tx.record.create({ data: { tenantId, recordId: text(record.id), position, data: json(record) } });
-      }
-      for (const [position, event] of expected.recordEvents.entries()) {
-        await tx.recordEvent.create({
-          data: { tenantId, eventId: text(event.id), recordId: text(event.recordId), position, data: json(event) },
-        });
-      }
-    });
-
-    return this.bundle(tenantId);
-  }
-
-  async verifyMigration(tenantId: string, body: unknown) {
-    const expected = normalizeBundle(body);
-    const current = await this.bundle(tenantId);
-    if (!current.migrated) throw new ConflictException('People, UEI и Записи ещё не перенесены');
-    const actual = normalizeBundle(current);
-    if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Проверка переноса People, UEI и Записей не пройдена');
-    }
-    await this.prisma.businessStateMeta.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
-    return this.bundle(tenantId);
-  }
-
-  async bootstrap(tenantId: string) {
-    const existing = await this.prisma.businessStateMeta.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.businessStateMeta.create({ data: { tenantId, migrationVerifiedAt: new Date() } });
-        await tx.ueiState.create({ data: { tenantId, data: json(normalizeUEI({})) } });
-      });
-    }
+  async get(tenantId: string) {
+    await this.ensureState(tenantId);
     return this.bundle(tenantId);
   }
 
   async upsertPerson(tenantId: string, key: string, body: unknown) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const source = objectValue(body);
     const person = clone(objectValue(source.person ?? source));
     const normalizedKey = text(key);
@@ -228,14 +179,14 @@ export class BusinessStateService {
   }
 
   async deletePerson(tenantId: string, key: string) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const normalizedKey = text(key);
     const result = await this.prisma.person.deleteMany({ where: { tenantId, key: normalizedKey } });
     return { deleted: result.count };
   }
 
   async updateUEI(tenantId: string, body: unknown) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const source = objectValue(body);
     const uei = normalizeUEI(source.uei ?? source);
     await this.prisma.ueiState.upsert({
@@ -253,7 +204,7 @@ export class BusinessStateService {
   }
 
   async deleteRecord(tenantId: string, recordId: string) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const id = text(recordId);
     return this.prisma.$transaction(async (tx) => {
       const financeOperations = await tx.financeOperation.deleteMany({
@@ -274,13 +225,13 @@ export class BusinessStateService {
   }
 
   async deleteRecordEvents(tenantId: string, recordId: string) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const result = await this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
     return { deleted: result.count };
   }
 
   async upsertRecordEvent(tenantId: string, eventId: string, body: unknown) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const source = objectValue(body);
     const event = clone(objectValue(source.event ?? source));
     const id = text(eventId);
@@ -319,62 +270,27 @@ export class BusinessStateService {
     return event;
   }
 
+  private async ensureOperationalState(tenantId: string) {
+    return this.prisma.businessOperationalState.upsert({
+      where: { tenantId },
+      create: { tenantId, data: json(normalizeOperational({})) },
+      update: {},
+    });
+  }
+
   private async operationalBundle(tenantId: string) {
-    const row = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
-    const data = normalizeOperational(row?.data || {});
-    return {
-      migrated: Boolean(row),
-      verified: Boolean(row?.migrationVerifiedAt),
-      migrationVerifiedAt: row?.migrationVerifiedAt || null,
-      ...data,
-    };
+    const row = await this.ensureOperationalState(tenantId);
+    return normalizeOperational(row.data);
   }
 
-  getOperational(tenantId: string) {
-    return this.operationalBundle(tenantId);
-  }
-
-  private async requireOperationalVerified(tenantId: string) {
-    const row = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
-    if (!row?.migrationVerifiedAt) throw new ConflictException('Перенос Графика, процедур и онлайн-записи ещё не подтверждён');
-    return row;
-  }
-
-  async migrateOperational(tenantId: string, body: unknown) {
-    const expected = normalizeOperational(body);
-    const existing = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.businessOperationalState.create({ data: { tenantId, data: json(expected) } });
-    }
-    return this.operationalBundle(tenantId);
-  }
-
-  async verifyOperationalMigration(tenantId: string, body: unknown) {
-    const expected = normalizeOperational(body);
-    const current = await this.operationalBundle(tenantId);
-    if (!current.migrated) throw new ConflictException('График, процедуры и онлайн-запись ещё не перенесены');
-    const actual = normalizeOperational(current);
-    if (canonicalOperational(actual) !== canonicalOperational(expected)) {
-      throw new ConflictException('Проверка переноса Графика, процедур и онлайн-записи не пройдена');
-    }
-    await this.prisma.businessOperationalState.update({ where: { tenantId }, data: { migrationVerifiedAt: new Date() } });
-    return this.operationalBundle(tenantId);
-  }
-
-  async bootstrapOperational(tenantId: string) {
-    const existing = await this.prisma.businessOperationalState.findUnique({ where: { tenantId } });
-    if (!existing) {
-      await this.prisma.businessOperationalState.create({
-        data: { tenantId, data: json(normalizeOperational({})), migrationVerifiedAt: new Date() },
-      });
-    }
+  async getOperational(tenantId: string) {
     return this.operationalBundle(tenantId);
   }
 
   async updateOperationalDataset(tenantId: string, dataset: string, body: unknown) {
     const key = text(dataset);
     if (!OPERATIONAL_DATASETS.has(key)) throw new BadRequestException('Неизвестный набор рабочих данных');
-    const row = await this.requireOperationalVerified(tenantId);
+    const row = await this.ensureOperationalState(tenantId);
     const current = normalizeOperational(row.data);
     const source = objectValue(body);
     const value = source.value;
@@ -385,12 +301,12 @@ export class BusinessStateService {
   }
 
   async publicOperational(tenantId: string) {
-    const row = await this.requireOperationalVerified(tenantId);
+    const row = await this.ensureOperationalState(tenantId);
     return normalizeOperational(row.data);
   }
 
   async bookingIdentityForAccount(tenantId: string, accountId: string) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const id = text(accountId);
     const [rows, identityRow] = await Promise.all([
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
@@ -424,7 +340,7 @@ export class BusinessStateService {
   }
 
   async accountIdsForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
-    await this.requireVerified(tenantId);
+    await this.ensureState(tenantId);
     const phone = text(phoneValue);
     const requestedUei = text(ueiValue);
     if (!phone && !requestedUei) return [];

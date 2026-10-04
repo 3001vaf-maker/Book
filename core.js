@@ -7,11 +7,11 @@ import { render as renderProfile } from './settings/profile/profile.js';
 import { getProfile } from './settings/profile/data.js';
 import { renderChat } from './chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
-import { initializeProfileWorkplaces } from './settings/profile/migration.js';
-import { initializeBusinessState } from './business-migration.js';
-import { initializeOperationalState } from './operational-migration.js';
-import { ensureRknGuide, initializeTenantDocumentArchive, refreshTenantDocumentArchive } from './tenant-document-archive.js';
-import { initializeAuxiliaryState } from './auxiliary-migration.js';
+import { loadProfileState } from './settings/profile/runtime.js';
+import { loadBusinessState } from './core/runtime/business-state.js';
+import { loadOperationalState } from './core/runtime/operational-state.js';
+import { ensureRknGuide, loadDocumentState, refreshTenantDocumentArchive } from './core/runtime/document-state.js';
+import { loadAuxiliaryState } from './core/runtime/auxiliary-state.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
@@ -22,7 +22,6 @@ import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient, renderOnlineBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
-import { clearLegacyBusinessStorage } from './core/legacy-browser-business.js';
 import { startPlatformNotices } from './core/platform-notices.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
@@ -139,15 +138,6 @@ function publicBookingPath() {
 
 async function bookingRoute() {
   const params = new URLSearchParams(location.search);
-  const legacyTenantId = String(params.get('booking') || '').trim();
-  if (legacyTenantId) {
-    return {
-      tenantId: legacyTenantId,
-      workplaceKey: String(params.get('workplace') || '').trim(),
-      ...bookingRouteQuery(params),
-    };
-  }
-
   const pathRoute = publicBookingPath();
   if (!pathRoute) return null;
   if (pathRoute.invalid || !pathRoute.profileSlug) {
@@ -631,23 +621,6 @@ function renderWorkspace() {
   syncViewport();
 }
 
-function renderMigrationPending() {
-  app.classList.remove('app-shell--booking');
-  workspaceReady = false;
-  disposeView();
-  disposeView = () => {};
-  app.innerHTML = v2Sticker({
-    title: 'Подготовка рабочего пространства',
-    body: '<p>Сервер ожидает безопасный перенос данных из основного браузера. Текущие данные не изменены.</p>',
-    className: 'v2-sticker-screen--technical',
-    closeData: 'data-technical-u-close',
-  });
-  app.querySelector('[data-technical-u-close]')?.addEventListener('click', () => {
-    if (window.history.length > 1) window.history.back();
-  });
-  syncViewport();
-}
-
 function renderSuspended() {
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
@@ -682,35 +655,14 @@ function startRegularPlatformNotices() {
 
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
-  const migration = await initializeProfileWorkplaces(authenticatedAccount);
-  if (!migration.verified) {
-    renderMigrationPending();
-    return;
-  }
-  const businessMigration = await initializeBusinessState(authenticatedAccount);
-  if (!businessMigration.verified) {
-    renderMigrationPending();
-    return;
-  }
-  const operationalMigration = await initializeOperationalState(authenticatedAccount);
-  if (!operationalMigration.verified) {
-    renderMigrationPending();
-    return;
-  }
-  const documentMigration = await initializeTenantDocumentArchive(authenticatedAccount);
-  if (!documentMigration.verified) {
-    renderMigrationPending();
-    return;
-  }
+  await loadProfileState();
+  await loadBusinessState();
+  await loadOperationalState();
+  await loadDocumentState();
   await syncRknGuideIfReady().catch((error) => {
     console.error('RKN guide initial sync failed', error);
   });
-  const auxiliaryMigration = await initializeAuxiliaryState(authenticatedAccount);
-  if (!auxiliaryMigration.verified) {
-    renderMigrationPending();
-    return;
-  }
-  clearLegacyBusinessStorage();
+  await loadAuxiliaryState();
   await activateBookDemo();
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();

@@ -284,127 +284,54 @@ export class ProfileService {
   private async bundle(tenantId: string, platformAccountId: string) {
     const [row, professionRows] = await Promise.all([
       this.prisma.profile.findUnique({
-      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
+        where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
         include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
       }),
       this.prisma.platformProfession.findMany({ orderBy: [{ name: 'asc' }], select: { name: true } }),
     ]);
-    const professionCatalog = professionRows.map((item) => item.name);
-    const referenceData = workplaceReferenceData();
-    if (!row) {
-      return {
-        migrated: false,
-        verified: false,
-        migrationVerifiedAt: null,
-        profile: null,
-        customProfessions: [],
-        professionCatalog,
-        workplaceReferenceData: referenceData,
-        workplaces: [],
-      };
-    }
-
-    const profile: ProfileInput = {
-      id: row.id,
-      platformAccountId: row.platformAccountId,
-      key: row.key,
-      name: row.name,
-      surname: row.surname,
-      phone: row.phone,
-      phones: stringList(row.phones),
-      telegrams: stringList(row.telegrams),
-      emails: stringList(row.emails),
-      about: row.about,
-      photo: row.photo,
-      photoCropX: row.photoCropX,
-      photoCropY: row.photoCropY,
-      profession: row.profession,
-      experience: row.experience,
-      professionAbout: row.professionAbout,
-      cardAppearance: objectValue(row.cardAppearance),
-    };
-
+    if (!row) throw new NotFoundException('Профиль не найден');
     return {
-      migrated: true,
-      verified: Boolean(row.migrationVerifiedAt),
-      migrationVerifiedAt: row.migrationVerifiedAt,
-      profile,
+      profile: {
+        id: row.id,
+        platformAccountId: row.platformAccountId,
+        key: row.key,
+        name: row.name,
+        surname: row.surname,
+        phone: row.phone,
+        phones: stringList(row.phones),
+        telegrams: stringList(row.telegrams),
+        emails: stringList(row.emails),
+        about: row.about,
+        photo: row.photo,
+        photoCropX: row.photoCropX,
+        photoCropY: row.photoCropY,
+        profession: row.profession,
+        experience: row.experience,
+        professionAbout: row.professionAbout,
+        cardAppearance: objectValue(row.cardAppearance),
+      },
       customProfessions: stringList(row.customProfessions),
-      professionCatalog,
-      workplaceReferenceData: referenceData,
+      professionCatalog: professionRows.map((item) => item.name),
+      workplaceReferenceData: workplaceReferenceData(),
       workplaces: row.workplaces.map(workplaceDto),
     };
   }
 
-  get(tenantId: string, platformAccountId: string) {
-    return this.bundle(tenantId, platformAccountId);
-  }
-
-  async migrate(tenantId: string, platformAccountId: string, body: unknown) {
-    const expected = normalizeBundle(body);
+  private async ensureProfile(tenantId: string, platformAccountId: string) {
     const existing = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (existing) return this.bundle(tenantId, platformAccountId);
-
-    await this.prisma.$transaction(async (tx) => {
-      const profile = await tx.profile.create({
-        data: { tenantId, platformAccountId, ...profileData(expected.profile, expected.customProfessions) },
-      });
-      if (expected.workplaces.length) {
-        await tx.workplace.createMany({
-          data: expected.workplaces.map((workplace, position) => ({
-            tenantId,
-            profileId: profile.id,
-            ...workplaceData(workplace, position),
-          })),
-        });
-      }
-      await this.observeProfessions(tx, [expected.profile.profession, ...expected.customProfessions]);
-    });
-
-    return this.bundle(tenantId, platformAccountId);
+    if (existing) return existing;
+    const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId }, select: { email: true } });
+    const empty = normalizeProfile({ emails: account?.email ? [account.email] : [] });
+    return this.prisma.profile.create({ data: { tenantId, platformAccountId, ...profileData(empty, []) } });
   }
 
-  async verifyMigration(tenantId: string, platformAccountId: string, body: unknown) {
-    const expected = normalizeBundle(body);
-    const current = await this.bundle(tenantId, platformAccountId);
-    if (!current.migrated || !current.profile) throw new NotFoundException('Профиль ещё не готов');
-
-    const actual = normalizeBundle({
-      profile: current.profile,
-      customProfessions: current.customProfessions,
-      workplaces: current.workplaces,
-    });
-    if (canonical(actual) !== canonical(expected)) {
-      throw new ConflictException('Не удалось подтвердить данные профиля. Обновите страницу и повторите.');
-    }
-
-    await this.prisma.profile.update({
-      where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-      data: { migrationVerifiedAt: new Date() },
-    });
-    return this.bundle(tenantId, platformAccountId);
-  }
-
-  async bootstrap(tenantId: string, platformAccountId: string) {
-    const existing = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (!existing) {
-      const account = await this.prisma.platformAccount.findUnique({ where: { id: platformAccountId }, select: { email: true } });
-      const empty = normalizeProfile({ emails: account?.email ? [account.email] : [] });
-      await this.prisma.profile.create({
-        data: {
-          tenantId,
-          platformAccountId,
-          ...profileData(empty, []),
-          migrationVerifiedAt: new Date(),
-        },
-      });
-    }
+  async get(tenantId: string, platformAccountId: string) {
+    await this.ensureProfile(tenantId, platformAccountId);
     return this.bundle(tenantId, platformAccountId);
   }
 
   async updateProfile(tenantId: string, platformAccountId: string, body: unknown) {
-    const current = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (!current?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
+    const current = await this.ensureProfile(tenantId, platformAccountId);
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
     const profile = normalizeProfile(source.profile ?? source);
     const customProfessions = source.customProfessions === undefined
@@ -425,7 +352,7 @@ export class ProfileService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } } },
     });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
+    if (!profile) throw new NotFoundException('Профиль не найден');
 
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
     const keys = Array.isArray(source.keys) ? source.keys.map((value) => stringValue(value).trim()).filter(Boolean) : [];
@@ -448,7 +375,7 @@ export class ProfileService {
       where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
       include: { workplaces: { where: { deletedAt: null }, select: { position: true } } },
     });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
+    if (!profile) throw new NotFoundException('Профиль не найден');
 
     const workplace = normalizeWorkplace({
       ...(body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {}),
@@ -478,7 +405,7 @@ export class ProfileService {
 
   async deleteWorkplace(tenantId: string, platformAccountId: string, key: string) {
     const profile = await this.prisma.profile.findUnique({ where: { tenantId_platformAccountId: { tenantId, platformAccountId } } });
-    if (!profile?.migrationVerifiedAt) throw new ConflictException('Данные профиля ещё не готовы. Обновите страницу и повторите.');
+    if (!profile) throw new NotFoundException('Профиль не найден');
     const existing = await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key } } });
     if (!existing || existing.profileId !== profile.id) throw new NotFoundException('Рабочее пространство не найдено');
     await this.prisma.workplace.update({
@@ -656,7 +583,7 @@ export class ProfileService {
 
   async accountRelationshipProfile(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
-      where: { tenantId, migrationVerifiedAt: { not: null } },
+      where: { tenantId },
       orderBy: { createdAt: 'asc' },
     });
     if (!row) throw new ConflictException('Профиль ещё не готов');
@@ -675,7 +602,7 @@ export class ProfileService {
 
   async publicBookingRouteSource(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
-      where: { tenantId, migrationVerifiedAt: { not: null } },
+      where: { tenantId },
       include: {
         workplaces: {
           where: { deletedAt: null },
@@ -702,7 +629,7 @@ export class ProfileService {
 
   async publicBookingBundle(tenantId: string) {
     const row = await this.prisma.profile.findFirst({
-      where: { tenantId, migrationVerifiedAt: { not: null } },
+      where: { tenantId },
       include: { workplaces: { where: { deletedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
       orderBy: { createdAt: 'asc' },
     });

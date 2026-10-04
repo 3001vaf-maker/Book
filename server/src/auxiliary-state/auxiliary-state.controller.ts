@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuxiliaryStateService } from './auxiliary-state.service';
@@ -13,21 +13,6 @@ export class AuxiliaryStateController {
   @Get()
   get(@Req() request: AuthenticatedRequest) {
     return this.auxiliaryState.get(request.auth!.tenantId);
-  }
-
-  @Post('migrate')
-  migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.auxiliaryState.migrate(request.auth!.tenantId, body);
-  }
-
-  @Post('migrate/verify')
-  verify(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.auxiliaryState.verifyMigration(request.auth!.tenantId, body);
-  }
-
-  @Post('bootstrap')
-  bootstrap(@Req() request: AuthenticatedRequest) {
-    return this.auxiliaryState.bootstrap(request.auth!.tenantId);
   }
 
   @Put(':dataset')

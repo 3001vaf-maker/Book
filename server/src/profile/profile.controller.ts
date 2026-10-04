@@ -16,21 +16,6 @@ export class ProfileController {
     return this.profile.get(request.auth!.tenantId, request.auth!.platformAccountId);
   }
 
-  @Post('migrate')
-  migrate(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.profile.migrate(request.auth!.tenantId, request.auth!.platformAccountId, body);
-  }
-
-  @Post('migrate/verify')
-  verifyMigration(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.profile.verifyMigration(request.auth!.tenantId, request.auth!.platformAccountId, body);
-  }
-
-  @Post('bootstrap')
-  bootstrap(@Req() request: AuthenticatedRequest) {
-    return this.profile.bootstrap(request.auth!.tenantId, request.auth!.platformAccountId);
-  }
-
   @Put()
   updateProfile(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.profile.updateProfile(request.auth!.tenantId, request.auth!.platformAccountId, body);
