@@ -99,6 +99,16 @@ for(const retired of [
 }
 if(!fs.existsSync(path.join(root,'PROJECT_STATE.md'))) failures.push('PROJECT_STATE.md is required');
 if(!fs.existsSync(path.join(root,'UI_ALPHABET.md'))) failures.push('UI_ALPHABET.md is required');
+if(fs.existsSync(path.join(root,'UI_ALPHABET.md'))){
+  const alphabet=fs.readFileSync(path.join(root,'UI_ALPHABET.md'),'utf8');
+  const uiRoot=path.join(root,'ui');
+  for(const entry of fs.readdirSync(uiRoot,{withFileTypes:true})){
+    if(!entry.isDirectory()) continue;
+    const owner='ui/'+entry.name;
+    if(!alphabet.includes('`'+owner+'`')) failures.push(owner+': UI owner directory is missing from UI_ALPHABET.md');
+  }
+  if(!alphabet.includes('`ui/ui.js`')) failures.push('ui/ui.js: UI facade is missing from UI_ALPHABET.md');
+}
 const branch=String(process.env.GITHUB_REF_NAME||'');
 if(branch && branch!=='main' && branch!=='staging') failures.push(`branch ${branch}: only main/staging are allowed`);
 if(failures.length){

@@ -20,3 +20,5 @@
 - Новый feature-CSS вне Shared UI запрещён.
 
 - Мёртвый runtime JS запрещён: каждый JS-модуль должен быть достижим от реального HTML-entry или `service-worker.js`.
+
+- UI owner без регистрации в `UI_ALPHABET.md` запрещён. Новый `ui/<owner>` не проходит CI, пока не описан и не защищён guard/test.
