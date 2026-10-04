@@ -88,7 +88,7 @@ assert.doesNotMatch(people, /surface:\s*'photo'/);
 assert.doesNotMatch(people, /actionLabel:\s*person\.photo/);
 
 assert.match(selectors, /import \{ modal, mountModal \} from '\.\.\/modals\/index\.js'/);
-assert.match(selectors, /variant: 'quick'/);
+assert.match(selectors, /variant: 'x'/);
 assert.doesNotMatch(selectors, /document\.body\.appendChild\(surface\)/);
 assert.doesNotMatch(selectorCss, /\.ui-selector\{[^}]*position:fixed/s);
 
