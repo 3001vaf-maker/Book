@@ -556,9 +556,9 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           label: 'Перенос',
           onSelect: openRecordEditSelector,
         } : null,
-        !cancelled ? {
+        !cancelled && state.group ? {
           id: 'group-capacity',
-          label: state.group ? 'Количество мест' : 'Групповая запись',
+          label: 'Количество мест',
           onSelect: openGroupCapacityEditor,
         } : null,
         !cancelled && state.group ? {
