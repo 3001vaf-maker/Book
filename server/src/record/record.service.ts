@@ -435,7 +435,12 @@ export class RecordService {
       : arrayValue(current.products).map((item) => clone(objectValue(item)));
     let person = personChanged ? clone(objectValue(incoming.person)) : clone(objectValue(current.person));
     const groupSource = groupChanged ? incoming.group : current.group;
-    const group = normalizeGroup(groupSource, person, groupCapacityFromProcedures(procedures));
+    const currentGroupCapacity = Math.max(
+      1,
+      Math.floor(Number(objectValue(current.group).capacity) || groupCapacityFromProcedures(arrayValue(current.procedures).map((item) => objectValue(item)))),
+    );
+    const allowedGroupCapacity = rawProceduresChanged ? groupCapacityFromProcedures(procedures) : currentGroupCapacity;
+    const group = normalizeGroup(groupSource, person, allowedGroupCapacity);
     if (group?.participants?.length) person = clone(group.participants[0]);
     const currentFallbackSettlement = this.finance.calculateSettlement([
       ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
