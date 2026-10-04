@@ -755,7 +755,7 @@ function blockEndValues({ date, workplaceId, from }) {
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
   modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-modal-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows(values, {
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-time-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows(values, {
     data: 'data-block-end',
     empty: 'Свободного времени нет.',
     accentEvery: 30,

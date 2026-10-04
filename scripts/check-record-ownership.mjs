@@ -244,6 +244,17 @@ for (const [path, source] of [
   }
 }
 
+
+if (/\.record-modal--|\.record-editor-|\.record-card-|\.entity-card--record|\.record-setting-|\.record-time-slot|\.record-confirm-(?:card|summary|actions|procedure)|\.record-view(?:\{|-(?:card|actions|services))|\.record-record-services|\.record-reset|\.record-delete-button|\.record-modal-(?:next|actions)|\.record-next-top|\.record-procedure-row|\.record-screen--(?:confirmation|settings)/.test(sharedRecordCss)) {
+  errors.push('Retired Record modal/editor CSS must not return; Record uses Shared Z, Shared Modal, Shared List, Shared Time and Shared Mini Card owners');
+}
+if (/record-modal-toolbar/.test(journalRecordUi + sharedRecordCss) || !/record-time-toolbar/.test(journalRecordUi + sharedRecordCss)) {
+  errors.push('Record step toolbar must remain a neutral Z-content toolbar and must not use retired modal terminology');
+}
+if (/journal-list-(?:mode-navigation|viewport|anchor)/.test(sharedRecordCss) || /\.segment-control--two\{/.test(sharedRecordCss)) {
+  errors.push('Record CSS must not own Journal List or SegmentControl geometry');
+}
+
 if (!/data-record-owner-settings/.test(sharedRecordUi)
   || !/(?:data-v2-primary-action|dataset\.v2PrimaryAction)/.test(sharedRecordUi)
   || !/mountV2ZLayer/.test(sharedRecordUi)) {
