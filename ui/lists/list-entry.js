@@ -41,6 +41,8 @@ export function v2ListEntry({
   toggleDisabled = false,
   deleteData = '',
   deleteAria = 'Удалить',
+  reorderHandle = false,
+  reorderAria = 'Переместить',
   selected = false
 } = {}) {
   const columnValues = (Array.isArray(columns) ? columns : []).slice(0, 3);
@@ -64,6 +66,9 @@ export function v2ListEntry({
   const deleteAction = deleteData
     ? `<span class="list-entry__delete" data-delete-action="${escapeHtml(deleteData)}" aria-label="${escapeHtml(deleteAria)}">×</span>`
     : '';
+  const reorderAction = reorderHandle
+    ? `<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="${escapeHtml(reorderAria)}"><span aria-hidden="true">⋮⋮</span></span>`
+    : '';
   const firstLine = overline ? `<strong>${escapeHtml(overline)}</strong>` : '';
   const classes = ['list-entry', image ? 'has-image' : '', columnMode ? 'list-entry--columns' : '', selected ? 'is-selected' : '', className].filter(Boolean).join(' ');
 
@@ -71,7 +76,7 @@ export function v2ListEntry({
     return `<${tag} class="${classes}"${attrs}${style}>
       <span class="list-entry__background" aria-hidden="true"></span>
       <span class="list-entry__content">
-        <span class="list-entry__columns">${columnValues.map((column, index) => `<span class="list-entry__column list-entry__column--${index + 1}">${columnLines(column)}</span>`).join('')}</span>
+        ${reorderAction}<span class="list-entry__columns">${columnValues.map((column, index) => `<span class="list-entry__column list-entry__column--${index + 1}">${columnLines(column)}</span>`).join('')}</span>
         ${action}${deleteAction}
       </span>
     </${tag}>`;
@@ -80,7 +85,7 @@ export function v2ListEntry({
   return `<${tag} class="${classes}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      <span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
+      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
       ${right}${toggleAction}${action}${deleteAction}
     </span>
   </${tag}>`;
@@ -98,60 +103,37 @@ export function v2ListEntries(items = []) {
 export function initV2ListReorder(root, {
   selector = '[data-reorder-id]',
   idAttribute = 'reorderId',
-  holdMs = 360,
+  handleSelector = '[data-reorder-handle]',
   onReorder = () => {},
 } = {}) {
   const host = root?.matches?.('.list-entries') ? root : root?.querySelector?.('.list-entries');
   if (!host) return () => {};
 
-  let timer = 0;
   let active = null;
-  let source = null;
+  let handle = null;
   let pointerId = null;
-  let startX = 0;
-  let startY = 0;
-  let suppressClick = false;
 
   const entries = () => [...host.querySelectorAll(selector)];
   const valueOf = (node) => String(node?.dataset?.[idAttribute] || '');
-  const clearTimer = () => {
-    if (timer) window.clearTimeout(timer);
-    timer = 0;
-  };
-  const resetState = () => {
-    clearTimer();
-    if (active) active.classList.remove('is-reordering');
+
+  const finish = (commit = false) => {
+    const node = active;
+    if (handle && pointerId != null) {
+      try {
+        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+      } catch {}
+    }
+    active?.classList.remove('is-reordering');
     host.classList.remove('is-reordering');
     active = null;
-    source = null;
+    handle = null;
     pointerId = null;
-  };
-  const finish = (commit = false) => {
-    const hadActive = Boolean(active);
-    if (commit && hadActive) {
+    if (commit && node) {
       const ids = entries().map(valueOf).filter(Boolean);
       if (ids.length) onReorder(ids);
-      suppressClick = true;
     }
-    resetState();
   };
-  const activate = () => {
-    timer = 0;
-    if (!source?.isConnected || pointerId == null) return;
-    active = source;
-    active.classList.add('is-reordering');
-    host.classList.add('is-reordering');
-    suppressClick = true;
-    try { source.setPointerCapture?.(pointerId); } catch {}
-  };
-  const schedule = (node, event) => {
-    finish(false);
-    source = node;
-    pointerId = event.pointerId;
-    startX = event.clientX;
-    startY = event.clientY;
-    timer = window.setTimeout(activate, Math.max(250, Number(holdMs) || 360));
-  };
+
   const moveActive = (clientY) => {
     if (!active) return;
     const candidates = entries().filter((node) => node !== active);
@@ -161,64 +143,89 @@ export function initV2ListReorder(root, {
     });
     if (!target) return;
     const rect = target.getBoundingClientRect();
-    const before = clientY < rect.top + rect.height / 2;
-    if (before) host.insertBefore(active, target);
+    if (clientY < rect.top + rect.height / 2) host.insertBefore(active, target);
     else host.insertBefore(active, target.nextSibling);
   };
 
   const onPointerDown = (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const node = event.target.closest(selector);
+    const nextHandle = event.target.closest?.(handleSelector);
+    if (!nextHandle || !host.contains(nextHandle)) return;
+    const node = nextHandle.closest?.(selector);
     if (!node || !host.contains(node)) return;
-    schedule(node, event);
-  };
-  const onPointerMove = (event) => {
-    if (!source || event.pointerId !== pointerId) return;
-    if (!active) {
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 7) resetState();
-      return;
-    }
-    event.preventDefault();
-    moveActive(event.clientY);
-  };
-  const onPointerUp = (event) => {
-    if (!source || event.pointerId !== pointerId) return;
-    if (active) {
-      try {
-        if (source.hasPointerCapture?.(event.pointerId)) source.releasePointerCapture?.(event.pointerId);
-      } catch {}
-      finish(true);
-      return;
-    }
-    // A short press is a normal tap/click. Do not cancel or synthesize it:
-    // the entry's native click handler must remain the only activation path.
-    resetState();
-  };
-  const onPointerCancel = (event) => {
-    if (pointerId != null && event.pointerId !== pointerId) return;
-    resetState();
-  };
-  const onClick = (event) => {
-    if (!suppressClick) return;
-    const node = event.target.closest(selector);
-    if (!node || !host.contains(node)) return;
+
     event.preventDefault();
     event.stopPropagation();
-    suppressClick = false;
+    active = node;
+    handle = nextHandle;
+    pointerId = event.pointerId;
+    active.classList.add('is-reordering');
+    host.classList.add('is-reordering');
+    try { handle.setPointerCapture?.(pointerId); } catch {}
   };
 
-  host.addEventListener('pointerdown', onPointerDown, { passive: true });
+  const onPointerMove = (event) => {
+    if (!active || event.pointerId !== pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveActive(event.clientY);
+  };
+
+  const onPointerUp = (event) => {
+    if (!active || event.pointerId !== pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finish(true);
+  };
+
+  const onPointerCancel = (event) => {
+    if (pointerId != null && event.pointerId !== pointerId) return;
+    finish(false);
+  };
+
+  const onClick = (event) => {
+    const nextHandle = event.target.closest?.(handleSelector);
+    if (!nextHandle || !host.contains(nextHandle)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const onKeyDown = (event) => {
+    const nextHandle = event.target.closest?.(handleSelector);
+    if (!nextHandle || !host.contains(nextHandle)) return;
+    const node = nextHandle.closest?.(selector);
+    if (!node) return;
+    const all = entries();
+    const index = all.indexOf(node);
+    if (index < 0) return;
+    const direction = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+    if (!direction) return;
+    const targetIndex = Math.max(0, Math.min(all.length - 1, index + direction));
+    if (targetIndex === index) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = all[targetIndex];
+    if (direction < 0) host.insertBefore(node, target);
+    else host.insertBefore(node, target.nextSibling);
+    const ids = entries().map(valueOf).filter(Boolean);
+    if (ids.length) onReorder(ids);
+    nextHandle.focus();
+  };
+
+  host.addEventListener('pointerdown', onPointerDown, { passive: false });
   host.addEventListener('pointermove', onPointerMove, { passive: false });
-  host.addEventListener('pointerup', onPointerUp);
+  host.addEventListener('pointerup', onPointerUp, { passive: false });
   host.addEventListener('pointercancel', onPointerCancel);
   host.addEventListener('click', onClick, true);
+  host.addEventListener('keydown', onKeyDown, true);
 
   return () => {
-    resetState();
+    finish(false);
     host.removeEventListener('pointerdown', onPointerDown);
     host.removeEventListener('pointermove', onPointerMove);
     host.removeEventListener('pointerup', onPointerUp);
     host.removeEventListener('pointercancel', onPointerCancel);
     host.removeEventListener('click', onClick, true);
+    host.removeEventListener('keydown', onKeyDown, true);
   };
 }

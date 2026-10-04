@@ -70,6 +70,8 @@ function procedureRow(procedure) {
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
     interactive: true,
+    reorderHandle: true,
+    reorderAria: 'Изменить порядок',
     data: `data-procedure="${escapeHtml(procedure.id)}" data-reorder-id="${escapeHtml(procedure.id)}"`,
     aria: `Открыть процедуру ${procedure.name || ''}`,
   });
