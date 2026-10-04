@@ -12,7 +12,7 @@ assert.match(selectorsCss, /\.ui-selector__wheel\{[^}]*width:100%[^}]*min-width:
 assert.match(selectorsCss, /\.ui-selector__option\{[^}]*min-width:0[^}]*white-space:normal[^}]*overflow-wrap:anywhere/s);
 assert.doesNotMatch(selectorsCss, /\.ui-selector\{[^}]*position:fixed/s);
 assert.match(selectorsUi, /import \{ modal, mountModal \} from '\.\.\/modals\/index\.js'/);
-assert.match(selectorsUi, /modal\(content, \{ variant: 'quick'/);
+assert.match(selectorsUi, /modal\(content, \{ variant: 'x'/);
 assert.match(selectorsUi, /input\.dispatchEvent\(new Event\('change'/);
 assert.doesNotMatch(selectorsUi, /document\.body\.appendChild\(surface\)/);
 assert.match(reference, /Очень длинное значение для проверки ширины Select на экране 390 px/);
