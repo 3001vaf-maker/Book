@@ -65,6 +65,7 @@ for(const file of allFiles){
 }
 
 const htmlFiles=walk(root).filter((file)=>file.endsWith('.html'));
+const referencedCss=new Set();
 for(const file of htmlFiles){
   const source=fs.readFileSync(file,'utf8');
   for(const match of source.matchAll(/<(?:link|script)\b[^>]*(?:href|src)=["']([^"']+)["'][^>]*>/gi)){
@@ -76,13 +77,23 @@ for(const file of htmlFiles){
       : path.resolve(path.dirname(file),clean);
     if(!fs.existsSync(target)){
       failures.push(`${rel(file)}: HTML local asset reference is missing: ${reference}`);
+    } else if(clean.endsWith('.css')){
+      referencedCss.add(rel(target));
     }
+  }
+}
+
+for(const file of allFiles){
+  const r=rel(file);
+  if(!r.endsWith('.css')) continue;
+  if(!referencedCss.has(r)){
+    failures.push(`${r}: orphan CSS file is forbidden; every stylesheet must belong to an explicit HTML entry`);
   }
 }
 
 for(const retired of [
   'business-migration.js','operational-migration.js','auxiliary-migration.js',
-  'tenant-document-archive.js','core/legacy-browser-business.js','settings/profile/migration.js','core/people/people.css','settings/online-booking/online-booking.css','journal/journal.css',
+  'tenant-document-archive.js','core/legacy-browser-business.js','settings/profile/migration.js','core/people/people.css','settings/online-booking/online-booking.css','journal/journal.css','ui/lists/journal-selection-override.css',
 ]){
   if(fs.existsSync(path.join(root,retired))) failures.push(`${retired}: retired runtime bridge must not exist`);
 }
