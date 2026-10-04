@@ -1,5 +1,5 @@
 import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
-import { createRecord } from '../core/record/index.js';
+import { createRecord, normalizeRecordGroup } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
@@ -22,6 +22,18 @@ const RECORD_MODES = [
 
 const people = () => getPeople();
 const procedures = () => getProcedures();
+
+function recordPersonSnapshot(person = {}) {
+  return {
+    key: String(person?.key || ''),
+    id: String(person?.id || ''),
+    name: String(person?.name || ''),
+    surname: String(person?.surname || ''),
+    phone: String(person?.phone || person?.phones?.[0] || ''),
+    discountPercent: Number(person?.discountPercent) || 0,
+  };
+}
+
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
