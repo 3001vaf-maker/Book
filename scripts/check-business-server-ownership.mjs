@@ -23,9 +23,10 @@ if (!serverRecord.includes('export class RecordService') || !serverRecord.includ
 if (!app.includes('BusinessStateModule')) failures.push('Nest application must register BusinessStateModule.');
 const businessServer = read('server/src/business-state/business-state.service.ts');
 if (/migrationVerifiedAt|verifyMigration|\/migrate|bootstrap/.test(businessServer)) failures.push('Business state runtime transition bridge must not return.');
-for (const model of ['BusinessStateMeta', 'Person', 'UeiState', 'Record', 'RecordEvent']) {
+for (const model of ['Person', 'UeiState', 'Record', 'RecordEvent']) {
   if (!schema.includes(`model ${model}`)) failures.push(`Prisma schema is missing ${model}.`);
 }
+if (/BusinessStateMeta|businessStateMeta/.test(schema + businessServer + serverRecord)) failures.push('BusinessStateMeta must stay removed; canonical owners do not need a readiness table.');
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));

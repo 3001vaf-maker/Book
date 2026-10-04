@@ -254,11 +254,6 @@ async function main() {
       update: { profileId: profile.id, position: 0 },
     });
 
-    await tx.businessStateMeta.upsert({
-      where: { tenantId },
-      create: { tenantId },
-      update: {},
-    });
     await tx.ueiState.upsert({
       where: { tenantId },
       create: { tenantId, data: json({ entities: {}, relations: {}, revoked: [] }) },

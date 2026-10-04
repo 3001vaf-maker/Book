@@ -136,13 +136,6 @@ export class BusinessStateService {
     private readonly records: RecordService,
   ) {}
 
-  private async ensureState(tenantId: string) {
-    await this.prisma.$transaction([
-      this.prisma.businessStateMeta.upsert({ where: { tenantId }, create: { tenantId }, update: {} }),
-      this.prisma.ueiState.upsert({ where: { tenantId }, create: { tenantId, data: json(normalizeUEI({})) }, update: {} }),
-    ]);
-  }
-
   private async bundle(tenantId: string) {
     const [people, identity, records, recordEvents] = await Promise.all([
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
@@ -159,12 +152,10 @@ export class BusinessStateService {
   }
 
   async get(tenantId: string) {
-    await this.ensureState(tenantId);
     return this.bundle(tenantId);
   }
 
   async upsertPerson(tenantId: string, key: string, body: unknown) {
-    await this.ensureState(tenantId);
     const source = objectValue(body);
     const person = clone(objectValue(source.person ?? source));
     const normalizedKey = text(key);
@@ -179,14 +170,12 @@ export class BusinessStateService {
   }
 
   async deletePerson(tenantId: string, key: string) {
-    await this.ensureState(tenantId);
     const normalizedKey = text(key);
     const result = await this.prisma.person.deleteMany({ where: { tenantId, key: normalizedKey } });
     return { deleted: result.count };
   }
 
   async updateUEI(tenantId: string, body: unknown) {
-    await this.ensureState(tenantId);
     const source = objectValue(body);
     const uei = normalizeUEI(source.uei ?? source);
     await this.prisma.ueiState.upsert({
@@ -204,7 +193,6 @@ export class BusinessStateService {
   }
 
   async deleteRecord(tenantId: string, recordId: string) {
-    await this.ensureState(tenantId);
     const id = text(recordId);
     return this.prisma.$transaction(async (tx) => {
       const financeOperations = await tx.financeOperation.deleteMany({
@@ -225,13 +213,11 @@ export class BusinessStateService {
   }
 
   async deleteRecordEvents(tenantId: string, recordId: string) {
-    await this.ensureState(tenantId);
     const result = await this.prisma.recordEvent.deleteMany({ where: { tenantId, recordId: text(recordId) } });
     return { deleted: result.count };
   }
 
   async upsertRecordEvent(tenantId: string, eventId: string, body: unknown) {
-    await this.ensureState(tenantId);
     const source = objectValue(body);
     const event = clone(objectValue(source.event ?? source));
     const id = text(eventId);
@@ -306,7 +292,6 @@ export class BusinessStateService {
   }
 
   async bookingIdentityForAccount(tenantId: string, accountId: string) {
-    await this.ensureState(tenantId);
     const id = text(accountId);
     const [rows, identityRow] = await Promise.all([
       this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
@@ -340,7 +325,6 @@ export class BusinessStateService {
   }
 
   async accountIdsForIdentity(tenantId: string, phoneValue: unknown, ueiValue: unknown) {
-    await this.ensureState(tenantId);
     const phone = text(phoneValue);
     const requestedUei = text(ueiValue);
     if (!phone && !requestedUei) return [];
