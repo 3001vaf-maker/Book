@@ -26,7 +26,7 @@ const styleCss = fs.readFileSync('css/style.css', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
 const bookingCss = fs.readFileSync('ui/booking/booking.css', 'utf8');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
-const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const v2Ui = ['index.js','header.js','card-deck.js','shell.js','sticker.js','z-stack.js','modal-portal.js','swipe.js','workspace-navigation.js','lifecycle.js','geometry.js'].map((file) => fs.readFileSync(`ui/v2/${file}`, 'utf8')).join('\n');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const documentCss = fs.readFileSync('ui/documents/document.css', 'utf8');
 const professionalCore = fs.readFileSync('core.js', 'utf8');
