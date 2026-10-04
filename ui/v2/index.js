@@ -181,6 +181,18 @@ export function v2Sticker({
   </section>`;
 }
 
+function syncV2ZStackInteraction(app, host) {
+  if (!app || !host) return;
+  const base = host.querySelector(':scope > [data-v2-z]:not([data-v2-z-layer])');
+  const layers = [...host.querySelectorAll(':scope > [data-v2-z-layer]')];
+  const active = layers.at(-1) || base || null;
+  [base, ...layers].filter(Boolean).forEach((surface) => {
+    const blocked = surface !== active;
+    surface.inert = blocked;
+    surface.classList.toggle('is-v2-obscured', blocked);
+  });
+}
+
 export function v2ZLayer(content = '', { className = '' } = {}) {
   return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
 }
@@ -204,6 +216,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
   host.appendChild(node);
   app?.classList.add('has-z-layer');
+  syncV2ZStackInteraction(app, host);
   const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   const contextObserver = new MutationObserver((mutations) => {
     if (mutations.some((mutation) => mutation.type === 'childList'
@@ -240,6 +253,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
     disposeSwipe();
     if (node.isConnected) node.remove();
     app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
+    syncV2ZStackInteraction(app, host);
     notify();
   };
   const close = () => {
@@ -360,6 +374,29 @@ function initV2LayerDismissGesture(node, { kind = 'standard', onDismiss = null, 
 }
 
 const v2ModalSurfaceLocks = new WeakMap();
+const v2StageInteractionLocks = new WeakMap();
+
+function lockV2StageInteraction(app) {
+  const stage = app?.querySelector?.('.v2-app__stage');
+  if (!app || !stage) return null;
+  const next = (v2StageInteractionLocks.get(stage) || 0) + 1;
+  v2StageInteractionLocks.set(stage, next);
+  stage.inert = true;
+  app.classList.add('has-v2-modal');
+  return stage;
+}
+
+function unlockV2StageInteraction(app, stage) {
+  if (!app || !stage) return;
+  const next = Math.max(0, (v2StageInteractionLocks.get(stage) || 1) - 1);
+  if (next) {
+    v2StageInteractionLocks.set(stage, next);
+    return;
+  }
+  v2StageInteractionLocks.delete(stage);
+  stage.inert = false;
+  app.classList.remove('has-v2-modal');
+}
 
 function activeV2ModalSurface(root = null) {
   const explicit = root?.matches?.('[data-v2-z-layer], [data-v2-z]')
@@ -475,6 +512,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const locksHeader = Boolean(app && kind === 'standard' && !qLayer);
   const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
+  const lockedStage = technical ? null : lockV2StageInteraction(app);
   const portalOwner = technical ? null : mountV2ModalPortal(host);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
@@ -498,6 +536,7 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (node.isConnected) node.remove();
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
+    if (!technical) unlockV2StageInteraction(app, lockedStage);
     if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
     if (locksHeader && app && !app.querySelector('[data-v2-layer-kind="standard"]')) {
       const currentHeader = app.querySelector?.('[data-v2-header]');
@@ -582,6 +621,7 @@ export function initV2Swipe(root, {
   };
 
   const down = (event) => {
+    if (app?.classList.contains('has-v2-modal')) return;
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const stageRect = stage?.getBoundingClientRect?.() || surface.getBoundingClientRect?.();
