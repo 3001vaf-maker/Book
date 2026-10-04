@@ -25,7 +25,7 @@ const persistence = await import('../core/business-persistence.js');
 const data = await import('../settings/documents/data.js');
 const consents = await import('../settings/documents/consents.js');
 const history = await import('../settings/documents/history.js');
-const runtime = await import('../core/runtime/document-state.js');
+const runtime = await import('../core/runtime/tenant-document-archive.js');
 void runtime;
 
 persistence.setBusinessServerReady(true);
