@@ -3,39 +3,16 @@ import { API_BASE } from '../environment.js';
 const ACCOUNT_TOKEN_KEY = 'book.account.token';
 const ACCOUNT_EMAIL_KEY = 'book.account.email';
 
-function legacyTokenKey(tenantId) {
-  return `book.account.token.${String(tenantId || '')}`;
+export function getAccountToken() {
+  return localStorage.getItem(ACCOUNT_TOKEN_KEY) || '';
 }
 
-function legacyEmailKey(tenantId) {
-  return `book.account.email.${String(tenantId || '')}`;
+export function getRememberedAccountEmail() {
+  return localStorage.getItem(ACCOUNT_EMAIL_KEY) || '';
 }
 
-export function getAccountToken(tenantId = '') {
-  const globalToken = localStorage.getItem(ACCOUNT_TOKEN_KEY) || '';
-  if (globalToken) return globalToken;
-  const legacy = tenantId ? localStorage.getItem(legacyTokenKey(tenantId)) || '' : '';
-  if (legacy) {
-    localStorage.setItem(ACCOUNT_TOKEN_KEY, legacy);
-    localStorage.removeItem(legacyTokenKey(tenantId));
-  }
-  return legacy;
-}
-
-export function getRememberedAccountEmail(tenantId = '') {
-  const globalEmail = localStorage.getItem(ACCOUNT_EMAIL_KEY) || '';
-  if (globalEmail) return globalEmail;
-  const legacy = tenantId ? localStorage.getItem(legacyEmailKey(tenantId)) || '' : '';
-  if (legacy) {
-    localStorage.setItem(ACCOUNT_EMAIL_KEY, legacy);
-    localStorage.removeItem(legacyEmailKey(tenantId));
-  }
-  return legacy;
-}
-
-export function clearAccount(tenantId = '') {
+export function clearAccount() {
   localStorage.removeItem(ACCOUNT_TOKEN_KEY);
-  if (tenantId) localStorage.removeItem(legacyTokenKey(tenantId));
 }
 
 async function request(path, { tenantId = '', auth = false, ...options } = {}) {
