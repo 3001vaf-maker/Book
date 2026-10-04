@@ -13,7 +13,6 @@ async function responseJson(response, fallback) {
 export async function refreshRecordsFromServer() {
   const response = await apiRequest('/business-state');
   const payload = await responseJson(response, 'Не удалось обновить записи');
-  if (!payload?.verified) throw new Error('Серверное хранилище записей не подтверждено');
   hydrateRecordStateFromServer({
     records: payload.records || [],
     recordEvents: payload.recordEvents || [],
