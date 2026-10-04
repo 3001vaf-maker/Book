@@ -84,6 +84,6 @@ assert.match(inputCss,/background:#ffff00/);
 assert.match(inputCss,/::-webkit-slider-thumb/);
 assert.match(colorSource,/#FFFF00/);
 assert.match(colorSource,/#FF1111/);
-assert.match(colorSource,/variant: 'bottom'/);
+assert.match(colorSource,/variant: 'x'/);
 
 console.log('entity card constructor tests passed');
