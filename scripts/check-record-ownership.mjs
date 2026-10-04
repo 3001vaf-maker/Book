@@ -261,7 +261,7 @@ if (!/data-record-owner-settings/.test(sharedRecordUi)
   errors.push('ui/record/runtime.js must remain the canonical Record Z/A/C presentation owner');
 }
 
-const sharedV2Runtime = read('ui/v2/index.js');
+const sharedV2Runtime = [read('ui/v2/index.js'), read('ui/v2/z-stack.js'), read('ui/v2/swipe.js')].join('\n');
 if (!/mountV2ZLayer/.test(sharedV2Runtime)
   || !/stack\s*=\s*false/.test(sharedV2Runtime)
   || !/initV2Swipe\(node,\s*\{\s*onRight:\s*close,\s*revealDeck:\s*false,\s*threshold:\s*28,\s*edgeWidth:\s*36\s*\}\)/.test(sharedV2Runtime)
