@@ -25,8 +25,8 @@ const persistence = await import('../core/business-persistence.js');
 const data = await import('../settings/documents/data.js');
 const consents = await import('../settings/documents/consents.js');
 const history = await import('../settings/documents/history.js');
-const migration = await import('../tenant-document-archive.js');
-void migration;
+const runtime = await import('../core/runtime/document-state.js');
+void runtime;
 
 persistence.setBusinessServerReady(true);
 data.hydrateDocumentsFromServer([{ id: 'pdn-consent', system: true, kind: 'consent', title: 'PDN', personConsent: true, required: true, version: 1, text: 'x' }]);

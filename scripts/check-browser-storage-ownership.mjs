@@ -14,8 +14,7 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'onboarding/onboarding.js',
 ]);
 
-const CLEANUP_OWNER = 'core/legacy-browser-business.js';
-const ALLOWED = new Set([...TECHNICAL_STORAGE_OWNERS, CLEANUP_OWNER]);
+const ALLOWED = new Set([...TECHNICAL_STORAGE_OWNERS]);
 
 function walk(dir) {
   const out = [];
@@ -45,30 +44,8 @@ if (fs.existsSync(path.join(ROOT, 'core/workspace-sync.js'))) {
 }
 
 const core = source(path.join(ROOT, 'core.js'));
-const auxiliaryCheck = core.indexOf('if (!auxiliaryMigration.verified)');
-const cleanupCall = core.indexOf('clearLegacyBusinessStorage();');
-const workspaceRender = core.indexOf('ensureServerBookingSync();');
-if (cleanupCall < 0) violations.push('core.js: verified server startup must purge stale legacy business storage');
-if (!(auxiliaryCheck >= 0 && cleanupCall > auxiliaryCheck && workspaceRender > cleanupCall)) {
-  violations.push('core.js: stale legacy business storage may only be purged after every server domain is verified and before workspace runtime starts');
-}
-
-const cleanup = source(path.join(ROOT, CLEANUP_OWNER));
-for (const requiredTechnicalKey of [
-  'book.account.token',
-  'book.account.email',
-  'book.account.token.',
-  'book.account.email.',
-  'book.people.sort',
-  'book.onboarding.',
-  'book:workplace-context',
-]) {
-  if (!cleanup.includes(requiredTechnicalKey)) {
-    violations.push(`${CLEANUP_OWNER}: technical/session/UI preservation rule is missing: ${requiredTechnicalKey}`);
-  }
-}
-if (/book\.(?:workplaces|records)|book\.journalBreaks/.test(cleanup)) {
-  violations.push(`${CLEANUP_OWNER}: cleanup must stay entity-agnostic and must not duplicate canonical business storage keys`);
+if (/clearLegacyBusinessStorage|legacy-browser-business|workspace-sync/.test(core)) {
+  violations.push('core.js: runtime cleanup/mirroring bridges are forbidden');
 }
 
 if (violations.length) {

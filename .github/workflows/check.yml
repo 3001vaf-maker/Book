@@ -2,7 +2,6 @@ name: Check Book
 
 on:
   push:
-    branches: [main, staging]
   pull_request:
     branches: [main, staging]
   workflow_dispatch:
@@ -24,6 +23,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Enforce branch policy
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ] && [ "${GITHUB_REF_NAME}" != "staging" ]; then
+            echo "Only main and staging branches are allowed"
+            exit 1
+          fi
       - name: Syntax and architecture checks
         run: npm run check
       - name: Domain regression tests

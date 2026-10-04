@@ -5,7 +5,7 @@ const core = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 const auth = readFileSync(new URL('../core/auth.js', import.meta.url), 'utf8');
 const profileData = readFileSync(new URL('../settings/profile/data.js', import.meta.url), 'utf8');
 const workplaceData = readFileSync(new URL('../settings/profile/workplaces/data.js', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../settings/profile/migration.js', import.meta.url), 'utf8');
+const runtime = readFileSync(new URL('../settings/profile/runtime.js', import.meta.url), 'utf8');
 const serverService = readFileSync(new URL('../server/src/profile/profile.service.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
 const workplaceTimeZoneMigration = readFileSync(new URL('../server/prisma/migrations/20260920113000_workplace_timezone/migration.sql', import.meta.url), 'utf8');
@@ -21,7 +21,7 @@ const listEntryUi = readFileSync(new URL('../ui/lists/list-entry.js', import.met
 
 assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
-assert.match(core, /initializeProfileWorkplaces/);
+assert.match(core, /loadProfileState/);
 
 assert.doesNotMatch(profileData, /localStorage|readLegacyProfileSnapshot/);
 assert.match(profileData, /apiRequest\('\/profile'/);
@@ -34,11 +34,10 @@ assert.doesNotMatch(workplaceData, /localStorage|readLegacyWorkplacesSnapshot/);
 assert.match(workplaceData, /apiRequest\(`\/profile\/workplaces\//);
 assert.match(workplaceData, /hydrateWorkplacesFromServer/);
 
-assert.match(migration, /apiRequest\('\/profile'\)/);
-assert.match(migration, /apiRequest\('\/profile\/bootstrap'/);
-assert.match(migration, /hydrateProfileFromServer/);
-assert.match(migration, /hydrateWorkplacesFromServer/);
-assert.doesNotMatch(migration, /localStorage|readLegacy|\/profile\/migrate/);
+assert.match(runtime, /apiRequest\('\/profile'\)/);
+assert.match(runtime, /hydrateProfileFromServer/);
+assert.match(runtime, /hydrateWorkplacesFromServer/);
+assert.doesNotMatch(runtime, /localStorage|readLegacy|\/migrate|bootstrap/);
 
 assert.match(schema, /model Profile\s*\{/);
 assert.match(schema, /model Workplace\s*\{/);
@@ -47,8 +46,8 @@ assert.match(workplaceData, /timeZone:\s*String\(workplace\.timeZone/);
 assert.match(serverService, /resolveWorkplaceTimeZone/);
 assert.match(workplaceTimeZoneMigration, /Asia\/Yekaterinburg/);
 assert.match(workplaceTimeZoneMigration, /Europe\/Kaliningrad/);
-assert.match(schema, /migrationVerifiedAt\s+DateTime\?/);
-assert.match(serverService, /migrationVerifiedAt/);
+assert.doesNotMatch(schema, /migrationVerifiedAt/);
+assert.doesNotMatch(serverService, /migrationVerifiedAt|verifyMigration|\bmigrate\(|bootstrap/);
 assert.match(serverService, /id:\s*row\.id/);
 assert.match(serverService, /platformAccountId:\s*row\.platformAccountId/);
 assert.doesNotMatch(serverService, /Profile \+ Workplaces/);
