@@ -126,7 +126,7 @@ assert.match(financeOperationsSource, /title: 'Инвестиции'/);
 assert.match(financeOperationsSource, /title: 'Переводы'/);
 assert.match(financeOperationsSource, /openFinanceOperations/);
 assert.match(financeOperationsSource, /mountV2ZLayer/);
-assert.match(financeOperationsSource, /variant: 'quick'/);
+assert.match(financeOperationsSource, /variant: 'x'/);
 assert.match(ddsSource, /ДДС\.csv/);
 assert.match(folderSource, /variant === 'compact'/);
 assert.doesNotMatch(settingsSource, /\['wallets', 'Кошелёк'/);
