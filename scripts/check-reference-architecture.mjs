@@ -125,14 +125,14 @@ for (const file of cssFiles) {
   if (/\.workplace-header-content\b/.test(source)) report(file, 'Workplace content must not be coupled to Header; use .workplace-content');
 }
 const headerSource = text(headerControlOwner);
-if (!/export\s+function\s+openHeaderControl\b/.test(headerSource) || !/variant:\s*['"]medium['"]/.test(headerSource)) {
-  report(headerControlOwner, 'Header Control must own one canonical medium modal manifestation through openHeaderControl()');
+if (!/export\s+function\s+openHeaderControl\b/.test(headerSource) || !/variant:\s*['"]x['"]/.test(headerSource)) {
+  report(headerControlOwner, 'Header Control must own one canonical X modal manifestation through openHeaderControl()');
 }
 const workplaceSource = text(workplaceUi);
 if (!/\bopenHeaderControl\s*\(/.test(workplaceSource)) {
   report(workplaceUi, 'Graph Workplace manifestation must use the shared openHeaderControl() shell');
 }
-if (/variant:\s*['"]medium['"]/.test(workplaceSource)) {
+if (/variant:\s*['"]x['"]/.test(workplaceSource)) {
   report(workplaceUi, 'Workplace must not choose Header Control modal size; medium belongs to ui/header');
 }
 
@@ -161,8 +161,8 @@ if (!/\bopenJournalWorkplaceControl\s*\(/.test(journalSource)) {
   report(journalController, 'Journal must use its own Header manifestation');
 }
 const journalWorkplaceSource = text(journalWorkplaceControl);
-if (!/\bmountModal\s*\(/.test(journalWorkplaceSource) || !/\bselect\s*\(/.test(journalWorkplaceSource) || !/variant:\s*['"]bottom['"]/.test(journalWorkplaceSource)) {
-  report(journalWorkplaceControl, 'Journal workplace manifestation must reuse Shared Select inside the canonical bottom Modal');
+if (!/\bmountModal\s*\(/.test(journalWorkplaceSource) || !/\bselect\s*\(/.test(journalWorkplaceSource) || !/variant:\s*['"]x['"]/.test(journalWorkplaceSource)) {
+  report(journalWorkplaceControl, 'Journal workplace manifestation must reuse Shared Select inside canonical X');
 }
 
 const workplaceOwner = 'settings/profile/workplaces/data.js';
