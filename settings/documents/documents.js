@@ -314,7 +314,7 @@ function openDocumentDetailSettings(root, layer, item) {
     `<div class="compact-form">${actions.join('')}</div>`,
     {
       title: 'Настройки документа',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },
@@ -339,7 +339,7 @@ function openDocumentDetailSettings(root, layer, item) {
       </div>`,
       {
         title: rkn ? 'Убрать документ' : 'Удалить документ',
-        variant: 'bottom',
+        variant: 'x',
         surface: 'app',
         className: 'modal--form-sheet',
       },
@@ -410,7 +410,7 @@ function openSigningDetail(item) {
     </div>`,
     {
       title: 'Информация о подписании',
-      variant: 'top',
+      variant: 's',
       surface: 'app',
       className: 'documents-signing-info-sheet',
     },
@@ -632,7 +632,7 @@ function openAddDocumentMenu(root) {
     </div>`,
     {
       title: 'Добавить документ',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },
@@ -658,7 +658,7 @@ function openSettingsMenu(root) {
     </div>`,
     {
       title: 'Документы',
-      variant: 'bottom',
+      variant: 'x',
       surface: 'app',
       className: 'modal--form-sheet',
     },
