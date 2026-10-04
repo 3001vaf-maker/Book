@@ -26,6 +26,9 @@
 | Receipt | чек / отчётный лист | `ui/receipt` |
 | Calendar | календарь | `ui/calendar` |
 | TimePicker | время / диапазон | `ui/time` |
+| ColorPicker | выбор цвета | `ui/colors` |
+| Cost | стоимость / диапазон | `ui/cost` |
+| Duration | длительность | `ui/duration` |
 | Selector | выбор значения | `ui/selectors` |
 | SegmentControl | переключатель вариантов | `ui/selection` |
 | Toggle | да/нет | Shared settings/list UI |

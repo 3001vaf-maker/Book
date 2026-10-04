@@ -18,3 +18,5 @@
 .time-slots--record-vertical{display:grid;grid-template-columns:1fr;gap:8px;width:min(100%,430px);margin:0 auto;overflow:visible}
 .time-slots--record-vertical .time-slot{width:100%;min-width:0;min-height:44px;height:44px;aspect-ratio:auto;border:1px solid var(--border);border-radius:0;background:var(--white);font-size:18px;font-weight:500;box-shadow:none}
 .time-slots--record-vertical .time-slot.is-emphasized{font-weight:800}
+
+.work-time-row{display:grid;gap:6px}.work-time-row__label{color:var(--text-secondary);font-size:13px}.work-time-row__fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.work-time-row__fields .field{grid-template-columns:auto 1fr;align-items:center;gap:7px}.work-time-row__fields .field>span{font-size:13px}@media(max-width:360px){.work-time-row__fields{gap:6px}}
