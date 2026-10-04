@@ -3,7 +3,6 @@ import {
   durationText,
   field,
   select,
-  initMultiSelect,
   openSharedProfileSettingsMenu,
   modal,
   mountModal,
@@ -326,7 +325,9 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const capacity = recordCapacity(currentRecord);
     if (capacity < 2) return;
     const all = people();
-    const selected = recordParticipants(currentRecord).map((person) => String(person?.key || person?.id || '')).filter(Boolean);
+    const selected = new Set(recordParticipants(currentRecord)
+      .map((person) => String(person?.key || person?.id || ''))
+      .filter(Boolean));
     const rows = recordPersonList(all.map((person) => {
       const display = personDisplay(person);
       return {
@@ -341,37 +342,41 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       empty: 'Люди не найдены.',
     });
     const layer = mountModal(document.body, modal(
-      `<div class="compact-form"><div><strong data-record-view-group-count>${selected.length} / ${capacity}</strong></div><div data-record-view-group-list>${rows}</div><div class="form-error" data-record-view-group-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-view-group-save' })}</div>`,
+      `<div class="compact-form"><div><strong data-record-view-group-count>${selected.size} / ${capacity}</strong></div><div data-record-view-group-list>${rows}</div><div class="form-error" data-record-view-group-error aria-live="polite"></div>${button('Сохранить', { data: 'data-record-view-group-save' })}</div>`,
       { variant: 'x', surface: 'app', title: 'Участники', className: 'modal--form-sheet' },
     ));
     const listRoot = layer?.querySelector('[data-record-view-group-list]');
     if (!layer || !listRoot) return;
-    let previous = selected;
-    let correcting = false;
-    const controller = initMultiSelect(listRoot, {
-      selectedValues: selected,
-      selector: '[data-record-view-group-person]',
-      valueAttribute: 'recordViewGroupPerson',
-      onChange: (values) => {
-        if (correcting) return;
-        const unique = [...new Set(values.map(String))];
-        if (unique.length > capacity) {
-          correcting = true;
-          controller.setSelectedValues(previous);
-          correcting = false;
-          const error = layer.querySelector('[data-record-view-group-error]');
+
+    const sync = () => {
+      listRoot.querySelectorAll('[data-record-view-group-person]').forEach((node) => {
+        const key = String(node.dataset.recordViewGroupPerson || '');
+        const active = selected.has(key);
+        node.classList.toggle('is-selected', active);
+        node.setAttribute('aria-pressed', String(active));
+      });
+      const count = layer.querySelector('[data-record-view-group-count]');
+      if (count) count.textContent = `${selected.size} / ${capacity}`;
+    };
+    sync();
+
+    listRoot.querySelectorAll('[data-record-view-group-person]').forEach((node) => {
+      node.addEventListener('click', () => {
+        const key = String(node.dataset.recordViewGroupPerson || '');
+        if (!key) return;
+        const error = layer.querySelector('[data-record-view-group-error]');
+        if (selected.has(key)) selected.delete(key);
+        else if (selected.size >= capacity) {
           if (error) error.textContent = `Можно выбрать не больше ${capacity} человек.`;
           return;
-        }
-        previous = unique;
-        const count = layer.querySelector('[data-record-view-group-count]');
-        if (count) count.textContent = `${unique.length} / ${capacity}`;
-        const error = layer.querySelector('[data-record-view-group-error]');
+        } else selected.add(key);
         if (error) error.textContent = '';
-      },
+        sync();
+      });
     });
+
     layer.querySelector('[data-record-view-group-save]')?.addEventListener('click', () => {
-      const keys = controller.getSelectedValues();
+      const keys = [...selected];
       if (!keys.length) {
         const error = layer.querySelector('[data-record-view-group-error]');
         if (error) error.textContent = 'Выберите хотя бы одного человека.';
@@ -384,7 +389,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         person: group?.participants?.[0] || state.person,
         group,
       };
-      controller.destroy();
       layer.v2Close?.();
       render();
     });
