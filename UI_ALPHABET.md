@@ -41,6 +41,9 @@
 - Z-content: native scroll, без локального перехвата.
 - HorizontalRail владеет своим горизонтальным scroll.
 - Один pointer gesture может иметь только одного владельца.
+- Нижний Z под открытым Z2/Z3 всегда inert и pointer-dead. Работает только верхний Z.
+- Частично отведённый Z не делает F интерактивным: F включается только после завершённого перехода.
+- Открытый X/Q/S блокирует взаимодействие с Z/F/E до полного закрытия modal.
 - Feature-код не создаёт `pointerdown/pointermove/touch*`, `touch-action`, drag physics или screen-edge logic.
 
 ## Modal
