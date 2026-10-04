@@ -87,6 +87,7 @@ export function renderJournalDay(root, {
 
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
   initJournalDayTimeline(contentRoot, {
+    onWorkFieldClick: () => onWorkplaceFieldClick(workplaceId),
     onUsageClick: ({ usageId }) => { void openUsage(usageById.get(String(usageId || '')), rerender); },
     onSlotClick: async ({ from, to }) => {
       const minuteState = getTimeAvailabilityAt({ date: dayDate, workplaceId, time: from });
