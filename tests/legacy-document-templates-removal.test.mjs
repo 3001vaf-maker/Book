@@ -8,7 +8,7 @@ import {
 } from '../settings/documents/data.js';
 
 const activeData = readFileSync(new URL('../settings/documents/data.js', import.meta.url), 'utf8');
-const runtime = readFileSync(new URL('../core/runtime/document-state.js', import.meta.url), 'utf8');
+const runtime = readFileSync(new URL('../core/runtime/tenant-document-archive.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(activeData, /DEFAULT_DOCUMENTS|getDefaultDocuments/);
 assert.doesNotMatch(activeData, /Шаблон для адаптации под вашу работу/);
