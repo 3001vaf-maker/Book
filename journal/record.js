@@ -23,6 +23,29 @@ const RECORD_MODES = [
 const people = () => getPeople();
 const procedures = () => getProcedures();
 
+function recordPersonSnapshot(person = {}) {
+  return {
+    key: String(person?.key || ''),
+    id: String(person?.id || ''),
+    name: String(person?.name || ''),
+    surname: String(person?.surname || ''),
+    phone: String(person?.phone || person?.phones?.[0] || ''),
+    discountPercent: Number(person?.discountPercent) || 0,
+  };
+}
+
+function groupCapacityForSelectedProcedures(selectedProcedures = []) {
+  const items = Array.isArray(selectedProcedures) ? selectedProcedures : [];
+  if (!items.length) return 1;
+  const capacities = items.map((entry) => {
+    const source = entry?.procedure || entry || {};
+    const catalog = procedures().find((item) => String(item?.id || '') === String(source?.id || '')) || source;
+    if (catalog?.groupBooking?.enabled !== true) return 1;
+    return Math.max(2, Math.min(999, Math.floor(Number(catalog?.groupBooking?.capacity) || 2)));
+  });
+  return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
+}
+
 function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
   const profile = getProfile();
   const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
