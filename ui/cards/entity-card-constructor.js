@@ -120,7 +120,7 @@ function fieldControl(line,fields){
   });
 }
 
-function editorWorkspace(state,fields){
+function editorWorkspace(state,fields,allowPhoto=true){
   if(allowPhoto && state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
       ${button(state.photo?'Заменить фото':'Добавить фото',{data:'data-card-photo-select'})}
@@ -214,7 +214,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       <div class="segment-control entity-card-editor__tabs" role="group" aria-label="Вид карты">
         ${(allowPhoto?[['photo','Фото'],['background','Фон'],['card','Карта']]:[['background','Фон'],['card','Карта']]).map(([value,label])=>`<button type="button" class="${state.tab===value?'is-active':''}" data-card-tab="${value}" aria-pressed="${state.tab===value?'true':'false'}">${label}</button>`).join('')}
       </div>
-      <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields)}</div>
+      <div class="entity-card-editor__workspace" data-card-workspace>${editorWorkspace(state,fields,allowPhoto)}</div>
       <div class="form-error" data-card-error>${escapeHtml(state.error||'')}</div>
     </div>`;
     bind();
@@ -228,7 +228,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
 
   const rerenderWorkspace=()=>{
     const workspace=root.querySelector('[data-card-workspace]');
-    if(workspace)workspace.innerHTML=editorWorkspace(state,fields);
+    if(workspace)workspace.innerHTML=editorWorkspace(state,fields,allowPhoto);
     bindWorkspace();
     updatePreview();
     notifyState();
