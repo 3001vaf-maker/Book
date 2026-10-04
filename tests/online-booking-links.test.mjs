@@ -40,7 +40,7 @@ assert.match(accountSource, /export async function resolveBookingPublicRoute/);
 assert.match(accountSource, /\/online-booking\/route\//);
 assert.match(coreSource, /await bookingRoute\(\)/);
 assert.match(coreSource, /resolveBookingPublicRoute/);
-assert.match(coreSource, /params\.get\('booking'\)/, 'Legacy booking links must remain readable during migration');
+assert.doesNotMatch(coreSource, /params\.get\('booking'\)/, 'Retired query-string booking route must not return');
 assert.match(controllerSource, /@Get\('owner\/route'\)/);
 assert.match(controllerSource, /@Get\('route\/:profileSlug'\)/);
 assert.match(serviceSource, /BookingPublicRouteType/);
