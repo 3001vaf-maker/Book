@@ -52,6 +52,23 @@ for(const file of allFiles){
     failures.push(`${r}: gesture ownership is forbidden outside Shared UI`);
   }
 }
+
+const htmlFiles=walk(root).filter((file)=>file.endsWith('.html'));
+for(const file of htmlFiles){
+  const source=fs.readFileSync(file,'utf8');
+  for(const match of source.matchAll(/<(?:link|script)\b[^>]*(?:href|src)=["']([^"']+)["'][^>]*>/gi)){
+    const reference=String(match[1]||'').trim();
+    if(!reference || /^(?:https?:|data:|#)/i.test(reference) || reference==='/') continue;
+    const clean=reference.split(/[?#]/)[0];
+    const target=clean.startsWith('/')
+      ? path.join(root,clean.replace(/^\/+/,'')) 
+      : path.resolve(path.dirname(file),clean);
+    if(!fs.existsSync(target)){
+      failures.push(`${rel(file)}: HTML local asset reference is missing: ${reference}`);
+    }
+  }
+}
+
 for(const retired of [
   'business-migration.js','operational-migration.js','auxiliary-migration.js',
   'tenant-document-archive.js','core/legacy-browser-business.js','settings/profile/migration.js','core/people/people.css','settings/online-booking/online-booking.css','journal/journal.css',
