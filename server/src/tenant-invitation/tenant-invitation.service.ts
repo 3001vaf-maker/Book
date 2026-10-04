@@ -300,7 +300,6 @@ export class TenantInvitationService {
           telegrams: [],
           emails: [email],
           customProfessions: [],
-          migrationVerifiedAt: acceptedAt,
         },
       });
       await tx.tenantInvitation.update({
