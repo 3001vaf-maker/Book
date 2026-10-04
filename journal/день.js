@@ -33,7 +33,8 @@ async function openUsage(usage, rerender = () => {}) {
 export function renderJournalDay(root, {
   date = new Date(),
   workplaceId = '',
-  onChange = () => {}
+  onChange = () => {},
+  onWorkplaceFieldClick = () => {},
 } = {}) {
   root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
   initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
