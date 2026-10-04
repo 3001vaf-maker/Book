@@ -51,11 +51,16 @@ export class ProcedureService {
       if (!procedure || !this.assignmentFor(procedure, workplaceId)) {
         throw new BadRequestException('Одна из процедур недоступна в этом рабочем пространстве');
       }
+      const groupEnabled = procedure?.groupBooking?.enabled === true;
       return {
         id,
         name: text(procedure?.name),
         duration: Math.max(0, Number(procedure?.duration || 0)),
         cost: this.costFor(procedure, workplaceId),
+        groupBooking: {
+          enabled: groupEnabled,
+          capacity: groupEnabled ? Math.max(2, Math.min(999, Math.floor(Number(procedure?.groupBooking?.capacity) || 2))) : 1,
+        },
       };
     });
   }
