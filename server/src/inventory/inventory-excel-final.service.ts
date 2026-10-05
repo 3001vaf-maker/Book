@@ -428,10 +428,11 @@ export class InventoryExcelService {
       grouped.set(key, group);
     });
 
-    const candidates: AnyRecord[] = [...grouped.entries()].map(([key, group]) => ({
+    const candidates: AnyRecord[] = [...grouped.entries()].map(([key, group]): AnyRecord => ({
       ...group,
       sourceId: stableSourceId([key, ...group.lines.map((line: AnyRecord) => `${line.itemId}:${line.quantity}:${line.unitCost ?? ''}:${line.note || ''}`)]),
-    })).sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+    }));
+    candidates.sort((a: AnyRecord, b: AnyRecord) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
     const existing = await this.prisma.inventoryMovement.findMany({
       where: { tenantId, sourceType: 'excel-import', sourceId: { in: candidates.map((item) => item.sourceId) } },
