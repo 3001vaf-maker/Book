@@ -389,7 +389,7 @@ export class InventoryExcelService {
       if (!match) errors.push(`Строка ${row.row}: материал «${row.material}» не найден в остатках`);
       if (match === 'ambiguous') errors.push(`Строка ${row.row}: материал «${row.material}» определяется неоднозначно`);
     });
-    const groups = new Set(rows.map((row) => [row.date, row.time, row.personUei, row.procedure, row.section, row.kind, row.note].join('|')));
+    const groups = new Set(rows.map((row) => [row.date, row.time, row.personUei, row.procedure, row.kind, row.note].join('|')));
     return { rows: rows.length, groups: groups.size, errors };
   }
 
@@ -413,7 +413,7 @@ export class InventoryExcelService {
 
     rows.forEach((row) => {
       const item = this.movementItemMatch(snapshot.items, row) as AnyRecord;
-      const key = [row.date, row.time, row.personUei, row.procedure, row.section, row.kind, row.note].join('|');
+      const key = [row.date, row.time, row.personUei, row.procedure, row.kind, row.note].join('|');
       const group = grouped.get(key) || {
         kind: row.kind,
         sourceType: 'excel-import',
