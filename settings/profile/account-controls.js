@@ -66,17 +66,6 @@ function serviceMarkup(state, pushState) {
   ]);
 }
 
-function pressed(control) {
-  return control?.getAttribute('aria-pressed') === 'true';
-}
-
-function setPressed(control, value) {
-  if (!control) return;
-  control.setAttribute('aria-pressed', value ? 'true' : 'false');
-  control.classList.toggle('is-on', Boolean(value));
-  control.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', Boolean(value));
-}
-
 function openConsentDocument(item) {
   return openDocumentViewer({
     title:item.title || 'Документ',
@@ -119,41 +108,41 @@ async function renderPanelState(root,state,pushState=null){
     });
   });
 
-  root.querySelector('[data-service-email]')?.addEventListener('click',async(event)=>{
-    const control=event.currentTarget;
+  root.querySelector('[data-service-email]')?.addEventListener('change',async(event)=>{
+    const input=event.currentTarget;
     const status=root.querySelector('[data-notification-status]');
-    const nextValue=!pressed(control);
-    control.disabled=true;
+    input.disabled=true;
     if(status)status.textContent='Сохраняем…';
     try{
       const next=await request('/profile/account-controls/service-notifications',{
         method:'PUT',
-        body:JSON.stringify({email:nextValue}),
+        body:JSON.stringify({email:input.checked}),
       });
-      setPressed(control,next.serviceNotifications?.email!==false);
+      input.checked=next.serviceNotifications?.email!==false;
       if(status)status.textContent='Сохранено.';
     }catch(error){
+      input.checked=!input.checked;
       if(status)status.textContent=error instanceof Error?error.message:'Не удалось сохранить';
     }finally{
-      control.disabled=false;
+      input.disabled=false;
     }
   });
 
-  root.querySelector('[data-service-push]')?.addEventListener('click',async(event)=>{
-    const control=event.currentTarget;
+  root.querySelector('[data-service-push]')?.addEventListener('change',async(event)=>{
+    const input=event.currentTarget;
     const status=root.querySelector('[data-notification-status]');
-    const nextValue=!pressed(control);
-    control.disabled=true;
+    input.disabled=true;
     if(status)status.textContent='Сохраняем…';
     try{
-      const next=nextValue?await enablePlatformPush():await disablePlatformPush();
-      setPressed(control,Boolean(next?.subscribed));
-      control.disabled=!(next?.supported&&next?.enabled);
-      if(status)status.textContent=pressed(control)?'Push включён.':'Push выключен.';
+      const next=input.checked?await enablePlatformPush():await disablePlatformPush();
+      input.checked=Boolean(next?.subscribed);
+      input.disabled=!(next?.supported&&next?.enabled);
+      if(status)status.textContent=input.checked?'Push включён.':'Push выключен.';
     }catch(error){
+      input.checked=!input.checked;
       if(status)status.textContent=error instanceof Error?error.message:'Не удалось изменить Push';
     }finally{
-      if(push?.supported&&push?.enabled)control.disabled=false;
+      if(push?.supported&&push?.enabled)input.disabled=false;
     }
   });
 }
