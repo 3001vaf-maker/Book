@@ -5,6 +5,7 @@ const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const personalData = fs.readFileSync('online-booking/personal-data.js', 'utf8');
 const consentSettings = fs.readFileSync('online-booking/consent-settings.js', 'utf8');
 const settings = fs.readFileSync('settings/online-booking/online-booking.js', 'utf8');
+const notificationSettings = fs.readFileSync('settings/notifications/notifications.js', 'utf8');
 const serverSync = fs.readFileSync('online-booking/server-sync.js', 'utf8');
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
@@ -93,12 +94,19 @@ expect(settings.includes("from '../../core/booking-settings/index.js'"), 'Online
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(settings) && !settings.includes('app-content--book-shell'), 'Online booking settings must not create a second full-screen shell inside Shared Z.');
 expect(settings.includes('workspaceHeaderContext({') && !settings.includes('data-online-booking-back') && settings.includes('data-online-booking-welcome-save') && settings.includes("variant: 'q'"), 'Online booking must use the single Shared V2 workspace and Q Header C while return navigation remains gesture-owned.');
 expect(settings.includes("title: 'Онлайн-запись'") && settings.includes("data: 'data-online-booking-settings'"), 'Online booking Z1 A must own its settings while C remains absent.');
-expect(settings.includes("openSharedProfileSettingsMenu({") && settings.includes("label: 'Приветствие'") && settings.includes("label: 'Настройки уведомлений'"), 'Online booking A must expose only Welcome and Notification settings through the Shared settings sheet.');
+expect(settings.includes("openSharedProfileSettingsMenu({") && settings.includes("label: 'Приветствие'") && !settings.includes("label: 'Настройки уведомлений'"), 'Online booking A must own only Welcome; notification delivery settings belong to Notifications.');
 expect(!settings.includes('Внешний вид') && !settings.includes('renderAppearance') && !settings.includes('BOOKING_SHAPES') && !settings.includes('BOOKING_CHOICE_STYLES'), 'Legacy online-booking appearance customization must stay removed.');
 expect(!fs.existsSync('ui/booking/index.js') && !fs.existsSync('ui/booking/account-theme.css'), 'Legacy online-booking appearance code and stylesheet must stay physically removed.');
 expect(settings.includes('data-v2-primary-visible="false"') && settings.includes('setWelcomeSaveVisible') && settings.includes("label: 'Сохранить'"), 'Welcome Q Header C Save must appear only after a draft change.');
 expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes('<span>Шаг записи</span>') && settings.includes("value === 60 ? '1 час'") && settings.includes("label: ''"), 'Online booking Z1 must use the full-width canonical 5/10/15/30/60 Shared Select with the shared small info control in its label row.');
-expect(settings.includes("label: 'Порядок отправки'") && settings.includes("label: 'Канал 1'") && settings.includes("label: 'Канал 2'") && settings.includes("label: 'Канал 3'"), 'Online booking notification X must own routing order and all three selectable channels.');
+expect(notificationSettings.includes("data: 'data-notification-delivery-settings-open'")
+  && notificationSettings.includes("label: 'Порядок отправки'")
+  && notificationSettings.includes("label: 'Канал 1'")
+  && notificationSettings.includes("label: 'Канал 2'")
+  && !notificationSettings.includes("label: 'Канал 3'")
+  && notificationSettings.includes('Push — всегда')
+  && notificationSettings.includes("className: 'modal--form-sheet'"),
+  'Notifications A/X must own one compact delivery policy; Push stays outside the Telegram/Email order.');
 expect(settings.includes('smallActionButton({') && settings.includes("icon: 'info'") && !settings.includes('v2ListEntry(') && !settings.includes('iconButton(') && !settings.includes('twoColumnLayout('), 'Online booking must reuse the one Shared small action control for info/copy and must not restore beige icon buttons or framed Push rows.');
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
 expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2CardDeck') && !v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own one CardDeck geometry for F/E inside V2 H/Z.');
@@ -112,7 +120,7 @@ expect(formsUi.includes('formView') && formsUi.includes('formError'), 'Shared ui
 expect(!uiFacade.includes('messageComposer') && !uiFacade.includes('messageThread') && !uiFacade.includes('settingsPanel') && !uiFacade.includes('settingToggle') && !uiFacade.includes('readOnlyReceipt'), 'Migrated owners must be imported directly, not re-exported through ui/ui.js.');
 expect(accountShell.includes("from '../core/chat/runtime.js'") && accountShell.includes("from '../ui/settings/index.js'") && accountShell.includes("from '../ui/receipt/index.js'"), 'End-user account must consume neutral Core Chat runtime plus direct Settings and Receipt owners.');
 expect(booking.includes("from '../ui/forms/index.js'"), 'End-user booking must consume Shared Forms directly.');
-expect(settings.includes('openSharedProfileSettingsMenu') && settings.includes("className: 'modal--form-sheet'"), 'Professional online-booking settings must consume Shared A/X owners directly.');
+expect(settings.includes('openSharedProfileSettingsMenu') && notificationSettings.includes("className: 'modal--form-sheet'"), 'Professional settings must keep the Shared A owner while notification delivery uses Notifications X.');
 expect(chatCss.includes('.message-composer{position:fixed') && chatCss.includes('.message-thread{'), 'Shared ui/chat CSS must own composer and thread geometry.');
 expect(settingsCss.includes('.app-settings-panel') && settingsCss.includes('.app-setting-toggle'), 'Shared ui/settings CSS must own settings geometry.');
 expect(receiptCss.includes('.read-only-sheet'), 'Shared ui/receipt CSS must own receipt geometry.');
