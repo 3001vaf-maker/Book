@@ -10,12 +10,17 @@ export async function getNotificationRouting() {
   return payload(await apiRequest('/notifications/routing'));
 }
 
-export async function saveNotificationRouting(eventType, { mode = 'always', channels = [] } = {}) {
+export async function saveNotificationRouting(eventType, {
+  mode = 'always',
+  channels = [],
+  titleTemplate = '',
+  bodyTemplate = '',
+} = {}) {
   const normalizedChannels = [...new Set((Array.isArray(channels) ? channels : [])
     .map((value) => String(value || '').trim().toUpperCase())
     .filter((value) => ['PUSH', 'TELEGRAM', 'EMAIL'].includes(value)))];
   return payload(await apiRequest(`/notifications/routing/${encodeURIComponent(eventType)}`, {
     method: 'PUT',
-    body: JSON.stringify({ mode, channels: normalizedChannels }),
+    body: JSON.stringify({ mode, channels: normalizedChannels, titleTemplate, bodyTemplate }),
   }));
 }
