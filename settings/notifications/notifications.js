@@ -2,7 +2,6 @@ import { getNotificationRouting, saveNotificationRouting } from '../../core/noti
 import {
   button,
   emptyState,
-  field,
   mountModal,
   page,
   settingsPanel,
@@ -41,42 +40,47 @@ function policySubtitle(policy) {
 
 function editPolicy(root, routing, event) {
   const current = normalizedPolicy(routing, event.type);
-  const channelRows = CHANNELS.map(([key, label]) => field({
-    label,
-    name: `channel-${key}`,
-    type: 'checkbox',
-    checked: current.channels.includes(key),
-  })).join('');
-
+  const state = { mode: current.mode, channels: new Set(current.channels) };
   const layer = mountModal(document.body, modal(`
-    <form class="form-grid" data-notification-policy-form>
+    <div class="form-grid" data-notification-policy>
       ${settingsPanel([
-        { label: 'Во все выбранные', data: `data-notification-mode="always"${current.mode === 'always' ? ' data-selected="true"' : ''}` },
-        { label: 'По очереди', data: `data-notification-mode="fallback"${current.mode === 'fallback' ? ' data-selected="true"' : ''}` },
+        { label: 'Во все выбранные', data: 'data-notification-mode="always"' },
+        { label: 'По очереди', data: 'data-notification-mode="fallback"' },
       ])}
-      ${channelRows}
-      ${button('Сохранить', { type: 'submit' })}
-    </form>
+      <div data-notification-channels></div>
+      ${button('Сохранить', { data: 'data-notification-save' })}
+    </div>
   `, { title: event.title, variant: 'q', surface: 'app' }));
 
-  const form = layer?.querySelector('[data-notification-policy-form]');
-  let mode = current.mode;
-  layer?.querySelectorAll('[data-notification-mode]').forEach((node) => node.addEventListener('click', () => {
-    mode = node.dataset.notificationMode === 'fallback' ? 'fallback' : 'always';
-    layer.querySelectorAll('[data-notification-mode]').forEach((item) => {
-      if (item.dataset.notificationMode === mode) item.dataset.selected = 'true';
-      else delete item.dataset.selected;
+  const draw = () => {
+    const host = layer?.querySelector('[data-notification-channels]');
+    if (host) host.innerHTML = v2ListEntries(CHANNELS.map(([key, label]) => v2ListEntry({
+      title: label,
+      subtitle: state.channels.has(key) ? 'Включён' : 'Выключен',
+      data: `data-notification-channel="${key}"`,
+    })));
+    layer?.querySelectorAll('[data-notification-channel]').forEach((node) => node.addEventListener('click', () => {
+      const key = node.dataset.notificationChannel;
+      if (state.channels.has(key)) state.channels.delete(key);
+      else state.channels.add(key);
+      draw();
+    }));
+    layer?.querySelectorAll('[data-notification-mode]').forEach((node) => {
+      if (node.dataset.notificationMode === state.mode) node.dataset.selected = 'true';
+      else delete node.dataset.selected;
     });
-  }));
+  };
 
-  form?.addEventListener('submit', async (submitEvent) => {
-    submitEvent.preventDefault();
-    const data = new FormData(form);
-    const channels = CHANNELS.filter(([key]) => data.get(`channel-${key}`) !== null).map(([key]) => key);
-    await saveNotificationRouting(event.type, { mode, channels });
+  layer?.querySelectorAll('[data-notification-mode]').forEach((node) => node.addEventListener('click', () => {
+    state.mode = node.dataset.notificationMode === 'fallback' ? 'fallback' : 'always';
+    draw();
+  }));
+  layer?.querySelector('[data-notification-save]')?.addEventListener('click', async () => {
+    await saveNotificationRouting(event.type, { mode: state.mode, channels: [...state.channels] });
     layer?.remove();
     await render(root);
   });
+  draw();
 }
 
 export async function render(root) {
