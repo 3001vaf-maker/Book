@@ -224,12 +224,9 @@ export class InventoryExcelService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Остатки');
     styleSheet(sheet, STOCK_HEADERS);
-    sheet.addRow(['Пример бренда', 'Пример товара', 'Тип продукта', 'шт.', 25, 100, '', '', '', '', '', '', '', '', '', '', '']);
 
     const suppliers = workbook.addWorksheet('Поставщики');
     styleSheet(suppliers, SUPPLIER_HEADERS);
-    suppliers.addRow(['Пример бренда', 'Пример товара', 'шт.', 'Поставщик А', 1000, '', 850, 'SKU-001', '']);
-    suppliers.addRow(['Пример бренда', 'Пример товара', 'шт.', 'Поставщик Б', 920, '', '', 'SKU-002', '']);
     return workbookBuffer(workbook);
   }
 
@@ -358,7 +355,7 @@ export class InventoryExcelService {
       else create += 1;
     });
 
-    const projected = [...snapshot.items];
+    const projected: AnyRecord[] = [...snapshot.items];
     parsed.rows.forEach((row) => {
       const match = this.matchItem(projected, row);
       if (!match) projected.push({ ...row, itemId: `preview:${row.row}` });
@@ -494,8 +491,6 @@ export class InventoryExcelService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Движения');
     styleSheet(sheet, MOVEMENT_HEADERS);
-    sheet.addRow(['05.10.2026', '12:00', '', '', 'Пример процедуры', '', 'Расход', 'Пример бренда', 'Пример материала', 2, 'шт.', '', '', '', '', '', '']);
-    sheet.addRow(['05.10.2026', '13:00', '', '', '', '', 'Приход', 'Пример бренда', 'Пример материала', 10, 'шт.', 'Поставщик А', 1000, '', 850, '', '']);
     return workbookBuffer(workbook);
   }
 

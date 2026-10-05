@@ -4,7 +4,7 @@ import path from 'node:path';
 const root=process.cwd();
 const failures=[];
 const skip=new Set(['.git','node_modules']);
-const runtimeRoots=new Set(['core','settings','journal','timetable','online-booking','chat','invite','ui','admin','landing','server']);
+const runtimeRoots=new Set(['core','settings','journal','timetable','online-booking','chat','invite','ui','admin','server']);
 function walk(dir){
   const out=[];
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
@@ -16,7 +16,7 @@ function walk(dir){
   return out;
 }
 const rel=(file)=>path.relative(root,file).replaceAll(path.sep,'/');
-const standaloneCss=new Set(['admin/admin.css','invite/invite.css','landing/landing.css']);
+const standaloneCss=new Set(['admin/admin.css','invite/invite.css']);
 const allFiles=walk(root);
 for(const file of allFiles){
   const r=rel(file);
