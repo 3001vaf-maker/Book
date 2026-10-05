@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F5F5F3">
+  <title>VA Tools — всё для вашего дела в одном месте</title>
+  <meta name="description" content="Простое рабочее пространство для тех, кто работает на себя: записи, люди, деньги и рабочие задачи в одном месте.">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../ui/lists/list-entry.css">
+  <link rel="stylesheet" href="../ui/receipt/receipt.css">
+  <style>
+    :root{--landing-ink:#111;--landing-dark:#2F3338;--landing-bg:#F5F5F3;--landing-soft:#ECE9E5;--landing-card:#fff;--landing-yellow:#FFFF00}
+    html{scroll-behavior:smooth;background:var(--landing-dark)}
+    body{margin:0;background:var(--landing-dark);color:var(--landing-ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    a{color:inherit;text-decoration:none}
+    .landing{width:100%;overflow:clip;background:var(--landing-dark)}
+    .topbar{position:fixed;z-index:100;left:0;right:0;top:0;height:68px;padding:10px clamp(18px,4vw,56px);display:flex;align-items:center;justify-content:space-between;gap:18px;color:#fff;background:linear-gradient(to bottom,rgba(47,51,56,.94),rgba(47,51,56,.72),transparent);pointer-events:none}
+    .topbar>*{pointer-events:auto}.brand{font-weight:800;letter-spacing:-.03em}.topbar__actions{display:flex;gap:8px}.topbar__link{height:42px;padding:0 15px;border:1px solid rgba(255,255,255,.66);border-radius:12px;display:grid;place-items:center;font-size:14px;font-weight:700;background:rgba(17,17,17,.18);backdrop-filter:blur(14px)}.topbar__link--primary{background:#fff;color:#111;border-color:#fff}
+    .scene{position:relative;min-height:110vh;padding:10vh clamp(14px,3vw,36px) 0;background:var(--landing-dark)}
+    .scene__card{position:sticky;top:22px;min-height:calc(100vh - 34px);border-radius:32px 32px 0 0;overflow:hidden;box-shadow:0 -12px 36px rgba(0,0,0,.18);background:var(--landing-card);transform:translateY(20px) scale(.985);opacity:.92;transition:transform .65s cubic-bezier(.16,1,.3,1),opacity .5s ease}
+    .scene.is-visible .scene__card{transform:translateY(0) scale(1);opacity:1}
+    .scene:nth-child(odd) .scene__card{background:#F5F5F3}.scene--dark .scene__card{background:#2F3338;color:#fff}.scene--warm .scene__card{background:#E7E2DC}.scene--white .scene__card{background:#fff}
+    .panel{min-height:calc(100vh - 34px);padding:clamp(84px,12vh,130px) clamp(22px,6vw,92px) clamp(42px,8vh,92px);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:clamp(30px,7vw,100px);align-items:center;max-width:1480px;margin:0 auto}
+    .panel--center{grid-template-columns:1fr;text-align:center;justify-items:center}.copy{max-width:720px}.eyebrow{margin:0 0 16px;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.54}.copy h1,.copy h2{margin:0;letter-spacing:-.055em;font-weight:820;text-wrap:balance}.copy h1{font-size:clamp(48px,7.2vw,108px);line-height:.92}.copy h2{font-size:clamp(38px,5.1vw,74px);line-height:.96}.copy p{max-width:650px;margin:24px 0 0;font-size:clamp(18px,1.7vw,26px);line-height:1.34;letter-spacing:-.018em;color:#62666A}.scene--dark .copy p{color:#C7C9CB}.copy .short{max-width:560px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}.action{height:52px;padding:0 20px;border:1px solid #111;border-radius:14px;display:grid;place-items:center;font-weight:760;background:#111;color:#fff}.action--secondary{background:#fff;color:#111}.scene--dark .action{border-color:#fff;background:#fff;color:#111}.scene--dark .action--secondary{background:transparent;color:#fff}
+    .hero-note{margin-top:22px;font-size:14px;color:#777A7D}.scene--dark .hero-note{color:#B8BBBD}
+    .preview-wrap{position:relative;min-height:520px;display:grid;place-items:center}.preview-glow{position:absolute;width:min(80vw,520px);height:min(80vw,520px);border-radius:50%;background:rgba(255,255,0,.28);filter:blur(50px);opacity:.38}
+    .device{position:relative;z-index:2;width:min(100%,390px);height:650px;border:1px solid rgba(17,17,17,.22);border-radius:34px;overflow:hidden;background:#2F3338;box-shadow:0 30px 70px rgba(0,0,0,.22);transform:rotate(1.5deg);transition:transform .8s cubic-bezier(.16,1,.3,1)}.scene.is-visible .device{transform:rotate(0)}
+    .device__header{height:72px;padding:10px;display:grid;grid-template-columns:50px 1fr auto 42px;gap:7px;align-items:center;color:#fff;background:#2F3338}.device__avatar{width:48px;height:48px;border:2px solid #FFFF00;border-radius:50%;display:grid;place-items:center;font-weight:800}.device__title{font-size:18px;font-weight:760}.device__action{height:42px;padding:0 12px;border:1px solid #fff;border-radius:12px;display:grid;place-items:center;background:#111;color:#fff;font-size:13px;font-weight:760}.device__chat{display:grid;place-items:center;font-size:25px}.device__surface{height:calc(100% - 72px);margin-left:16px;padding:22px 18px 30px;border-radius:34px 0 0 0;overflow:hidden;background:#fff}.device__surface h3{margin:0 0 16px;font-size:22px;letter-spacing:-.03em}.device .list-entries{gap:8px}.device .list-entry{min-height:78px}.device .list-entry__content{min-height:78px;padding:11px 12px}.device .list-entry__main strong{font-size:14px}.device .list-entry__main small{font-size:12px}.device .list-entry__right strong{font-size:13px}.device .list-entry__right small{font-size:11px}
+    .scatter{position:relative;min-height:510px}.scatter-card{position:absolute;width:min(78%,360px);padding:22px;border:1px solid rgba(17,17,17,.14);border-radius:18px;background:#fff;box-shadow:0 18px 45px rgba(0,0,0,.12);transition:transform .8s cubic-bezier(.16,1,.3,1),opacity .5s ease}.scatter-card:nth-child(1){top:4%;left:0;transform:translate3d(-22px,32px,0) rotate(-4deg)}.scatter-card:nth-child(2){top:30%;right:0;transform:translate3d(24px,36px,0) rotate(4deg)}.scatter-card:nth-child(3){bottom:0;left:11%;transform:translate3d(-10px,40px,0) rotate(-2deg)}.scene.is-visible .scatter-card:nth-child(1){transform:rotate(-2deg)}.scene.is-visible .scatter-card:nth-child(2){transform:rotate(2deg)}.scene.is-visible .scatter-card:nth-child(3){transform:rotate(0)}.scatter-card span{display:block;font-size:13px;color:#777A7D}.scatter-card strong{display:block;margin-top:6px;font-size:23px;letter-spacing:-.03em}
+    .one-place{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tile{min-height:150px;padding:20px;border:1px solid rgba(17,17,17,.16);border-radius:18px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 15px 35px rgba(0,0,0,.08)}.tile__icon{width:42px;height:42px;border:1px solid #111;border-radius:12px;display:grid;place-items:center;font-weight:850}.tile strong{font-size:19px}.tile small{margin-top:5px;color:#777A7D;font-size:13px}
+    .steps{display:grid;gap:12px;max-width:540px}.step{display:grid;grid-template-columns:52px 1fr;gap:16px;align-items:center;padding:16px;border:1px solid rgba(17,17,17,.14);border-radius:16px;background:rgba(255,255,255,.72)}.step__n{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;font-weight:800}.step strong{display:block;font-size:18px}.step span{display:block;margin-top:4px;color:#777A7D;line-height:1.35}
+    .receipt-frame{width:min(100%,390px);padding:20px 22px 24px;border:1px solid rgba(17,17,17,.18);background:#fff;box-shadow:0 28px 60px rgba(0,0,0,.16)}.receipt-frame .read-only-sheet{gap:13px}.receipt-frame .read-only-sheet__header h2{font-size:18px}.receipt-frame .read-only-sheet__row{padding:5px 0}
+    .crafts{display:flex;flex-wrap:wrap;gap:9px;margin-top:28px}.craft{padding:10px 13px;border:1px solid currentColor;border-radius:999px;font-size:14px;opacity:.78}
+    .grow-stack{position:relative;min-height:500px;perspective:1000px}.grow-card{position:absolute;left:50%;width:min(88%,390px);height:270px;border:1px solid rgba(17,17,17,.3);border-radius:14px;padding:24px;background:#D8D3CF;box-shadow:10px 15px 30px rgba(0,0,0,.14);display:flex;align-items:flex-end;font-size:22px;font-weight:800;transform-origin:center bottom;transition:transform .8s cubic-bezier(.16,1,.3,1)}.grow-card:nth-child(1){top:0;transform:translateX(-58%) rotate(-5deg) translateZ(-80px)}.grow-card:nth-child(2){top:70px;transform:translateX(-50%) rotate(2deg) translateZ(-40px)}.grow-card:nth-child(3){top:140px;transform:translateX(-42%) rotate(5deg)}.scene.is-visible .grow-card:nth-child(1){transform:translateX(-57%) rotate(-3deg) translateZ(-50px)}.scene.is-visible .grow-card:nth-child(2){transform:translateX(-50%) rotate(1deg) translateZ(-25px)}.scene.is-visible .grow-card:nth-child(3){transform:translateX(-43%) rotate(3deg)}.grow-card b{position:absolute;top:14px;right:14px;min-width:26px;height:26px;padding:0 7px;border-radius:13px;display:grid;place-items:center;background:#FFFF00;color:#111;font-size:11px}
+    .final-mark{width:74px;height:74px;border:2px solid #FFFF00;border-radius:50%;display:grid;place-items:center;margin-bottom:28px;color:#fff;font-weight:850;font-size:18px}.footer{padding:30px clamp(20px,5vw,70px) 42px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;background:#2F3338;color:#fff;font-size:13px}.footer__links{display:flex;flex-wrap:wrap;gap:18px;opacity:.74}.footer__brand{font-weight:800}
+    @media(max-width:820px){.topbar{height:62px;padding:8px 14px}.topbar__link{height:38px;padding:0 12px}.scene{min-height:104vh;padding:7vh 8px 0}.scene__card{top:10px;min-height:calc(100vh - 18px);border-radius:24px 24px 0 0}.panel{min-height:calc(100vh - 18px);grid-template-columns:1fr;gap:28px;padding:84px 20px 42px}.panel--hero{align-content:center}.copy h1{font-size:clamp(46px,14vw,76px)}.copy h2{font-size:clamp(38px,11vw,62px)}.copy p{font-size:19px}.preview-wrap{min-height:430px}.device{height:560px;width:min(92vw,350px)}.scatter{min-height:390px}.scatter-card{padding:17px}.scatter-card strong{font-size:19px}.one-place{grid-template-columns:1fr 1fr}.tile{min-height:120px;padding:16px}.receipt-frame{width:min(92vw,360px)}.grow-stack{min-height:390px}.grow-card{height:220px}.footer{padding-bottom:calc(34px + env(safe-area-inset-bottom))}}
+    @media(max-width:430px){.brand{font-size:14px}.topbar__actions .topbar__link:first-child{display:none}.one-place{grid-template-columns:1fr}.tile{min-height:104px}.panel{padding-left:17px;padding-right:17px}.device{height:535px}.device__surface{padding:19px 14px}.scatter-card{width:84%}.actions{width:100%}.action{flex:1}.copy .short{max-width:none}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.scene__card,.device,.scatter-card,.grow-card{transition:none!important;transform:none!important}}
+  </style>
+</head>
+<body>
+  <header class="topbar" aria-label="Навигация">
+    <a class="brand" href="#start">VA Tools</a>
+    <nav class="topbar__actions">
+      <a class="topbar__link" href="https://book.va-tools.ru/">Войти</a>
+      <a class="topbar__link topbar__link--primary" href="#start-now">Начать</a>
+    </nav>
+  </header>
+
+  <main class="landing">
+    <section class="scene scene--dark" id="start">
+      <div class="scene__card">
+        <div class="panel panel--hero">
+          <div class="copy">
+            <p class="eyebrow">VA Tools</p>
+            <h1>Всё для вашего дела — в одном месте.</h1>
+            <p class="short">Записи, люди, деньги и рабочие задачи — просто, понятно и без сложной CRM.</p>
+            <div class="actions"><a class="action" href="#start-now">Начать</a><a class="action action--secondary" href="https://book.va-tools.ru/">Войти</a></div>
+            <div class="hero-note">Для тех, кто работает на себя и хочет меньше рутины вокруг любимого дела.</div>
+          </div>
+          <div class="preview-wrap" aria-label="Фрагмент интерфейса журнала">
+            <div class="preview-glow"></div>
+            <div class="device">
+              <div class="device__header"><div class="device__avatar">VA</div><div class="device__title">Журнал</div><div class="device__action">Сегодня</div><div class="device__chat">◌</div></div>
+              <div class="device__surface">
+                <h3>Сегодня</h3>
+                <div class="list-entries">
+                  <div class="list-entry journal-list-record--active"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>Анна</strong><small>Консультация</small></div></div><div class="list-entry__right"><strong>10:00</strong><small>3 500 ₽</small></div></div></div>
+                  <div class="list-entry"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>Мария</strong><small>Встреча</small></div></div><div class="list-entry__right"><strong>12:30</strong><small>2 000 ₽</small></div></div></div>
+                  <div class="list-entry journal-list-record--paid"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>Ирина</strong><small>Индивидуальная работа</small></div></div><div class="list-entry__right"><strong>15:00</strong><small>4 500 ₽</small></div></div></div>
+                  <div class="list-entry"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>Алексей</strong><small>Консультация</small></div></div><div class="list-entry__right"><strong>18:00</strong><small>3 000 ₽</small></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--warm">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Когда всё в разных местах</p><h2>Работа не должна рассыпаться по приложениям.</h2><p>Календарь в одном месте. Контакты — в другом. Деньги — в таблице. Документы — где-то ещё.</p><p class="short">Соберите всё, что нужно для работы, в одной системе.</p></div>
+          <div class="scatter" aria-hidden="true"><div class="scatter-card"><span>Календарь</span><strong>Запись на 12:30</strong></div><div class="scatter-card"><span>Контакты</span><strong>Кто был в прошлый раз?</strong></div><div class="scatter-card"><span>Таблица</span><strong>Сколько пришло за месяц?</strong></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--white">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Всё связано</p><h2>Открыл — и понятно, что происходит.</h2><p>Кто записан. Что запланировано. Кто к вам приходил. Что оплатили. Что нужно сделать дальше.</p><p class="short">Не нужно каждый раз собирать картину по кусочкам.</p></div>
+          <div class="one-place" aria-label="Инструменты рабочего пространства"><div class="tile"><div class="tile__icon">01</div><div><strong>Журнал</strong><small>День, месяц и список</small></div></div><div class="tile"><div class="tile__icon">02</div><div><strong>Люди</strong><small>Профиль и история</small></div></div><div class="tile"><div class="tile__icon">03</div><div><strong>Финансы</strong><small>Касса и движения денег</small></div></div><div class="tile"><div class="tile__icon">04</div><div><strong>Документы</strong><small>В одном рабочем контуре</small></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Лёгкий вход</p><h2>Не нужно сначала учиться пользоваться системой.</h2><p>Создайте профиль, добавьте рабочее пространство и начните с того, что нужно именно сейчас.</p><p class="short">Остальное можно подключать постепенно.</p></div>
+          <div class="steps"><div class="step"><div class="step__n">1</div><div><strong>Профиль</strong><span>Ваше рабочее пространство начинается с вас.</span></div></div><div class="step"><div class="step__n">2</div><div><strong>Рабочее место</strong><span>Добавьте график и то, с чем работаете.</span></div></div><div class="step"><div class="step__n">3</div><div><strong>Начинайте работу</strong><span>Без длинного внедрения и обязательной настройки всего сразу.</span></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--dark">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Для своего дела</p><h2>У каждого работа устроена по-своему.</h2><p>Стрижки, маникюр, частные уроки, handmade, консультации, коучинг и другие услуги.</p><p class="short">Система не заставляет подстраивать своё дело под чужую схему.</p><div class="crafts"><span class="craft">Красота</span><span class="craft">Обучение</span><span class="craft">Ремесло</span><span class="craft">Консультации</span><span class="craft">Творчество</span><span class="craft">Частная практика</span></div></div>
+          <div class="preview-wrap" aria-label="Фрагмент финансового чека"><div class="receipt-frame"><div class="read-only-sheet"><header class="read-only-sheet__header"><h2>Прочие доходы</h2><div class="read-only-sheet__meta"><span>Рабочее пространство</span><span>05.10.2026 · 14:20</span><strong>Операция</strong></div></header><div class="read-only-sheet__items"><div class="read-only-sheet__row"><span>Консультация</span><strong>3 500 ₽</strong></div><div class="read-only-sheet__row"><span>Безналичные</span><strong>3 500 ₽</strong></div></div><div class="read-only-sheet__totals"><div class="read-only-sheet__row is-strong"><span>Итого</span><strong>3 500 ₽</strong></div></div></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--warm">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Меньше рутины</p><h2>Больше внимания работе. Меньше — всему вокруг неё.</h2><p>Записи, люди, история, деньги и рабочая информация остаются рядом и связаны между собой.</p><p class="short">Чтобы не помнить всё самому.</p></div>
+          <div class="device" aria-label="Фрагмент профиля человека" style="height:560px"><div class="device__header"><div class="device__avatar">А</div><div class="device__title">Анна</div><div class="device__action">Сохранить</div><div class="device__chat">◌</div></div><div class="device__surface"><h3>Профиль</h3><div class="list-entries"><div class="list-entry"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>UEI</strong><small>Связанный профиль</small></div></div><div class="list-entry__right"><strong>VA-1048</strong></div></div></div><div class="list-entry"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>История</strong><small>Записи и операции</small></div></div><div class="list-entry__right"><strong>18</strong><small>событий</small></div></div></div><div class="list-entry"><span class="list-entry__background"></span><div class="list-entry__content"><div class="list-entry__main"><div class="list-entry__text"><strong>Документы</strong><small>Согласия и версии</small></div></div><div class="list-entry__right"><strong>3</strong></div></div></div></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--white">
+      <div class="scene__card">
+        <div class="panel">
+          <div class="copy"><p class="eyebrow">Растёт вместе с вами</p><h2>Начните с простого.</h2><p>Сегодня — записи и люди. Потом — финансы, документы, склад и другие инструменты.</p><p class="short">Только тогда, когда они действительно понадобятся.</p></div>
+          <div class="grow-stack" aria-hidden="true"><div class="grow-card">Записи и люди<b>сейчас</b></div><div class="grow-card">Финансы и документы<b>потом</b></div><div class="grow-card">Склад и новые инструменты<b>по мере роста</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene scene--dark" id="start-now">
+      <div class="scene__card">
+        <div class="panel panel--center"><div class="final-mark">VA</div><div class="copy"><p class="eyebrow">Начать</p><h2>Порядок в работе может быть простым.</h2><p>Создайте профиль и соберите своё рабочее пространство.</p><div class="actions" style="justify-content:center"><a class="action" href="https://book.va-tools.ru/">Создать профиль</a><a class="action action--secondary" href="https://book.va-tools.ru/">Войти</a></div></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="footer__brand">VA Tools</div><div class="footer__links"><span>Публичный технический предпросмотр</span><span>Юридические документы будут подключены перед запуском оплаты</span></div></footer>
+
+  <script>
+    const scenes=[...document.querySelectorAll('.scene')];
+    const observer=new IntersectionObserver((entries)=>{for(const entry of entries){if(entry.isIntersecting)entry.target.classList.add('is-visible')}},{threshold:.18,rootMargin:'0px 0px -12% 0px'});
+    scenes.forEach((scene)=>observer.observe(scene));
+    if(scenes[0]) scenes[0].classList.add('is-visible');
+  </script>
+</body>
+</html>
