@@ -6,7 +6,6 @@ import {
   initV2ListReorder,
   mountModal,
   page,
-  settingsPanel,
   modal,
   textareaField,
   v2ListEntry,
@@ -54,10 +53,7 @@ function editPolicy(root, routing, event) {
       ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate, required: true })}
       ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 5, required: true })}
       <div class="muted">Доступно: {{date}}, {{time}}, {{workplace}}, {{person.name}}, {{person.surname}}</div>
-      ${settingsPanel([
-        { label: 'Во все выбранные', data: 'data-notification-mode="always"' },
-        { label: 'По очереди', data: 'data-notification-mode="fallback"' },
-      ])}
+      <div data-notification-modes></div>
       <div data-notification-channels></div>
       ${button('Сохранить', { type: 'submit' })}
     </form>
@@ -114,18 +110,29 @@ function editPolicy(root, routing, event) {
     }
   };
 
-  const drawMode = () => {
-    layer?.querySelectorAll('[data-notification-mode]').forEach((node) => {
-      if (node.dataset.notificationMode === state.mode) node.dataset.selected = 'true';
-      else delete node.dataset.selected;
-    });
-    drawChannels();
+  const drawModes = () => {
+    const host = layer?.querySelector('[data-notification-modes]');
+    if (!host) return;
+    host.innerHTML = v2ListEntries([
+      v2ListEntry({
+        title: 'Во все выбранные',
+        subtitle: 'Одновременно используем все доступные каналы',
+        selected: state.mode === 'always',
+        data: 'data-notification-mode="always"',
+      }),
+      v2ListEntry({
+        title: 'По очереди',
+        subtitle: 'Используем первый доступный канал по заданному приоритету',
+        selected: state.mode === 'fallback',
+        data: 'data-notification-mode="fallback"',
+      }),
+    ]);
+    host.querySelectorAll('[data-notification-mode]').forEach((node) => node.addEventListener('click', () => {
+      state.mode = node.dataset.notificationMode === 'fallback' ? 'fallback' : 'always';
+      drawModes();
+      drawChannels();
+    }));
   };
-
-  layer?.querySelectorAll('[data-notification-mode]').forEach((node) => node.addEventListener('click', () => {
-    state.mode = node.dataset.notificationMode === 'fallback' ? 'fallback' : 'always';
-    drawMode();
-  }));
 
   layer?.querySelector('[data-notification-policy-form]')?.addEventListener('submit', async (submitEvent) => {
     submitEvent.preventDefault();
@@ -140,7 +147,8 @@ function editPolicy(root, routing, event) {
     layer?.remove();
     await render(root);
   });
-  drawMode();
+  drawModes();
+  drawChannels();
 }
 
 export async function render(root) {
