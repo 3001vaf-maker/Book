@@ -1,6 +1,8 @@
 import {
   button,
   emptyState,
+  entityCard,
+  entityCardStack,
   field,
   modal,
   mountModal,
@@ -32,6 +34,11 @@ import {
 } from './service.js';
 
 const UNIT_OPTIONS = ['шт.', 'г', 'кг', 'мл', 'л', 'м', 'уп.'].map((value) => ({ value, label: value }));
+const STOCK_SORT = {
+  manufacturers: 'name-asc',
+  items: 'name-asc',
+};
+const EMPTY_MANUFACTURER = 'Без производителя';
 
 function numberText(value, maximum = 3) {
   const number = Number(value) || 0;
@@ -41,6 +48,59 @@ function numberText(value, maximum = 3) {
 function moneyText(value) {
   const number = Number(value) || 0;
   return `${number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replaceAll('\u00a0', ' ')} ₽`;
+}
+
+function normalizedSearch(value = '') {
+  return String(value || '').trim().toLocaleLowerCase('ru-RU');
+}
+
+function itemSearchText(item = {}) {
+  return [
+    item.manufacturer,
+    item.name,
+    item.productType,
+    item.category,
+    item.location,
+    item.sku,
+    item.barcode,
+  ].filter(Boolean).join(' ').toLocaleLowerCase('ru-RU');
+}
+
+function manufacturerName(item = {}) {
+  return String(item.manufacturer || '').trim() || EMPTY_MANUFACTURER;
+}
+
+function productTypeText(item = {}) {
+  return String(item.productType || item.category || '').trim();
+}
+
+function sortItems(items = [], mode = STOCK_SORT.items) {
+  const rows = [...items];
+  const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' });
+  if (mode === 'name-desc') return rows.sort((left, right) => byName(right, left));
+  if (mode === 'balance-asc') return rows.sort((left, right) => (Number(left.balance) || 0) - (Number(right.balance) || 0) || byName(left, right));
+  if (mode === 'balance-desc') return rows.sort((left, right) => (Number(right.balance) || 0) - (Number(left.balance) || 0) || byName(left, right));
+  if (mode === 'type-asc') return rows.sort((left, right) => productTypeText(left).localeCompare(productTypeText(right), 'ru', { sensitivity: 'base' }) || byName(left, right));
+  return rows.sort(byName);
+}
+
+function manufacturerGroups(query = '') {
+  const needle = normalizedSearch(query);
+  const groups = new Map();
+  getInventoryItems().forEach((item) => {
+    const manufacturer = manufacturerName(item);
+    if (needle && !`${manufacturer} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle)) return;
+    const rows = groups.get(manufacturer) || [];
+    rows.push(item);
+    groups.set(manufacturer, rows);
+  });
+  const result = [...groups.entries()].map(([name, items]) => ({ name, items }));
+  const byName = (left, right) => left.name.localeCompare(right.name, 'ru', { numeric: true, sensitivity: 'base' });
+  if (STOCK_SORT.manufacturers === 'name-desc') result.sort((left, right) => byName(right, left));
+  else if (STOCK_SORT.manufacturers === 'count-desc') result.sort((left, right) => right.items.length - left.items.length || byName(left, right));
+  else if (STOCK_SORT.manufacturers === 'count-asc') result.sort((left, right) => left.items.length - right.items.length || byName(left, right));
+  else result.sort(byName);
+  return result;
 }
 
 function movementTitle(movement = {}) {
@@ -122,7 +182,7 @@ function collectOptionalNumber(form, name) {
   return raw === '' ? null : Number(raw.replace(',', '.'));
 }
 
-function openItemEditor(root, itemId = '') {
+function openItemEditor(root, itemId = '', defaults = {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
   const markup = `
@@ -131,6 +191,7 @@ function openItemEditor(root, itemId = '') {
       c: { label: 'Сохранить', data: 'data-inventory-item-save', aria: 'Сохранить позицию' },
     })}
     <form data-inventory-item-form>
+      ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
       ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
       ${twoColumnLayout(
         select({ label: 'Единица', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
@@ -186,6 +247,7 @@ function openItemEditor(root, itemId = '') {
       return;
     }
     const value = {
+      manufacturer: String(data.get('manufacturer') || '').trim(),
       name,
       unit: String(data.get('unit') || 'шт.'),
       lastPurchasePrice: collectOptionalNumber(form, 'purchasePrice'),
@@ -330,12 +392,42 @@ function openMovementKind(root, trigger) {
   });
 }
 
-function stockListMarkup() {
-  const items = getInventoryItems();
-  if (!items.length) return emptyState('Склад пуст', 'Добавьте первую позицию.');
+function stockSearchField(value = '', data = 'data-inventory-stock-search') {
+  return field({
+    label: 'Поиск',
+    name: 'inventorySearch',
+    value,
+    type: 'search',
+    autocomplete: 'off',
+    placeholder: 'Название, тип, артикул…',
+    data,
+  });
+}
+
+function stockManufacturerCardsMarkup(query = '') {
+  const groups = manufacturerGroups(query);
+  if (!getInventoryItems().length) return emptyState('Склад пуст', 'Добавьте первую позицию.');
+  if (!groups.length) return emptyState('Ничего не найдено', 'Измените запрос поиска.');
+  return entityCardStack(groups.map(({ name, items }) => entityCard({
+    title: name,
+    subtitle: `${items.length} ${items.length === 1 ? 'позиция' : items.length > 1 && items.length < 5 ? 'позиции' : 'позиций'}`,
+    initial: name === EMPTY_MANUFACTURER ? '?' : name.slice(0, 1).toUpperCase(),
+    interactive: true,
+    data: `data-inventory-manufacturer="${escapeHtml(name)}"`,
+    aria: `Открыть товары ${name}`,
+  })));
+}
+
+function stockListMarkup(manufacturer, query = '') {
+  const needle = normalizedSearch(query);
+  const items = sortItems(getInventoryItems().filter((item) => {
+    if (manufacturerName(item) !== manufacturer) return false;
+    return !needle || itemSearchText(item).includes(needle);
+  }));
+  if (!items.length) return emptyState('Ничего не найдено', 'Измените запрос поиска.');
   return v2ListEntries(items.map((item) => v2ListEntry({
     title: item.name,
-    subtitle: [item.category, item.location].filter(Boolean).join(' · '),
+    subtitle: [productTypeText(item), item.location].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
     interactive: true,
@@ -343,6 +435,68 @@ function stockListMarkup() {
     data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
     aria: `Открыть ${item.name}`,
   })));
+}
+
+function openStockSort(trigger, level, onChange) {
+  const manufacturerOptions = [
+    ['name-asc', 'Название А—Я'],
+    ['name-desc', 'Название Я—А'],
+    ['count-desc', 'Больше позиций сначала'],
+    ['count-asc', 'Меньше позиций сначала'],
+  ];
+  const itemOptionsList = [
+    ['name-asc', 'Название А—Я'],
+    ['name-desc', 'Название Я—А'],
+    ['type-asc', 'По типу'],
+    ['balance-desc', 'Остаток: больше сначала'],
+    ['balance-asc', 'Остаток: меньше сначала'],
+  ];
+  const options = level === 'manufacturers' ? manufacturerOptions : itemOptionsList;
+  const current = STOCK_SORT[level];
+  const content = options.map(([value, label]) => button(`${value === current ? '✓ ' : ''}${label}`, {
+    type: 'button',
+    variant: 'secondary',
+    data: `data-inventory-sort-value="${escapeHtml(value)}"`,
+  })).join('');
+  const modalRoot = mountModal(trigger, modal(content, { title: 'Сортировка', variant: 'x' }));
+  modalRoot?.querySelectorAll('[data-inventory-sort-value]').forEach((control) => {
+    control.addEventListener('click', () => {
+      STOCK_SORT[level] = control.dataset.inventorySortValue;
+      modalRoot.v2Close?.();
+      onChange?.();
+    });
+  });
+}
+
+function bindManufacturerCards(root, host) {
+  host.querySelectorAll('[data-inventory-manufacturer]').forEach((control) => {
+    control.addEventListener('click', () => openManufacturerStock(root, control.dataset.inventoryManufacturer));
+  });
+}
+
+function openManufacturerStock(root, manufacturer) {
+  const markup = `
+    ${context(manufacturer, {
+      a: { kind: 'settings', data: 'data-inventory-item-sort', aria: 'Сортировка товаров' },
+      c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
+    })}
+    ${stockSearchField('', 'data-inventory-company-search')}
+    <div data-inventory-company-list>${stockListMarkup(manufacturer)}</div>`;
+  const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
+  if (!layer) return;
+
+  const listHost = layer.querySelector('[data-inventory-company-list]');
+  const renderList = () => {
+    const query = layer.querySelector('[name="inventorySearch"]')?.value || '';
+    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
+    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem)));
+  };
+
+  layer.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderList);
+  layer.querySelector('[data-inventory-item-sort]')?.addEventListener('click', (event) => openStockSort(event.currentTarget, 'items', renderList));
+  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }));
+  renderList();
+  notifyContext();
 }
 
 function movementJournalMarkup() {
@@ -386,11 +540,21 @@ function inventoryCountMarkup() {
 
 function renderStock(root) {
   root.innerHTML = `${context('Остатки', {
-    a: { kind: 'settings', aria: 'Excel склада' },
+    a: { kind: 'settings', data: 'data-inventory-manufacturer-sort', aria: 'Сортировка производителей' },
     c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
-  })}${stockListMarkup()}`;
+  })}${stockSearchField()}<div data-inventory-manufacturer-list>${stockManufacturerCardsMarkup()}</div>`;
+
+  const listHost = root.querySelector('[data-inventory-manufacturer-list]');
+  const renderManufacturers = () => {
+    const query = root.querySelector('[name="inventorySearch"]')?.value || '';
+    if (listHost) listHost.innerHTML = stockManufacturerCardsMarkup(query);
+    if (listHost) bindManufacturerCards(root, listHost);
+  };
+
+  root.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderManufacturers);
+  root.querySelector('[data-inventory-manufacturer-sort]')?.addEventListener('click', (event) => openStockSort(event.currentTarget, 'manufacturers', renderManufacturers));
   root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root));
-  root.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem)));
+  renderManufacturers();
   notifyContext();
 }
 
