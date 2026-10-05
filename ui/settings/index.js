@@ -1,5 +1,4 @@
 import { button } from '../buttons/index.js';
-import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 function text(value = '') {
@@ -17,15 +16,22 @@ export function settingsPanel(items = []) {
   }).join('')}</div>`;
 }
 
+function notificationSettingEntry(item = {}) {
+  const checked = Boolean(item.checked);
+  const disabled = Boolean(item.disabled);
+  return `<label class="list-entry app-notification-row${disabled ? ' is-disabled' : ''}">
+    <span class="list-entry__background" aria-hidden="true"></span>
+    <span class="list-entry__content">
+      <span class="list-entry__main"><span class="list-entry__text"><strong>${text(item.label || '')}</strong><small>${text(item.description || '') || '&nbsp;'}</small></span></span>
+      <span class="list-entry__toggle${checked ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}">
+        <input class="app-notification-input" type="checkbox" ${item.data || ''}${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}${item.aria ? ` aria-label="${text(item.aria)}"` : ''}>
+        <span class="app-setting-toggle__switch${checked ? ' is-on' : ''}" aria-hidden="true"><span></span></span>
+      </span>
+    </span>
+  </label>`;
+}
+
 export function notificationSettings(items = []) {
-  const rows = (Array.isArray(items) ? items : []).filter(Boolean).map((item) => v2ListEntry({
-    title: item.label || '',
-    subtitle: item.description || '',
-    interactive: false,
-    toggleData: item.data || '',
-    toggleAria: item.aria || `${item.checked ? 'Выключить' : 'Включить'} ${item.label || ''}`,
-    toggleChecked: Boolean(item.checked),
-    toggleDisabled: Boolean(item.disabled),
-  }));
-  return `<div class="app-notification-list">${v2ListEntries(rows)}<div class="muted" data-notification-status></div></div>`;
+  const rows = (Array.isArray(items) ? items : []).filter(Boolean).map(notificationSettingEntry).join('');
+  return `<div class="app-notification-list"><div class="list-entries">${rows}</div><div class="muted" data-notification-status></div></div>`;
 }
