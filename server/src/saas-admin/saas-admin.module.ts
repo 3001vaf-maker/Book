@@ -9,10 +9,12 @@ import { PlatformAdminGuard } from './platform-admin.guard';
 import { SaasAdminController } from './saas-admin.controller';
 import { SaasAdminService } from './saas-admin.service';
 import { PlatformNoticeModule } from '../platform-notice/platform-notice.module';
+import { CommercialCatalogController } from './commercial-catalog.controller';
+import { CommercialCatalogService } from './commercial-catalog.service';
 
 @Module({
   imports: [AuthModule, SaasAccessModule, TenantInvitationModule, DocumentRegistryModule, TransactionalEmailModule, PlatformNoticeModule],
-  controllers: [SaasAdminController],
-  providers: [SaasAdminService, PlatformAdminGuard, PrismaService],
+  controllers: [SaasAdminController, CommercialCatalogController],
+  providers: [SaasAdminService, CommercialCatalogService, PlatformAdminGuard, PrismaService],
 })
 export class SaasAdminModule {}
