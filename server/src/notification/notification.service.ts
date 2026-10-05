@@ -72,6 +72,9 @@ type RoutingPolicyRow = {
   updatedAt: Date;
 };
 
+type AccountIdentity = Awaited<ReturnType<NotificationService['accountIdentity']>>;
+type RoutedDelivery = { channel: string; recipient: string };
+
 const ROUTING_MODES = new Set(['always', 'fallback']);
 const ROUTING_CHANNELS = new Set(['PUSH', 'TELEGRAM', 'EMAIL']);
 const ACTIVE_EXTERNAL_CHANNELS = new Set(['TELEGRAM', 'EMAIL']);
@@ -255,7 +258,8 @@ export class NotificationService {
       ORDER BY "eventType" ASC
     `;
     const byType = new Map(rows.map((row) => [row.eventType, row]));
-    const types = [...SYSTEM_EVENT_TYPES, ...rows.map((row) => row.eventType).filter((type) => !SYSTEM_EVENT_TYPES.includes(type as any))];
+    const systemTypes = new Set<string>(SYSTEM_EVENT_TYPES);
+    const types = [...SYSTEM_EVENT_TYPES, ...rows.map((row) => row.eventType).filter((type) => !systemTypes.has(type))];
     return types.map((type) => this.projectPolicy(byType.get(type) || null, type));
   }
 
@@ -302,7 +306,7 @@ export class NotificationService {
     return this.getRoutingPolicy(tenantId, type);
   }
 
-  private recipientForChannel(identity: Awaited<ReturnType<NotificationService['accountIdentity']>>, channel: string) {
+  private recipientForChannel(identity: AccountIdentity, channel: string) {
     if (channel === 'EMAIL') return identity.email;
     if (channel === 'TELEGRAM') return identity.telegramId;
     return '';
@@ -324,7 +328,7 @@ export class NotificationService {
 
   private async externalAllowed(
     tenantId: string,
-    identity: Awaited<ReturnType<NotificationService['accountIdentity']>>,
+    identity: AccountIdentity,
     channel: string,
     purposeValue: unknown,
   ) {
@@ -338,34 +342,77 @@ export class NotificationService {
     return this.documents.canSendMarketing(tenantId, channel, recipient);
   }
 
+  private async queueChannel(
+    tenantId: string,
+    notificationId: string,
+    channel: string,
+    purpose: MessagePurpose,
+    identity: AccountIdentity,
+  ): Promise<RoutedDelivery[]> {
+    if (channel === 'PUSH') {
+      if (!(await this.externalAllowed(tenantId, identity, channel, purpose))) return [];
+      const endpoints = await this.webPush.listAccountEndpoints(tenantId, identity.accountId);
+      const routed: RoutedDelivery[] = [];
+      for (const endpoint of endpoints) {
+        if (await this.queueDelivery(tenantId, notificationId, 'PUSH', endpoint)) {
+          routed.push({ channel: 'PUSH', recipient: endpoint });
+        }
+      }
+      return routed;
+    }
+    if (!ACTIVE_EXTERNAL_CHANNELS.has(channel)) return [];
+    const recipient = this.recipientForChannel(identity, channel);
+    if (!recipient || !(await this.externalAllowed(tenantId, identity, channel, purpose))) return [];
+    const queued = await this.queueDelivery(tenantId, notificationId, channel, recipient);
+    return queued ? [{ channel, recipient }] : [];
+  }
+
   private async queueExternalByPolicy(
     tenantId: string,
     notificationId: string,
     eventType: string,
     purpose: MessagePurpose,
-    identity: Awaited<ReturnType<NotificationService['accountIdentity']>>,
+    identity: AccountIdentity,
   ) {
     const policy = await this.getRoutingPolicy(tenantId, eventType);
-    const routed: Array<{ channel: string; recipient: string }> = [];
-
-    if (policy.channels.includes('PUSH') && await this.externalAllowed(tenantId, identity, 'PUSH', purpose)) {
-      const endpoints = await this.webPush.listAccountEndpoints(tenantId, identity.accountId);
-      for (const endpoint of endpoints) {
-        await this.queueDelivery(tenantId, notificationId, 'PUSH', endpoint);
-        routed.push({ channel: 'PUSH', recipient: endpoint });
+    if (policy.mode === 'fallback') {
+      for (const channel of policy.channels) {
+        const routed = await this.queueChannel(tenantId, notificationId, channel, purpose, identity);
+        if (routed.length) return routed;
       }
+      return [];
     }
 
-    const configured = policy.channels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
-    const available: Array<{ channel: string; recipient: string }> = [];
-    for (const channel of configured) {
-      const recipient = this.recipientForChannel(identity, channel);
-      if (!recipient || !(await this.externalAllowed(tenantId, identity, channel, purpose))) continue;
-      available.push({ channel, recipient });
+    const routed: RoutedDelivery[] = [];
+    for (const channel of policy.channels) {
+      routed.push(...await this.queueChannel(tenantId, notificationId, channel, purpose, identity));
     }
-    const selected = policy.mode === 'fallback' ? available.slice(0, 1) : available;
-    for (const item of selected) await this.queueDelivery(tenantId, notificationId, item.channel, item.recipient);
-    return [...routed, ...selected];
+    return routed;
+  }
+
+  private async queueFallbackAfter(
+    tenantId: string,
+    notificationId: string,
+    eventType: string,
+    purposeValue: unknown,
+    identity: AccountIdentity,
+    failedChannel: string,
+  ) {
+    const purpose = normalizeMessagePurpose(purposeValue);
+    if (!purpose) return [];
+    const policy = await this.getRoutingPolicy(tenantId, eventType);
+    if (policy.mode !== 'fallback') return [];
+    const failedIndex = policy.channels.indexOf(failedChannel);
+    if (failedIndex < 0) return [];
+    for (const channel of policy.channels.slice(failedIndex + 1)) {
+      const routed = await this.queueChannel(tenantId, notificationId, channel, purpose, identity);
+      if (!routed.length) continue;
+      if (routed.some((item) => item.channel === 'PUSH')) {
+        await this.webPush.dispatchNotification(tenantId, notificationId);
+      }
+      return routed;
+    }
+    return [];
   }
 
   private async createForAccountInternal(
@@ -409,7 +456,11 @@ export class NotificationService {
 
     const routed = routeExternal ? await this.queueExternalByPolicy(tenantId, notificationId, type, purpose, identity) : [];
     if (routeExternal && routed.some((item) => item.channel === 'PUSH')) {
-      await this.webPush.dispatchNotification(tenantId, notificationId);
+      const pushResult = await this.webPush.dispatchNotification(tenantId, notificationId);
+      const policy = await this.getRoutingPolicy(tenantId, type);
+      if (policy.mode === 'fallback' && pushResult.sent === 0 && pushResult.failed > 0) {
+        routed.push(...await this.queueFallbackAfter(tenantId, notificationId, type, purpose, identity, 'PUSH'));
+      }
     }
     return { notification: await this.getForAccount(tenantId, accountId, notificationId), routed };
   }
@@ -610,20 +661,16 @@ export class NotificationService {
     `;
 
     if (current) {
-      const policy = await this.getRoutingPolicy(tenantId, current.type);
-      if (policy.mode === 'fallback') {
-        const failedIndex = policy.channels.indexOf(current.channel);
-        const nextChannels = failedIndex >= 0 ? policy.channels.slice(failedIndex + 1) : [];
-        const identity = await this.accountIdentityByPhone(tenantId, current.personPhone);
-        if (identity) {
-          for (const nextChannel of nextChannels) {
-            if (!ACTIVE_EXTERNAL_CHANNELS.has(nextChannel)) continue;
-            const recipient = this.recipientForChannel(identity, nextChannel);
-            if (!recipient || !(await this.externalAllowed(tenantId, identity, nextChannel, current.purpose))) continue;
-            await this.queueDelivery(tenantId, current.notificationId, nextChannel, recipient);
-            break;
-          }
-        }
+      const identity = await this.accountIdentityByPhone(tenantId, current.personPhone);
+      if (identity) {
+        await this.queueFallbackAfter(
+          tenantId,
+          current.notificationId,
+          current.type,
+          current.purpose,
+          identity,
+          current.channel,
+        );
       }
     }
     return { deliveryId, status: 'failed', failedAt: now, error: message };
