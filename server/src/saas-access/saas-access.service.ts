@@ -110,11 +110,7 @@ export class SaasAccessService {
           tenantId,
           platformAccountId,
           eventType: 'COMMERCIAL_MODE_CHANGED',
-          metadata: {
-            from: current.commercialMode,
-            commercialMode: 'LIVE',
-            source: 'USER',
-          },
+          metadata: { from: current.commercialMode, commercialMode: 'LIVE', source: 'USER' },
           occurredAt: now,
         },
       });
@@ -127,7 +123,7 @@ export class SaasAccessService {
 
     return {
       transitioned: transition.changed,
-      alreadyLive: !transition.changed || undefined,
+      alreadyLive: transition.changed ? undefined : true,
       occurredAt: transition.occurredAt.toISOString(),
       access: await this.resolveTenantAccess(tenantId),
     };
@@ -148,7 +144,7 @@ export class SaasAccessService {
     if (!['DEMO', 'LIVE'].includes(mode)) throw new BadRequestException('Неизвестный режим');
     const approvedByAdminId = String(platformAdminId || '').trim();
     if (mode === 'LIVE' && !approvedByAdminId) {
-      throw new BadRequestException('Для административного переключения LIVE требуется администратор');
+      throw new BadRequestException('LIVE требует явного подтверждения администратора');
     }
 
     const now = new Date();
@@ -182,12 +178,7 @@ export class SaasAccessService {
         data: {
           tenantId,
           eventType: 'COMMERCIAL_MODE_CHANGED',
-          metadata: {
-            from: current.commercialMode,
-            commercialMode: mode,
-            source: 'ADMIN',
-            platformAdminId: mode === 'LIVE' ? approvedByAdminId : '',
-          },
+          metadata: { from: current.commercialMode, commercialMode: mode, approvedByAdminId: mode === 'LIVE' ? approvedByAdminId : '' },
           occurredAt: now,
         },
       });
@@ -195,7 +186,7 @@ export class SaasAccessService {
         await tx.platformActivityEvent.create({
           data: {
             tenantId,
-            eventType: 'LIVE_ENABLED_BY_ADMIN',
+            eventType: 'LIVE_APPROVED_BY_ADMIN',
             metadata: {
               platformAdminId: approvedByAdminId,
               requestedAt: current.liveRequestedAt?.toISOString() || '',
@@ -258,7 +249,10 @@ export class SaasAccessService {
   }
 
   async resolveCapability(tenantId: string, capabilityKey: string): Promise<ResolvedCapability> {
-    const capability = await this.prisma.capability.findUnique({ where: { key: capabilityKey } });
+    const capability = await this.prisma.capability.findUnique({
+      where: { key: capabilityKey },
+    });
+
     if (!capability || !capability.isActive) {
       throw new NotFoundException(`Неизвестная возможность: ${capabilityKey}`);
     }
@@ -266,20 +260,41 @@ export class SaasAccessService {
     const access = await this.prisma.tenantAccess.findUnique({
       where: { tenantId },
       include: {
-        plan: { include: { capabilityValues: { where: { capabilityId: capability.id }, take: 1 } } },
-        overrides: { where: { capabilityId: capability.id }, take: 1 },
+        plan: {
+          include: {
+            capabilityValues: {
+              where: { capabilityId: capability.id },
+              take: 1,
+            },
+          },
+        },
+        overrides: {
+          where: { capabilityId: capability.id },
+          take: 1,
+        },
       },
     });
-    if (!access) throw new NotFoundException('Состояние рабочего пространства не настроено');
+
+    if (!access) {
+      throw new NotFoundException('Состояние рабочего пространства не настроено');
+    }
+
     if (access.status === TenantAccessStatus.SUSPENDED) {
       return this.suspendedValue(capability.key, capability.valueType);
     }
 
     const override = access.overrides[0];
     const planValue = access.plan?.capabilityValues[0];
+
     if (this.demoActive(access)) {
       if (capability.valueType === CapabilityValueType.BOOLEAN && override && override.enabled !== null) {
-        return { key: capability.key, valueType: capability.valueType, enabled: override.enabled, limit: null, source: 'TENANT_OVERRIDE' };
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: override.enabled,
+          limit: null,
+          source: 'TENANT_OVERRIDE',
+        };
       }
       return this.demoValue(capability.key, capability.valueType);
     }
@@ -287,23 +302,69 @@ export class SaasAccessService {
 
     if (capability.valueType === CapabilityValueType.BOOLEAN) {
       if (override && override.enabled !== null) {
-        return { key: capability.key, valueType: capability.valueType, enabled: override.enabled, limit: null, source: 'TENANT_OVERRIDE' };
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: override.enabled,
+          limit: null,
+          source: 'TENANT_OVERRIDE',
+        };
       }
-      if (access.isOwnerBook && !access.plan) return this.ownerValue(capability.key, capability.valueType);
+
+      if (access.isOwnerBook && !access.plan) {
+        return this.ownerValue(capability.key, capability.valueType);
+      }
+
       if (planValue && planValue.enabled !== null) {
-        return { key: capability.key, valueType: capability.valueType, enabled: planValue.enabled, limit: null, source: 'PLAN' };
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: planValue.enabled,
+          limit: null,
+          source: 'PLAN',
+        };
       }
-      return { key: capability.key, valueType: capability.valueType, enabled: capability.defaultEnabled, limit: null, source: 'DEFAULT' };
+
+      return {
+        key: capability.key,
+        valueType: capability.valueType,
+        enabled: capability.defaultEnabled,
+        limit: null,
+        source: 'DEFAULT',
+      };
     }
 
     if (override) {
-      return { key: capability.key, valueType: capability.valueType, enabled: null, limit: override.limit, source: 'TENANT_OVERRIDE' };
+      return {
+        key: capability.key,
+        valueType: capability.valueType,
+        enabled: null,
+        limit: override.limit,
+        source: 'TENANT_OVERRIDE',
+      };
     }
-    if (access.isOwnerBook && !access.plan) return this.ownerValue(capability.key, capability.valueType);
+
+    if (access.isOwnerBook && !access.plan) {
+      return this.ownerValue(capability.key, capability.valueType);
+    }
+
     if (planValue) {
-      return { key: capability.key, valueType: capability.valueType, enabled: null, limit: planValue.limit, source: 'PLAN' };
+      return {
+        key: capability.key,
+        valueType: capability.valueType,
+        enabled: null,
+        limit: planValue.limit,
+        source: 'PLAN',
+      };
     }
-    return { key: capability.key, valueType: capability.valueType, enabled: null, limit: capability.defaultLimit, source: 'DEFAULT' };
+
+    return {
+      key: capability.key,
+      valueType: capability.valueType,
+      enabled: null,
+      limit: capability.defaultLimit,
+      source: 'DEFAULT',
+    };
   }
 
   async resolveTenantAccess(tenantId: string): Promise<ResolvedTenantAccess> {
@@ -311,15 +372,23 @@ export class SaasAccessService {
       where: { isActive: true },
       orderBy: [{ groupKey: 'asc' }, { position: 'asc' }, { key: 'asc' }],
     });
+
     const access = await this.prisma.tenantAccess.findUnique({
       where: { tenantId },
       include: {
-        plan: { include: { capabilityValues: true } },
+        plan: {
+          include: {
+            capabilityValues: true,
+          },
+        },
         overrides: true,
         capabilityOrder: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
       },
     });
-    if (!access) throw new NotFoundException('Состояние рабочего пространства не настроено');
+
+    if (!access) {
+      throw new NotFoundException('Состояние рабочего пространства не настроено');
+    }
 
     const planValues = new Map(access.plan?.capabilityValues.map((value) => [value.capabilityId, value]) || []);
     const overrides = new Map(access.overrides.map((value) => [value.capabilityId, value]));
@@ -335,13 +404,22 @@ export class SaasAccessService {
     });
 
     const resolved = capabilities.map<ResolvedCapability>((capability) => {
-      if (access.status === TenantAccessStatus.SUSPENDED) return this.suspendedValue(capability.key, capability.valueType);
+      if (access.status === TenantAccessStatus.SUSPENDED) {
+        return this.suspendedValue(capability.key, capability.valueType);
+      }
+
       const override = overrides.get(capability.id);
       const planValue = planValues.get(capability.id);
 
       if (this.demoActive(access)) {
         if (capability.valueType === CapabilityValueType.BOOLEAN && override && override.enabled !== null) {
-          return { key: capability.key, valueType: capability.valueType, enabled: override.enabled, limit: null, source: 'TENANT_OVERRIDE' };
+          return {
+            key: capability.key,
+            valueType: capability.valueType,
+            enabled: override.enabled,
+            limit: null,
+            source: 'TENANT_OVERRIDE',
+          };
         }
         return this.demoValue(capability.key, capability.valueType);
       }
@@ -349,19 +427,63 @@ export class SaasAccessService {
 
       if (capability.valueType === CapabilityValueType.BOOLEAN) {
         if (override && override.enabled !== null) {
-          return { key: capability.key, valueType: capability.valueType, enabled: override.enabled, limit: null, source: 'TENANT_OVERRIDE' };
+          return {
+            key: capability.key,
+            valueType: capability.valueType,
+            enabled: override.enabled,
+            limit: null,
+            source: 'TENANT_OVERRIDE',
+          };
         }
-        if (access.isOwnerBook && !access.plan) return this.ownerValue(capability.key, capability.valueType);
+        if (access.isOwnerBook && !access.plan) {
+          return this.ownerValue(capability.key, capability.valueType);
+        }
         if (planValue && planValue.enabled !== null) {
-          return { key: capability.key, valueType: capability.valueType, enabled: planValue.enabled, limit: null, source: 'PLAN' };
+          return {
+            key: capability.key,
+            valueType: capability.valueType,
+            enabled: planValue.enabled,
+            limit: null,
+            source: 'PLAN',
+          };
         }
-        return { key: capability.key, valueType: capability.valueType, enabled: capability.defaultEnabled, limit: null, source: 'DEFAULT' };
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: capability.defaultEnabled,
+          limit: null,
+          source: 'DEFAULT',
+        };
       }
 
-      if (override) return { key: capability.key, valueType: capability.valueType, enabled: null, limit: override.limit, source: 'TENANT_OVERRIDE' };
-      if (access.isOwnerBook && !access.plan) return this.ownerValue(capability.key, capability.valueType);
-      if (planValue) return { key: capability.key, valueType: capability.valueType, enabled: null, limit: planValue.limit, source: 'PLAN' };
-      return { key: capability.key, valueType: capability.valueType, enabled: null, limit: capability.defaultLimit, source: 'DEFAULT' };
+      if (override) {
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: null,
+          limit: override.limit,
+          source: 'TENANT_OVERRIDE',
+        };
+      }
+      if (access.isOwnerBook && !access.plan) {
+        return this.ownerValue(capability.key, capability.valueType);
+      }
+      if (planValue) {
+        return {
+          key: capability.key,
+          valueType: capability.valueType,
+          enabled: null,
+          limit: planValue.limit,
+          source: 'PLAN',
+        };
+      }
+      return {
+        key: capability.key,
+        valueType: capability.valueType,
+        enabled: null,
+        limit: capability.defaultLimit,
+        source: 'DEFAULT',
+      };
     });
 
     return {
@@ -380,30 +502,41 @@ export class SaasAccessService {
   }
 
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
-    return access.commercialMode === 'DEMO' && (!access.demoExpiresAt || access.demoExpiresAt.getTime() > Date.now());
+    return access.commercialMode === 'DEMO'
+      && (!access.demoExpiresAt || access.demoExpiresAt.getTime() > Date.now());
   }
 
   private demoExpired(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
-    return access.commercialMode === 'DEMO' && Boolean(access.demoExpiresAt) && access.demoExpiresAt!.getTime() <= Date.now();
+    return access.commercialMode === 'DEMO'
+      && Boolean(access.demoExpiresAt)
+      && access.demoExpiresAt!.getTime() <= Date.now();
   }
 
   private demoValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) return { key, valueType, enabled: true, limit: null, source: 'DEMO' };
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: true, limit: null, source: 'DEMO' };
+    }
     return { key, valueType, enabled: null, limit: null, source: 'DEMO' };
   }
 
   private demoExpiredValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) return { key, valueType, enabled: false, limit: null, source: 'DEMO_EXPIRED' };
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: false, limit: null, source: 'DEMO_EXPIRED' };
+    }
     return { key, valueType, enabled: null, limit: 0, source: 'DEMO_EXPIRED' };
   }
 
   private ownerValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) return { key, valueType, enabled: true, limit: null, source: 'OWNER' };
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: true, limit: null, source: 'OWNER' };
+    }
     return { key, valueType, enabled: null, limit: null, source: 'OWNER' };
   }
 
   private suspendedValue(key: string, valueType: CapabilityValueType): ResolvedCapability {
-    if (valueType === CapabilityValueType.BOOLEAN) return { key, valueType, enabled: false, limit: null, source: 'SUSPENDED' };
+    if (valueType === CapabilityValueType.BOOLEAN) {
+      return { key, valueType, enabled: false, limit: null, source: 'SUSPENDED' };
+    }
     return { key, valueType, enabled: null, limit: 0, source: 'SUSPENDED' };
   }
 }
