@@ -1,4 +1,9 @@
-import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
+import {
+  getNotificationDeliveryRouting,
+  getNotificationRouting,
+  saveNotificationDeliveryRouting,
+  saveNotificationRouting,
+} from '../../core/notifications/routing.js';
 import {
   button,
   emptyState,
@@ -14,7 +19,6 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 
-const DELIVERY_POLICY_TYPE = '__delivery__';
 const EVENTS = [
   { type: 'booking.created', title: 'Запись создана', body: 'После создания записи' },
   { type: 'booking.rescheduled', title: 'Запись перенесена', body: 'После изменения даты или времени' },
@@ -35,19 +39,8 @@ const ROUTING_MODE_OPTIONS = Object.freeze([
 function normalizedPolicy(routing, type) {
   const source = Array.isArray(routing) ? routing.find((item) => item?.eventType === type) : null;
   return {
-    mode: source?.mode === 'fallback' ? 'fallback' : 'always',
-    channels: Array.isArray(source?.channels) ? source.channels : ['PUSH'],
     titleTemplate: String(source?.titleTemplate || '').trim(),
     bodyTemplate: String(source?.bodyTemplate || '').trim(),
-  };
-}
-
-function deliveryPolicy(items = []) {
-  const source = (Array.isArray(items) ? items : []).find((item) => item?.eventType === DELIVERY_POLICY_TYPE)
-    || (Array.isArray(items) ? items : []).find((item) => item?.eventType === 'booking.created');
-  return {
-    mode: source?.mode === 'fallback' ? 'fallback' : 'always',
-    channels: Array.isArray(source?.channels) ? source.channels : ['PUSH'],
   };
 }
 
@@ -80,8 +73,7 @@ function openPushInfo() {
 }
 
 async function openDeliverySettings() {
-  const items = await getNotificationRouting();
-  const policy = deliveryPolicy(items);
+  const policy = await getNotificationDeliveryRouting();
   const channels = externalChannelValues(policy);
   const pushInfo = `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
     icon: 'info',
@@ -94,7 +86,7 @@ async function openDeliverySettings() {
       ${select({
         label: 'Порядок отправки',
         name: 'mode',
-        value: policy.mode,
+        value: policy?.mode === 'fallback' ? 'fallback' : 'always',
         options: ROUTING_MODE_OPTIONS,
       })}
       ${select({ label: 'Канал 1', name: 'channel1', value: channels[0], options: EXTERNAL_CHANNEL_OPTIONS })}
@@ -120,7 +112,7 @@ async function openDeliverySettings() {
     if (status) status.textContent = 'Сохраняем…';
     try {
       const data = new FormData(form);
-      await saveNotificationRouting(DELIVERY_POLICY_TYPE, {
+      await saveNotificationDeliveryRouting({
         mode: String(data.get('mode') || 'always'),
         channels: ['PUSH', ...selectedExternalChannels(form)],
       });
@@ -149,8 +141,6 @@ function editPolicy(root, routing, event) {
     const form = submitEvent.currentTarget;
     const data = new FormData(form);
     await saveNotificationRouting(event.type, {
-      mode: current.mode,
-      channels: current.channels,
       titleTemplate: data.get('titleTemplate'),
       bodyTemplate: data.get('bodyTemplate'),
     });
