@@ -1,13 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityValueType, TenantAccessStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 
 const DEMO_DAYS = 14;
-
-function addDays(value: Date, days: number) {
-  return new Date(value.getTime() + Math.max(0, days) * 24 * 60 * 60 * 1000);
-}
 
 type ResolutionSource = 'TENANT_OVERRIDE' | 'PLAN' | 'DEFAULT' | 'OWNER' | 'SUSPENDED' | 'DEMO' | 'DEMO_EXPIRED';
 
@@ -35,10 +30,7 @@ export type ResolvedTenantAccess = {
 
 @Injectable()
 export class SaasAccessService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notices: PlatformNoticeService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async activateDemo(tenantId: string, platformAccountId: string): Promise<ResolvedTenantAccess> {
     const current = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
@@ -74,60 +66,70 @@ export class SaasAccessService {
   async requestLive(tenantId: string, platformAccountId: string) {
     const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
     if (!access) throw new NotFoundException('Рабочее пространство не найдено');
-    if (access.commercialMode === 'LIVE' && (access.isOwnerBook || access.liveApprovedAt)) {
-      return { requested: false, alreadyLive: true };
-    }
-    if (access.liveRequestedAt) {
-      return { requested: true, duplicate: true, occurredAt: access.liveRequestedAt.toISOString() };
+    if (access.commercialMode === 'LIVE') {
+      return {
+        transitioned: false,
+        alreadyLive: true,
+        access: await this.resolveTenantAccess(tenantId),
+      };
     }
 
     const now = new Date();
-    const event = await this.prisma.$transaction(async (tx) => {
+    const transition = await this.prisma.$transaction(async (tx) => {
       const current = await tx.tenantAccess.findUnique({ where: { tenantId } });
       if (!current) throw new NotFoundException('Рабочее пространство не найдено');
-      if (current.liveRequestedAt) {
-        return { occurredAt: current.liveRequestedAt, duplicate: true };
+      if (current.commercialMode === 'LIVE') {
+        return { changed: false, occurredAt: current.liveApprovedAt || now };
       }
+
       await tx.tenantAccess.update({
         where: { tenantId },
-        data: { liveRequestedAt: now, liveRequestedByPlatformAccountId: platformAccountId },
+        data: {
+          commercialMode: 'LIVE',
+          liveRequestedAt: now,
+          liveRequestedByPlatformAccountId: platformAccountId,
+          liveApprovedAt: now,
+          liveApprovedByAdminId: null,
+        },
       });
       await tx.platformActivityEvent.create({
         data: {
           tenantId,
           platformAccountId,
-          eventType: 'LIVE_REQUESTED',
-          metadata: { commercialMode: current.commercialMode },
+          eventType: 'LIVE_ACTIVATED_BY_USER',
+          metadata: {
+            from: current.commercialMode,
+            demoActivatedAt: current.demoActivatedAt?.toISOString() || '',
+            demoExpiresAt: current.demoExpiresAt?.toISOString() || '',
+          },
           occurredAt: now,
         },
       });
-      return { occurredAt: now, duplicate: false };
+      await tx.platformActivityEvent.create({
+        data: {
+          tenantId,
+          platformAccountId,
+          eventType: 'COMMERCIAL_MODE_CHANGED',
+          metadata: {
+            from: current.commercialMode,
+            commercialMode: 'LIVE',
+            source: 'USER',
+          },
+          occurredAt: now,
+        },
+      });
+      return { changed: true, occurredAt: now };
     });
 
-    if (!event.duplicate) {
-      const [profile, account] = await Promise.all([
-        this.prisma.profile.findUnique({
-          where: { tenantId_platformAccountId: { tenantId, platformAccountId } },
-          select: { name: true, surname: true },
-        }),
-        this.prisma.platformAccount.findUnique({
-          where: { id: platformAccountId },
-          select: { email: true },
-        }),
-      ]);
-      const requester = [profile?.name, profile?.surname].filter(Boolean).join(' ') || account?.email || 'Пользователь';
-      await this.notices.createForPlatformAdmins({
-        type: 'LIVE_REQUESTED',
-        title: 'Запрос LIVE',
-        body: `${requester} запросил переход в LIVE.`,
-        metadata: { tenantId, platformAccountId, occurredAt: event.occurredAt.toISOString() },
-      });
+    if (transition.changed) {
+      await this.cleanupDemoOperationalData(tenantId);
     }
 
     return {
-      requested: true,
-      duplicate: event.duplicate || undefined,
-      occurredAt: event.occurredAt.toISOString(),
+      transitioned: transition.changed,
+      alreadyLive: !transition.changed || undefined,
+      occurredAt: transition.occurredAt.toISOString(),
+      access: await this.resolveTenantAccess(tenantId),
     };
   }
 
@@ -138,9 +140,6 @@ export class SaasAccessService {
     if (access.commercialMode !== 'LIVE') {
       throw new ForbiddenException('Реальные внешние действия доступны после перехода в LIVE');
     }
-    if (!access.isOwnerBook && !access.liveApprovedAt) {
-      throw new ForbiddenException('LIVE доступен после подтверждения администратором');
-    }
     return true;
   }
 
@@ -149,7 +148,7 @@ export class SaasAccessService {
     if (!['DEMO', 'LIVE'].includes(mode)) throw new BadRequestException('Неизвестный режим');
     const approvedByAdminId = String(platformAdminId || '').trim();
     if (mode === 'LIVE' && !approvedByAdminId) {
-      throw new BadRequestException('LIVE требует явного подтверждения администратора');
+      throw new BadRequestException('Для административного переключения LIVE требуется администратор');
     }
 
     const now = new Date();
@@ -159,7 +158,7 @@ export class SaasAccessService {
       if (current.isOwnerBook && mode === 'LIVE' && current.commercialMode === 'LIVE') {
         return { access: current, previousMode: current.commercialMode };
       }
-      if (mode === 'LIVE' && current.commercialMode === 'LIVE' && current.liveApprovedAt && current.liveApprovedByAdminId) {
+      if (mode === 'LIVE' && current.commercialMode === 'LIVE') {
         return { access: current, previousMode: current.commercialMode };
       }
 
@@ -183,7 +182,12 @@ export class SaasAccessService {
         data: {
           tenantId,
           eventType: 'COMMERCIAL_MODE_CHANGED',
-          metadata: { from: current.commercialMode, commercialMode: mode, approvedByAdminId: mode === 'LIVE' ? approvedByAdminId : '' },
+          metadata: {
+            from: current.commercialMode,
+            commercialMode: mode,
+            source: 'ADMIN',
+            platformAdminId: mode === 'LIVE' ? approvedByAdminId : '',
+          },
           occurredAt: now,
         },
       });
@@ -191,7 +195,7 @@ export class SaasAccessService {
         await tx.platformActivityEvent.create({
           data: {
             tenantId,
-            eventType: 'LIVE_APPROVED_BY_ADMIN',
+            eventType: 'LIVE_ENABLED_BY_ADMIN',
             metadata: {
               platformAdminId: approvedByAdminId,
               requestedAt: current.liveRequestedAt?.toISOString() || '',
@@ -218,31 +222,6 @@ export class SaasAccessService {
       liveApprovedAt: access.liveApprovedAt?.toISOString() || '',
       liveApprovedByAdminId: access.liveApprovedByAdminId || '',
     };
-  }
-
-  async extendDemo(tenantId: string, daysValue: unknown = DEMO_DAYS) {
-    const days = Math.min(90, Math.max(1, Number(daysValue) || DEMO_DAYS));
-    const access = await this.prisma.tenantAccess.findUnique({ where: { tenantId } });
-    if (!access) throw new NotFoundException('Рабочее пространство не найдено');
-    const base = access.demoExpiresAt && access.demoExpiresAt.getTime() > Date.now() ? access.demoExpiresAt : new Date();
-    const expiresAt = addDays(base, days);
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.tenantAccess.update({
-        where: { tenantId },
-        data: { demoExpiresAt: expiresAt, demoExtendedAt: now },
-      });
-      await tx.tenantInvitation.updateMany({ where: { tenantId }, data: { demoExpiresAt: expiresAt } });
-      await tx.platformActivityEvent.create({
-        data: {
-          tenantId,
-          eventType: 'DEMO_EXTENDED',
-          metadata: { days, expiresAt: expiresAt.toISOString() },
-          occurredAt: now,
-        },
-      });
-    });
-    return { expiresAt: expiresAt.toISOString(), days };
   }
 
   private async cleanupDemoOperationalData(tenantId: string) {
@@ -325,7 +304,6 @@ export class SaasAccessService {
       return this.demoValue(capability.key, capability.valueType);
     }
     if (this.demoExpired(access)) return this.demoExpiredValue(capability.key, capability.valueType);
-    if (this.liveUnapproved(access)) return this.demoExpiredValue(capability.key, capability.valueType);
 
     if (capability.valueType === CapabilityValueType.BOOLEAN) {
       if (override && override.enabled !== null) {
@@ -526,12 +504,6 @@ export class SaasAccessService {
       capabilityOrder: capabilities.map((capability) => capability.key),
       capabilities: resolved,
     };
-  }
-
-  private liveUnapproved(access: { commercialMode: string; isOwnerBook: boolean; liveApprovedAt: Date | null }) {
-    return access.commercialMode === 'LIVE'
-      && !access.isOwnerBook
-      && !access.liveApprovedAt;
   }
 
   private demoActive(access: { commercialMode: string; demoActivatedAt: Date | null; demoExpiresAt: Date | null }) {
