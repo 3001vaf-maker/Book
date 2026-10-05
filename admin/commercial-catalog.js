@@ -221,7 +221,8 @@ function simplifyRegistrationLink() {
   access.hidden = true;
   access.querySelectorAll('[data-invite-tool]').forEach((input) => { input.checked = true; });
   const note = app.querySelector('.admin-invite-panel .admin-service-note');
-  if (note) note.textContent = 'Создай одноразовую регистрационную ссылку. Набор продукта и коммерческие условия управляются в разделе «Инструменты».';
+  const textValue = 'Создай одноразовую регистрационную ссылку. Набор продукта и коммерческие условия управляются в разделе «Инструменты».';
+  if (note && note.textContent !== textValue) note.textContent = textValue;
 }
 
 app?.addEventListener('click', (event) => {
@@ -230,7 +231,7 @@ app?.addEventListener('click', (event) => {
 }, true);
 
 const observer = new MutationObserver(() => {
-  simplifyRegistrationLink();
+  if (!app?.querySelector('.admin-invite-access[hidden]')) simplifyRegistrationLink();
 });
 if (app) observer.observe(app, { childList: true, subtree: true });
 window.setTimeout(simplifyRegistrationLink, 0);
