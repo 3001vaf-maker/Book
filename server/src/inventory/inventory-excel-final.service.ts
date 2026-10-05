@@ -8,18 +8,36 @@ type AnyRecord = Record<string, any>;
 
 type StockRow = {
   row: number;
+  manufacturer: string;
   name: string;
+  productType: string;
   unit: string;
   quantity: number;
-  purchasePrice: number | null;
-  category: string;
+  packageQuantity: number | null;
+  grossWeight: number | null;
+  tareWeight: number | null;
   supplier: string;
+  listPrice: number | null;
+  discountPercent: number | null;
+  actualPrice: number | null;
   location: string;
   minStock: number | null;
   targetStock: number | null;
-  packageQuantity: number | null;
   sku: string;
   barcode: string;
+};
+
+type SupplierRow = {
+  row: number;
+  manufacturer: string;
+  name: string;
+  unit: string;
+  supplier: string;
+  listPrice: number | null;
+  discountPercent: number | null;
+  actualPrice: number | null;
+  supplierSku: string;
+  note: string;
 };
 
 type MovementRow = {
@@ -31,22 +49,34 @@ type MovementRow = {
   procedure: string;
   section: string;
   kind: string;
+  manufacturer: string;
   material: string;
   quantity: number;
   unit: string;
+  supplier: string;
+  listPrice: number | null;
+  discountPercent: number | null;
+  actualPrice: number | null;
   unitCost: number | null;
   note: string;
 };
 
 const STOCK_HEADERS = [
-  'Наименование *', 'Единица *', 'Количество *', 'Цена закупки', 'Категория',
-  'Поставщик', 'Место хранения', 'Минимальный остаток', 'Целевой остаток',
-  'В упаковке', 'Артикул', 'Штрихкод',
+  'Производитель', 'Наименование *', 'Категория / тип', 'Единица *', 'Количество *',
+  'В упаковке', 'Масса брутто полной упаковки', 'Масса тары',
+  'Поставщик начального остатка', 'Прайсовая цена', 'Скидка %', 'Фактическая цена закупки',
+  'Место хранения', 'Минимальный остаток', 'Целевой остаток', 'Артикул', 'Штрихкод',
+];
+
+const SUPPLIER_HEADERS = [
+  'Производитель', 'Наименование товара *', 'Единица', 'Поставщик *',
+  'Прайсовая цена', 'Скидка %', 'Фактическая цена', 'Артикул поставщика', 'Примечание',
 ];
 
 const MOVEMENT_HEADERS = [
   'Дата *', 'Время', 'UEI', 'Имя', 'Процедура', 'Часть / зона', 'Тип *',
-  'Материал *', 'Количество *', 'Единица', 'Себестоимость', 'Примечание',
+  'Производитель', 'Материал *', 'Количество *', 'Единица', 'Поставщик',
+  'Прайсовая цена', 'Скидка %', 'Фактическая цена закупки', 'Себестоимость', 'Примечание',
 ];
 
 const ORDER_HEADERS = ['Наименование', 'Количество', 'Единица', 'Поставщик', 'Артикул'];
@@ -97,6 +127,23 @@ function nonNegative(value: unknown): number | null {
   return parsed == null ? null : Math.max(0, parsed);
 }
 
+function percentValue(value: unknown): number | null {
+  const parsed = nonNegative(value);
+  return parsed == null ? null : Math.min(100, parsed);
+}
+
+function effectivePrice(listPrice: number | null, discountPercent: number | null, actualPrice: number | null): number | null {
+  if (actualPrice != null) return actualPrice;
+  if (listPrice == null) return null;
+  return discountPercent == null ? listPrice : listPrice * (1 - discountPercent / 100);
+}
+
+function effectiveDiscount(listPrice: number | null, discountPercent: number | null, actualPrice: number | null): number | null {
+  if (discountPercent != null) return discountPercent;
+  if (listPrice == null || actualPrice == null || listPrice <= 0) return null;
+  return Math.max(0, Math.min(100, (1 - actualPrice / listPrice) * 100));
+}
+
 function dateOnly(value: unknown): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const raw = text(value);
@@ -144,7 +191,7 @@ function styleSheet(sheet: ExcelJS.Worksheet, headers: string[]) {
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
   headers.forEach((header, index) => {
-    sheet.getColumn(index + 1).width = Math.max(14, Math.min(28, header.length + 4));
+    sheet.getColumn(index + 1).width = Math.max(14, Math.min(34, header.length + 4));
   });
 }
 
@@ -160,6 +207,12 @@ function stableSourceId(parts: unknown[]): string {
   return createHash('sha256').update(parts.map((part) => text(part)).join('|')).digest('hex').slice(0, 40);
 }
 
+function stockIdentity(row: Pick<StockRow, 'manufacturer' | 'name' | 'unit' | 'sku' | 'barcode'>): string {
+  if (row.sku) return `sku:${normalized(row.sku)}`;
+  if (row.barcode) return `barcode:${normalized(row.barcode)}`;
+  return `product:${normalized(row.manufacturer)}|${normalized(row.name)}|${normalized(row.unit)}`;
+}
+
 @Injectable()
 export class InventoryExcelService {
   constructor(
@@ -171,7 +224,9 @@ export class InventoryExcelService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Остатки');
     styleSheet(sheet, STOCK_HEADERS);
-    sheet.addRow(['6A', 'г', 100, '', 'Красители', '', '', '', '', '', '', '']);
+
+    const suppliers = workbook.addWorksheet('Поставщики');
+    styleSheet(suppliers, SUPPLIER_HEADERS);
     return workbookBuffer(workbook);
   }
 
@@ -181,18 +236,29 @@ export class InventoryExcelService {
     const sheet = workbook.addWorksheet('Остатки');
     styleSheet(sheet, STOCK_HEADERS);
     snapshot.items.forEach((item: AnyRecord) => sheet.addRow([
-      item.name, item.unit, item.balance, item.lastPurchasePrice ?? '', item.category || '',
-      item.supplier || '', item.location || '', item.minStock ?? '', item.targetStock ?? '',
-      item.packageQuantity ?? '', item.sku || '', item.barcode || '',
+      item.manufacturer || '', item.name, item.productType || item.category || '', item.unit, item.balance,
+      item.packageQuantity ?? '', item.grossWeight ?? '', item.tareWeight ?? '',
+      '', '', '', item.lastPurchasePrice ?? '',
+      item.location || '', item.minStock ?? '', item.targetStock ?? '', item.sku || '', item.barcode || '',
     ]));
+
+    const suppliers = workbook.addWorksheet('Поставщики');
+    styleSheet(suppliers, SUPPLIER_HEADERS);
+    snapshot.items.forEach((item: AnyRecord) => {
+      (item.supplierOffers || []).forEach((offer: AnyRecord) => suppliers.addRow([
+        item.manufacturer || '', item.name, item.unit, offer.supplier || '',
+        offer.listPrice ?? '', offer.discountPercent ?? '', offer.actualPrice ?? '',
+        offer.supplierSku || '', offer.note || '',
+      ]));
+    });
     return workbookBuffer(workbook);
   }
 
-  private async parseStock(dataUrl: unknown): Promise<StockRow[]> {
+  private async parseStock(dataUrl: unknown): Promise<{ rows: StockRow[]; suppliers: SupplierRow[] }> {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer(dataUrl) as any);
-    const sheet = workbook.worksheets[0];
-    if (!sheet) throw new BadRequestException('В Excel нет листа');
+    const sheet = workbook.getWorksheet('Остатки') || workbook.worksheets[0];
+    if (!sheet) throw new BadRequestException('В Excel нет листа «Остатки»');
     const rows: StockRow[] = [];
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
@@ -200,65 +266,117 @@ export class InventoryExcelService {
       if (v.every((value) => !text(value))) return;
       rows.push({
         row: rowNumber,
-        name: text(v[0]),
-        unit: text(v[1]) || 'шт.',
-        quantity: nonNegative(v[2]) ?? -1,
-        purchasePrice: nonNegative(v[3]),
-        category: text(v[4]),
-        supplier: text(v[5]),
-        location: text(v[6]),
-        minStock: nonNegative(v[7]),
-        targetStock: nonNegative(v[8]),
-        packageQuantity: nonNegative(v[9]),
-        sku: text(v[10]),
-        barcode: text(v[11]),
+        manufacturer: text(v[0]),
+        name: text(v[1]),
+        productType: text(v[2]),
+        unit: text(v[3]) || 'шт.',
+        quantity: nonNegative(v[4]) ?? -1,
+        packageQuantity: nonNegative(v[5]),
+        grossWeight: nonNegative(v[6]),
+        tareWeight: nonNegative(v[7]),
+        supplier: text(v[8]),
+        listPrice: nonNegative(v[9]),
+        discountPercent: percentValue(v[10]),
+        actualPrice: nonNegative(v[11]),
+        location: text(v[12]),
+        minStock: nonNegative(v[13]),
+        targetStock: nonNegative(v[14]),
+        sku: text(v[15]),
+        barcode: text(v[16]),
       });
     });
-    return rows;
+
+    const suppliers: SupplierRow[] = [];
+    const supplierSheet = workbook.getWorksheet('Поставщики');
+    supplierSheet?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const v = rowValues(row, SUPPLIER_HEADERS.length);
+      if (v.every((value) => !text(value))) return;
+      suppliers.push({
+        row: rowNumber,
+        manufacturer: text(v[0]),
+        name: text(v[1]),
+        unit: text(v[2]),
+        supplier: text(v[3]),
+        listPrice: nonNegative(v[4]),
+        discountPercent: percentValue(v[5]),
+        actualPrice: nonNegative(v[6]),
+        supplierSku: text(v[7]),
+        note: text(v[8]),
+      });
+    });
+    return { rows, suppliers };
   }
 
-  private matchItem(items: AnyRecord[], row: Pick<StockRow, 'name' | 'unit' | 'sku' | 'barcode'>) {
+  private matchItem(items: AnyRecord[], row: Pick<StockRow, 'manufacturer' | 'name' | 'unit' | 'sku' | 'barcode'>) {
     const bySku = row.sku ? items.filter((item) => normalized(item.sku) === normalized(row.sku)) : [];
     if (bySku.length === 1) return bySku[0];
     if (bySku.length > 1) return 'ambiguous';
     const byBarcode = row.barcode ? items.filter((item) => normalized(item.barcode) === normalized(row.barcode)) : [];
     if (byBarcode.length === 1) return byBarcode[0];
     if (byBarcode.length > 1) return 'ambiguous';
-    const byName = items.filter((item) => normalized(item.name) === normalized(row.name) && normalized(item.unit) === normalized(row.unit));
+    const byName = items.filter((item) =>
+      normalized(item.manufacturer) === normalized(row.manufacturer)
+      && normalized(item.name) === normalized(row.name)
+      && normalized(item.unit) === normalized(row.unit));
     if (byName.length === 1) return byName[0];
     if (byName.length > 1) return 'ambiguous';
     return null;
   }
 
+  private supplierItemMatch(items: AnyRecord[], row: SupplierRow) {
+    const matches = items.filter((item) =>
+      normalized(item.manufacturer) === normalized(row.manufacturer)
+      && normalized(item.name) === normalized(row.name)
+      && (!row.unit || normalized(item.unit) === normalized(row.unit)));
+    return matches.length === 1 ? matches[0] : matches.length > 1 ? 'ambiguous' : null;
+  }
+
   async stockPreview(tenantId: string, dataUrl: unknown) {
-    const rows = await this.parseStock(dataUrl);
+    const parsed = await this.parseStock(dataUrl);
     const snapshot = await this.inventory.snapshot(tenantId);
     const errors: string[] = [];
     let create = 0;
     let update = 0;
     const seen = new Set<string>();
-    rows.forEach((row) => {
-      if (!row.name) errors.push(`Строка ${row.row}: нет наименования`);
-      if (!row.unit) errors.push(`Строка ${row.row}: нет единицы`);
-      if (row.quantity < 0) errors.push(`Строка ${row.row}: количество должно быть числом`);
-      const identity = row.sku ? `sku:${normalized(row.sku)}` : row.barcode ? `barcode:${normalized(row.barcode)}` : `name:${normalized(row.name)}|${normalized(row.unit)}`;
-      if (seen.has(identity)) errors.push(`Строка ${row.row}: позиция повторяется в файле`);
+    parsed.rows.forEach((row) => {
+      if (!row.name) errors.push(`Остатки, строка ${row.row}: нет наименования`);
+      if (!row.unit) errors.push(`Остатки, строка ${row.row}: нет единицы`);
+      if (row.quantity < 0) errors.push(`Остатки, строка ${row.row}: количество должно быть числом`);
+      if (row.grossWeight != null && row.tareWeight != null && row.tareWeight > row.grossWeight) {
+        errors.push(`Остатки, строка ${row.row}: масса тары больше массы брутто`);
+      }
+      const identity = stockIdentity(row);
+      if (seen.has(identity)) errors.push(`Остатки, строка ${row.row}: позиция повторяется в файле`);
       seen.add(identity);
       const match = this.matchItem(snapshot.items, row);
-      if (match === 'ambiguous') errors.push(`Строка ${row.row}: позиция определяется неоднозначно`);
+      if (match === 'ambiguous') errors.push(`Остатки, строка ${row.row}: позиция определяется неоднозначно`);
       else if (match) update += 1;
       else create += 1;
     });
-    return { rows: rows.length, create, update, errors };
+
+    const projected: AnyRecord[] = [...snapshot.items];
+    parsed.rows.forEach((row) => {
+      const match = this.matchItem(projected, row);
+      if (!match) projected.push({ ...row, itemId: `preview:${row.row}` });
+    });
+    parsed.suppliers.forEach((row) => {
+      if (!row.name) errors.push(`Поставщики, строка ${row.row}: нет товара`);
+      if (!row.supplier) errors.push(`Поставщики, строка ${row.row}: нет поставщика`);
+      const match = this.supplierItemMatch(projected, row);
+      if (!match) errors.push(`Поставщики, строка ${row.row}: товар «${row.name}» не найден в остатках`);
+      if (match === 'ambiguous') errors.push(`Поставщики, строка ${row.row}: товар «${row.name}» определяется неоднозначно`);
+    });
+    return { rows: parsed.rows.length, create, update, offers: parsed.suppliers.length, errors };
   }
 
   async stockImport(tenantId: string, dataUrl: unknown) {
-    const rows = await this.parseStock(dataUrl);
+    const parsed = await this.parseStock(dataUrl);
     const snapshot = await this.inventory.snapshot(tenantId);
     const preview = await this.stockPreview(tenantId, dataUrl);
     if (preview.errors.length) throw new BadRequestException(preview.errors.join('; '));
 
-    const prepared = rows.map((row) => {
+    const prepared = parsed.rows.map((row) => {
       const match = this.matchItem(snapshot.items, row);
       const existing = match && match !== 'ambiguous' ? match : null;
       return {
@@ -279,17 +397,22 @@ export class InventoryExcelService {
       for (const entry of prepared) {
         const commonData: AnyRecord = {
           name: entry.row.name,
+          manufacturer: entry.row.manufacturer,
+          productType: entry.row.productType,
+          category: entry.row.productType,
           unit: entry.row.unit,
-          category: entry.row.category,
-          supplier: entry.row.supplier,
           location: entry.row.location,
           minStock: entry.row.minStock,
           targetStock: entry.row.targetStock,
           packageQuantity: entry.row.packageQuantity,
+          grossWeight: entry.row.grossWeight,
+          tareWeight: entry.row.tareWeight,
           sku: entry.row.sku,
           barcode: entry.row.barcode,
         };
-        if (entry.row.purchasePrice != null) commonData.lastPurchasePrice = entry.row.purchasePrice;
+        const purchasePrice = effectivePrice(entry.row.listPrice, entry.row.discountPercent, entry.row.actualPrice);
+        if (purchasePrice != null) commonData.lastPurchasePrice = purchasePrice;
+        if (entry.row.supplier) commonData.supplier = entry.row.supplier;
         const stored = existingByItemId.get(entry.itemId);
         if (stored) {
           await tx.inventoryItem.update({ where: { id: stored.id }, data: commonData });
@@ -299,7 +422,8 @@ export class InventoryExcelService {
               tenantId,
               itemId: entry.itemId,
               ...commonData,
-              lastPurchasePrice: entry.row.purchasePrice,
+              lastPurchasePrice: purchasePrice,
+              supplier: entry.row.supplier,
               trackLots: true,
               canConsume: true,
               canSell: false,
@@ -314,10 +438,14 @@ export class InventoryExcelService {
     const lines = prepared.map((entry) => {
       const difference = entry.row.quantity - entry.currentBalance;
       if (Math.abs(difference) < 0.000001) return null;
+      const importedPrice = effectivePrice(entry.row.listPrice, entry.row.discountPercent, entry.row.actualPrice);
       return {
         itemId: entry.itemId,
         quantity: difference,
-        unitCost: difference > 0 ? (entry.row.purchasePrice ?? effectivePrices.get(entry.itemId) ?? null) : null,
+        unitCost: difference > 0 ? (importedPrice ?? effectivePrices.get(entry.itemId) ?? null) : null,
+        supplier: entry.row.supplier,
+        listPrice: entry.row.listPrice,
+        discountPercent: effectiveDiscount(entry.row.listPrice, entry.row.discountPercent, entry.row.actualPrice),
       };
     }).filter(Boolean);
 
@@ -325,9 +453,35 @@ export class InventoryExcelService {
       await this.inventory.createMovement(tenantId, {
         kind: 'ADJUSTMENT',
         sourceType: 'excel-stock-import',
-        sourceId: stableSourceId([Date.now(), rows.length]),
+        sourceId: stableSourceId([Date.now(), parsed.rows.length]),
         note: 'Импорт остатков',
         lines,
+      });
+    }
+
+    const freshSnapshot = await this.inventory.snapshot(tenantId);
+    for (const row of parsed.suppliers) {
+      const item = this.supplierItemMatch(freshSnapshot.items, row);
+      if (!item || item === 'ambiguous') continue;
+      const stored = await this.prisma.inventoryItem.findFirst({ where: { tenantId, itemId: item.itemId, archivedAt: null } });
+      if (!stored) continue;
+      const discount = effectiveDiscount(row.listPrice, row.discountPercent, row.actualPrice);
+      const actual = effectivePrice(row.listPrice, row.discountPercent, row.actualPrice);
+      const existing = await this.prisma.inventorySupplierOffer.findFirst({
+        where: { tenantId, inventoryItemId: stored.id, supplier: { equals: row.supplier, mode: 'insensitive' } },
+      });
+      const data = {
+        supplier: row.supplier,
+        listPrice: row.listPrice,
+        discountPercent: discount,
+        actualPrice: actual,
+        supplierSku: row.supplierSku,
+        note: row.note,
+        isActive: true,
+      };
+      if (existing) await this.prisma.inventorySupplierOffer.update({ where: { id: existing.id }, data });
+      else await this.prisma.inventorySupplierOffer.create({
+        data: { tenantId, offerId: randomUUID(), inventoryItemId: stored.id, ...data },
       });
     }
     return this.inventory.snapshot(tenantId);
@@ -337,16 +491,14 @@ export class InventoryExcelService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Движения');
     styleSheet(sheet, MOVEMENT_HEADERS);
-    sheet.addRow(['05.10.2026', '12:00', '', '', 'Окрашивание', 'Корни', 'Расход', '6A', 8, 'г', '', '']);
-    sheet.addRow(['05.10.2026', '12:00', '', '', 'Окрашивание', 'Корни', 'Расход', 'Оксид 3%', 42, 'г', '', '']);
     return workbookBuffer(workbook);
   }
 
   private async parseMovements(dataUrl: unknown): Promise<MovementRow[]> {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer(dataUrl) as any);
-    const sheet = workbook.worksheets[0];
-    if (!sheet) throw new BadRequestException('В Excel нет листа');
+    const sheet = workbook.getWorksheet('Движения') || workbook.worksheets[0];
+    if (!sheet) throw new BadRequestException('В Excel нет листа «Движения»');
     const rows: MovementRow[] = [];
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
@@ -361,18 +513,26 @@ export class InventoryExcelService {
         procedure: text(v[4]),
         section: text(v[5]),
         kind: KIND_VALUES[normalized(v[6])] || text(v[6]).toUpperCase(),
-        material: text(v[7]),
-        quantity: nonNegative(v[8]) ?? -1,
-        unit: text(v[9]),
-        unitCost: nonNegative(v[10]),
-        note: text(v[11]),
+        manufacturer: text(v[7]),
+        material: text(v[8]),
+        quantity: nonNegative(v[9]) ?? -1,
+        unit: text(v[10]),
+        supplier: text(v[11]),
+        listPrice: nonNegative(v[12]),
+        discountPercent: percentValue(v[13]),
+        actualPrice: nonNegative(v[14]),
+        unitCost: nonNegative(v[15]),
+        note: text(v[16]),
       });
     });
     return rows;
   }
 
   private movementItemMatch(items: AnyRecord[], row: MovementRow) {
-    const matches = items.filter((item) => normalized(item.name) === normalized(row.material) && (!row.unit || normalized(item.unit) === normalized(row.unit)));
+    const matches = items.filter((item) =>
+      normalized(item.name) === normalized(row.material)
+      && (!row.manufacturer || normalized(item.manufacturer) === normalized(row.manufacturer))
+      && (!row.unit || normalized(item.unit) === normalized(row.unit)));
     return matches.length === 1 ? matches[0] : matches.length > 1 ? 'ambiguous' : null;
   }
 
@@ -424,13 +584,25 @@ export class InventoryExcelService {
         note: row.note,
         lines: [],
       };
-      group.lines.push({ itemId: item.itemId, quantity: row.quantity, unitCost: row.unitCost, note: row.section });
+      const importedCost = effectivePrice(row.listPrice, row.discountPercent, row.actualPrice) ?? row.unitCost;
+      group.lines.push({
+        itemId: item.itemId,
+        quantity: row.quantity,
+        unitCost: row.kind === 'RECEIPT' || row.kind === 'RETURN' || row.kind === 'ADJUSTMENT' ? importedCost : null,
+        supplier: row.supplier,
+        listPrice: row.listPrice,
+        discountPercent: effectiveDiscount(row.listPrice, row.discountPercent, row.actualPrice),
+        note: row.section,
+      });
       grouped.set(key, group);
     });
 
     const candidates: AnyRecord[] = [...grouped.entries()].map(([key, group]): AnyRecord => ({
       ...group,
-      sourceId: stableSourceId([key, ...group.lines.map((line: AnyRecord) => `${line.itemId}:${line.quantity}:${line.unitCost ?? ''}:${line.note || ''}`)]),
+      sourceId: stableSourceId([key, ...group.lines.map((line: AnyRecord) => [
+        line.itemId, line.quantity, line.unitCost ?? '', line.supplier || '', line.listPrice ?? '',
+        line.discountPercent ?? '', line.note || '',
+      ].join(':'))]),
     }));
     candidates.sort((a: AnyRecord, b: AnyRecord) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
@@ -466,7 +638,12 @@ export class InventoryExcelService {
         tenantId,
         ...(start || end ? { occurredAt: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {}),
       },
-      include: { lines: { include: { item: true }, orderBy: { position: 'asc' } } },
+      include: {
+        lines: {
+          include: { item: true, allocations: { include: { lot: true } } },
+          orderBy: { position: 'asc' },
+        },
+      },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     });
     const names = await this.personNames(tenantId);
@@ -476,20 +653,31 @@ export class InventoryExcelService {
     movements.forEach((movement: AnyRecord) => {
       const date = new Date(movement.occurredAt);
       const personName = names.byUei.get(movement.personUei) || names.byKey.get(movement.personKey) || '';
-      (movement.lines || []).forEach((line: AnyRecord) => sheet.addRow([
-        date.toLocaleDateString('ru-RU'),
-        date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-        movement.personUei || '',
-        personName,
-        movement.procedureKey || '',
-        line.note || '',
-        KIND_LABELS[movement.kind] || movement.kind,
-        line.item?.name || '',
-        Number(line.quantity),
-        line.item?.unit || '',
-        Number(line.unitCost) || '',
-        movement.note || '',
-      ]));
+      (movement.lines || []).forEach((line: AnyRecord) => {
+        const lots = (line.allocations || []).map((allocation: AnyRecord) => allocation.lot).filter(Boolean);
+        const suppliers = [...new Set(lots.map((lot: AnyRecord) => text(lot.supplier)).filter(Boolean))];
+        const listPrices = [...new Set(lots.map((lot: AnyRecord) => lot.listPrice == null ? '' : String(lot.listPrice)).filter(Boolean))];
+        const discounts = [...new Set(lots.map((lot: AnyRecord) => lot.discountPercent == null ? '' : String(lot.discountPercent)).filter(Boolean))];
+        sheet.addRow([
+          date.toLocaleDateString('ru-RU'),
+          date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          movement.personUei || '',
+          personName,
+          movement.procedureKey || '',
+          line.note || '',
+          KIND_LABELS[movement.kind] || movement.kind,
+          line.item?.manufacturer || '',
+          line.item?.name || '',
+          Number(line.quantity),
+          line.item?.unit || '',
+          suppliers.join(', '),
+          listPrices.length === 1 ? Number(listPrices[0]) : '',
+          discounts.length === 1 ? Number(discounts[0]) : '',
+          line.direction === 'IN' ? Number(line.unitCost) || '' : '',
+          Number(line.unitCost) || '',
+          movement.note || '',
+        ]);
+      });
     });
     return workbookBuffer(workbook);
   }
