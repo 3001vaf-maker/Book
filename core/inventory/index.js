@@ -1,4 +1,4 @@
-import { enhanceInventoryExcel } from './excel.js';
+import { enhanceInventoryExcel } from './excel-v2.js';
 import { renderInventory } from './inventory.js';
 
 const INVENTORY_NAVIGATION = [
