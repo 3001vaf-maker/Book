@@ -101,9 +101,13 @@ assert.match(core, /children\.length > 1 \? children\.length : 0/);
 assert.match(core, /childItems\.length > 1 \? v2CardDeck/);
 assert.match(core, /secondaryItems\(id\)\.length > 1/);
 
-assert.match(admin, /Инструменты DEMO/);
+assert.match(admin, /Доступ по ссылке/);
 assert.match(admin, /selectedInvitationTools/);
 assert.match(admin, /JSON\.stringify\(\{ tools \}\)/);
+assert.doesNotMatch(admin, /Инструменты DEMO/);
+assert.doesNotMatch(admin, /data-section="live-requests"/);
+assert.doesNotMatch(admin, /Продлить DEMO на 14 дней/);
+assert.doesNotMatch(admin, /Перевести в LIVE/);
 
 assert.doesNotMatch(cleanupMigration, /DELETE FROM "PlatformActivityEvent"/);
 assert.match(recovery, /firstRunCleanupMigration/);
