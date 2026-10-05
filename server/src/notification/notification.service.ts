@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AccountContactType } from '@prisma/client';
-import { BusinessStateService } from '../business-state/business-state.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { PrismaService } from '../prisma.service';
 import { WebPushService } from './web-push.service';
 import { normalizeMessagePurpose, type MessagePurpose } from '../communication/message-purpose';
+
+type JsonObject = Record<string, any>;
 
 type NotificationInput = {
   purpose: MessagePurpose;
@@ -65,6 +66,8 @@ type RoutingPolicyRow = {
   eventType: string;
   mode: string;
   channels: unknown;
+  titleTemplate: string;
+  bodyTemplate: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -72,6 +75,30 @@ type RoutingPolicyRow = {
 const ROUTING_MODES = new Set(['always', 'fallback']);
 const ROUTING_CHANNELS = new Set(['PUSH', 'TELEGRAM', 'EMAIL']);
 const ACTIVE_EXTERNAL_CHANNELS = new Set(['TELEGRAM', 'EMAIL']);
+const SYSTEM_EVENT_TYPES = ['booking.created', 'booking.rescheduled', 'booking.cancelled'] as const;
+
+const DEFAULT_TEMPLATES: Record<string, { title: string; body: string }> = {
+  'booking.created': {
+    title: 'Запись создана',
+    body: 'Запись создана на {{date}} в {{time}}.',
+  },
+  'booking.rescheduled': {
+    title: 'Запись перенесена',
+    body: 'Запись перенесена на {{date}} в {{time}}.',
+  },
+  'booking.cancelled': {
+    title: 'Запись отменена',
+    body: 'Запись на {{date}} в {{time}} отменена.',
+  },
+};
+
+function objectValue(value: unknown): JsonObject {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
+}
+
+function arrayValue(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -104,28 +131,61 @@ function policyChannels(value: unknown, { defaultPush = false } = {}) {
   return channels.length || !defaultPush ? channels : ['PUSH'];
 }
 
+function accountIdsFromPerson(person: JsonObject) {
+  const values = [person.accountId, ...arrayValue(person.accounts)];
+  return [...new Set(values.map((value) => text(value)).filter(Boolean))];
+}
+
+function phonesMatch(left: unknown, right: unknown) {
+  const a = canonicalPhone(left);
+  const b = canonicalPhone(right);
+  return Boolean(a && b && a === b);
+}
+
+function defaultTemplate(eventType: string) {
+  return DEFAULT_TEMPLATES[eventType] || { title: 'Уведомление', body: '' };
+}
+
+function renderTemplate(template: unknown, context: JsonObject) {
+  return text(template).replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path) => {
+    const value = String(path || '').split('.').reduce<any>((current, key) => objectValue(current)[key], context);
+    return text(value);
+  });
+}
+
 @Injectable()
 export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly businessState: BusinessStateService,
     private readonly documents: ConsentPolicyService,
     private readonly webPush: WebPushService,
   ) {}
 
   private async accountIdentity(tenantId: string, accountId: string) {
-    const [account, identity] = await Promise.all([
+    const [account, personRows, identityRow] = await Promise.all([
       this.prisma.account.findUnique({
         where: { id: accountId },
         select: { phone: true, email: true },
       }),
-      this.businessState.bookingIdentityForAccount(tenantId, accountId),
+      this.prisma.person.findMany({ where: { tenantId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.ueiState.findUnique({ where: { tenantId } }),
     ]);
     if (!account) throw new NotFoundException('Аккаунт не найден');
     const personPhone = canonicalPhone(account.phone);
     if (!personPhone) throw new NotFoundException('У человека не определён номер телефона');
-    const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
-    const uei = text(identity?.uei);
+
+    const matched = personRows.find((row) => {
+      const person = objectValue(row.data);
+      return accountIdsFromPerson(person).includes(accountId)
+        || phonesMatch(person.phone, account.phone)
+        || arrayValue(person.phones).some((phone) => phonesMatch(phone, account.phone));
+    }) || null;
+    const person = objectValue(matched?.data);
+    const personKey = text(person.key || matched?.key);
+    const identity = objectValue(identityRow?.data);
+    const relations = objectValue(identity.relations);
+    const uei = personKey ? text(relations[`person:${personKey}`]) : '';
+
     const telegramRows = await this.prisma.$queryRaw<Array<{ externalUserId: string }>>`
       SELECT "externalUserId"
       FROM "CommunicationIdentity"
@@ -177,27 +237,32 @@ export class NotificationService {
   }
 
   private projectPolicy(row: RoutingPolicyRow | null, eventType: string) {
+    const fallback = defaultTemplate(eventType);
     return {
       eventType,
       mode: normalizeMode(row?.mode),
       channels: policyChannels(row?.channels, { defaultPush: !row }),
+      titleTemplate: text(row?.titleTemplate) || fallback.title,
+      bodyTemplate: text(row?.bodyTemplate) || fallback.body,
     };
   }
 
   async listRoutingPolicies(tenantId: string) {
     const rows = await this.prisma.$queryRaw<RoutingPolicyRow[]>`
-      SELECT "id", "tenantId", "eventType", "mode", "channels", "createdAt", "updatedAt"
+      SELECT "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
       FROM "NotificationRoutingPolicy"
       WHERE "tenantId" = ${tenantId}
       ORDER BY "eventType" ASC
     `;
-    return rows.map((row) => this.projectPolicy(row, row.eventType));
+    const byType = new Map(rows.map((row) => [row.eventType, row]));
+    const types = [...SYSTEM_EVENT_TYPES, ...rows.map((row) => row.eventType).filter((type) => !SYSTEM_EVENT_TYPES.includes(type as any))];
+    return types.map((type) => this.projectPolicy(byType.get(type) || null, type));
   }
 
   async getRoutingPolicy(tenantId: string, eventType: string) {
     const type = text(eventType) || 'message';
     const rows = await this.prisma.$queryRaw<RoutingPolicyRow[]>`
-      SELECT "id", "tenantId", "eventType", "mode", "channels", "createdAt", "updatedAt"
+      SELECT "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
       FROM "NotificationRoutingPolicy"
       WHERE "tenantId" = ${tenantId}
         AND "eventType" = ${type}
@@ -206,22 +271,32 @@ export class NotificationService {
     return this.projectPolicy(rows[0] || null, type);
   }
 
-  async saveRoutingPolicy(tenantId: string, eventType: string, input: { mode?: unknown; channels?: unknown }) {
+  async saveRoutingPolicy(
+    tenantId: string,
+    eventType: string,
+    input: { mode?: unknown; channels?: unknown; titleTemplate?: unknown; bodyTemplate?: unknown },
+  ) {
     const type = text(eventType);
     if (!type) throw new BadRequestException('Не указан тип уведомления');
-    const mode = normalizeMode(input?.mode);
-    const channels = policyChannels(input?.channels);
+    const existing = await this.getRoutingPolicy(tenantId, type);
+    const fallback = defaultTemplate(type);
+    const mode = normalizeMode(input?.mode ?? existing.mode);
+    const channels = input?.channels === undefined ? existing.channels : policyChannels(input?.channels);
+    const titleTemplate = text(input?.titleTemplate) || existing.titleTemplate || fallback.title;
+    const bodyTemplate = text(input?.bodyTemplate) || existing.bodyTemplate || fallback.body;
     const id = randomUUID();
     const channelsJson = JSON.stringify(channels);
     await this.prisma.$executeRaw`
       INSERT INTO "NotificationRoutingPolicy" (
-        "id", "tenantId", "eventType", "mode", "channels", "createdAt", "updatedAt"
+        "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
       ) VALUES (
-        ${id}, ${tenantId}, ${type}, ${mode}, ${channelsJson}::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ${id}, ${tenantId}, ${type}, ${mode}, ${channelsJson}::jsonb, ${titleTemplate}, ${bodyTemplate}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("tenantId", "eventType") DO UPDATE
       SET "mode" = EXCLUDED."mode",
           "channels" = EXCLUDED."channels",
+          "titleTemplate" = EXCLUDED."titleTemplate",
+          "bodyTemplate" = EXCLUDED."bodyTemplate",
           "updatedAt" = CURRENT_TIMESTAMP
     `;
     return this.getRoutingPolicy(tenantId, type);
@@ -346,6 +421,40 @@ export class NotificationService {
 
   async createForAccount(tenantId: string, accountId: string, input: NotificationInput) {
     return this.createForAccountInternal(tenantId, accountId, input, true);
+  }
+
+  async createEventForPerson(
+    tenantId: string,
+    personValue: unknown,
+    input: { type?: unknown; entityType?: unknown; entityId?: unknown; context?: unknown },
+  ) {
+    const person = objectValue(personValue);
+    const type = text(input?.type);
+    if (!type) throw new BadRequestException('Не указан тип уведомления');
+    let accountId = accountIdsFromPerson(person)[0] || '';
+    if (!accountId) {
+      const identity = await this.accountIdentityByPhone(tenantId, text(person.phone));
+      accountId = text(identity?.accountId);
+    }
+    if (!accountId) return { notification: null, routed: [], blocked: 'ACCOUNT_REQUIRED' };
+
+    const policy = await this.getRoutingPolicy(tenantId, type);
+    const context = {
+      ...objectValue(input?.context),
+      person: {
+        name: text(person.name),
+        surname: text(person.surname),
+        phone: text(person.phone),
+      },
+    };
+    return this.createForAccount(tenantId, accountId, {
+      purpose: 'SERVICE',
+      type,
+      title: renderTemplate(policy.titleTemplate, context),
+      body: renderTemplate(policy.bodyTemplate, context),
+      entityType: text(input?.entityType),
+      entityId: text(input?.entityId),
+    });
   }
 
   async listForAccount(tenantId: string, accountId: string) {
@@ -519,6 +628,7 @@ export class NotificationService {
     }
     return { deliveryId, status: 'failed', failedAt: now, error: message };
   }
+
   async markEmailSent(tenantId: string, deliveryId: string) {
     return this.markDeliverySent(tenantId, deliveryId, 'EMAIL');
   }
@@ -538,5 +648,4 @@ export class NotificationService {
   async markTelegramFailed(tenantId: string, deliveryId: string, error: unknown) {
     return this.markDeliveryFailed(tenantId, deliveryId, 'TELEGRAM', error);
   }
-
 }
