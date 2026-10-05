@@ -21,6 +21,7 @@ type PreparedLine = {
 const OUT_KINDS = new Set(['CONSUMPTION', 'SALE', 'WRITE_OFF']);
 const IN_KINDS = new Set(['RECEIPT', 'RETURN']);
 const MOVEMENT_KINDS = new Set([...OUT_KINDS, ...IN_KINDS, 'ADJUSTMENT', 'CORRECTION']);
+const EPSILON = 0.000001;
 
 function objectValue(value: unknown): AnyRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as AnyRecord : {};
@@ -91,6 +92,10 @@ function normalizedMovementLines(kind: string, value: unknown): PreparedLine[] {
 function decimalNumber(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function compareDates(left: unknown, right: unknown): number {
+  return new Date(String(left)).getTime() - new Date(String(right)).getTime();
 }
 
 @Injectable()
@@ -377,7 +382,7 @@ export class InventoryService {
       const before = currentByItem.get(itemId)?.signed || 0;
       const after = desiredByItem.get(itemId)?.signed || 0;
       const delta = after - before;
-      if (Math.abs(delta) < 0.000001) return;
+      if (Math.abs(delta) < EPSILON) return;
       deltaLines.push({
         itemId,
         quantity: delta,
@@ -399,13 +404,168 @@ export class InventoryService {
         recordId: original.recordId,
         procedureKey: original.procedureKey,
         workplaceKey: original.workplaceKey,
-        occurredAt: source.occurredAt || new Date(),
+        occurredAt: source.occurredAt || original.occurredAt,
         note: optionalText(source.note) || 'Корректировка движения',
         lines: deltaLines,
       });
     });
 
     return this.snapshot(tenantId);
+  }
+
+  private async maxKnownUnitCostInTx(tx: Tx, tenantId: string, inventoryItemId: string, fallback: number) {
+    const [lots, offers] = await Promise.all([
+      tx.inventoryLot.findMany({
+        where: { tenantId, inventoryItemId },
+        select: { unitCost: true },
+      }),
+      tx.inventorySupplierOffer.findMany({
+        where: { tenantId, inventoryItemId, isActive: true },
+        select: { actualPrice: true, listPrice: true, discountPercent: true },
+      }),
+    ]);
+
+    let maximum = Math.max(0, fallback);
+    for (const lot of lots as AnyRecord[]) maximum = Math.max(maximum, decimalNumber(lot.unitCost));
+    for (const offer of offers as AnyRecord[]) {
+      const listPrice = offer.listPrice == null ? null : decimalNumber(offer.listPrice);
+      const discount = offer.discountPercent == null ? null : decimalNumber(offer.discountPercent);
+      const actual = offer.actualPrice == null ? null : decimalNumber(offer.actualPrice);
+      const effective = actual ?? (listPrice == null ? null : listPrice * (1 - (discount ?? 0) / 100));
+      if (effective != null) maximum = Math.max(maximum, effective);
+    }
+    return maximum;
+  }
+
+  private async rebuildItemCostingInTx(tx: Tx, tenantId: string, inventoryItemId: string) {
+    const item = await tx.inventoryItem.findFirst({ where: { tenantId, id: inventoryItemId } });
+    if (!item) return;
+
+    const lines = await tx.inventoryMovementLine.findMany({
+      where: { tenantId, inventoryItemId },
+    });
+    if (!lines.length) return;
+
+    const movementIds = [...new Set((lines as AnyRecord[]).map((line) => line.inventoryMovementId))];
+    const lineIds = (lines as AnyRecord[]).map((line) => line.id);
+    const [movements, lots, allocations] = await Promise.all([
+      tx.inventoryMovement.findMany({
+        where: { tenantId, id: { in: movementIds } },
+        select: { id: true, occurredAt: true, createdAt: true },
+      }),
+      tx.inventoryLot.findMany({
+        where: { tenantId, inventoryItemId },
+        orderBy: [{ receivedAt: 'asc' }, { createdAt: 'asc' }],
+      }),
+      tx.inventoryMovementAllocation.findMany({
+        where: { tenantId, inventoryMovementLineId: { in: lineIds } },
+      }),
+    ]);
+
+    const movementById = new Map((movements as AnyRecord[]).map((movement) => [movement.id, movement]));
+    const lineById = new Map((lines as AnyRecord[]).map((line) => [line.id, line]));
+    const lotById = new Map((lots as AnyRecord[]).map((lot) => [lot.id, lot]));
+    const inboundLotByLine = new Map<string, string>();
+    for (const allocation of allocations as AnyRecord[]) {
+      const line = lineById.get(allocation.inventoryMovementLineId) as AnyRecord | undefined;
+      if (line?.direction === 'IN') inboundLotByLine.set(line.id, allocation.inventoryLotId);
+    }
+
+    const outLineIds = (lines as AnyRecord[])
+      .filter((line) => line.direction === 'OUT')
+      .map((line) => line.id);
+    if (outLineIds.length) {
+      await tx.inventoryMovementAllocation.deleteMany({
+        where: { tenantId, inventoryMovementLineId: { in: outLineIds } },
+      });
+    }
+
+    const remainingByLot = new Map<string, number>();
+    for (const lot of lots as AnyRecord[]) remainingByLot.set(lot.id, 0);
+
+    const maxKnownUnitCost = await this.maxKnownUnitCostInTx(
+      tx,
+      tenantId,
+      inventoryItemId,
+      decimalNumber(item.lastPurchasePrice),
+    );
+
+    const chronological = [...(lines as AnyRecord[])].sort((left, right) => {
+      const leftMovement = movementById.get(left.inventoryMovementId) as AnyRecord;
+      const rightMovement = movementById.get(right.inventoryMovementId) as AnyRecord;
+      const byFact = compareDates(leftMovement.occurredAt, rightMovement.occurredAt);
+      if (byFact !== 0) return byFact;
+      if (left.direction !== right.direction) return left.direction === 'IN' ? -1 : 1;
+      const byAudit = compareDates(leftMovement.createdAt, rightMovement.createdAt);
+      if (byAudit !== 0) return byAudit;
+      const byPosition = Number(left.position || 0) - Number(right.position || 0);
+      return byPosition !== 0 ? byPosition : String(left.id).localeCompare(String(right.id));
+    });
+
+    for (const line of chronological) {
+      if (line.direction === 'IN') {
+        const lotId = inboundLotByLine.get(line.id);
+        const lot = lotId ? lotById.get(lotId) as AnyRecord | undefined : undefined;
+        if (lot) remainingByLot.set(lot.id, decimalNumber(lot.quantityReceived));
+        continue;
+      }
+
+      let remaining = decimalNumber(line.quantity);
+      let totalCost = 0;
+      const movement = movementById.get(line.inventoryMovementId) as AnyRecord;
+      const eligibleLots = (lots as AnyRecord[]).filter((lot) => {
+        const available = remainingByLot.get(lot.id) || 0;
+        return available > EPSILON && compareDates(lot.receivedAt, movement.occurredAt) <= 0;
+      });
+
+      for (const lot of eligibleLots) {
+        if (remaining <= EPSILON) break;
+        const available = remainingByLot.get(lot.id) || 0;
+        const quantity = Math.min(remaining, available);
+        const unitCost = decimalNumber(lot.unitCost);
+        await tx.inventoryMovementAllocation.create({
+          data: {
+            tenantId,
+            inventoryMovementLineId: line.id,
+            inventoryLotId: lot.id,
+            allocationId: randomUUID(),
+            quantity,
+            unitCost,
+            amount: quantity * unitCost,
+          },
+        });
+        remainingByLot.set(lot.id, available - quantity);
+        totalCost += quantity * unitCost;
+        remaining -= quantity;
+      }
+
+      if (remaining > EPSILON) totalCost += remaining * maxKnownUnitCost;
+      const quantity = decimalNumber(line.quantity);
+      const unitCost = quantity > 0 ? totalCost / quantity : 0;
+      await tx.inventoryMovementLine.update({
+        where: { id: line.id },
+        data: { unitCost, amount: totalCost },
+      });
+    }
+
+    for (const lot of lots as AnyRecord[]) {
+      await tx.inventoryLot.update({
+        where: { id: lot.id },
+        data: { quantityRemaining: Math.max(0, remainingByLot.get(lot.id) || 0) },
+      });
+    }
+
+    const latestLot = [...(lots as AnyRecord[])].sort((left, right) => {
+      const byFact = compareDates(right.receivedAt, left.receivedAt);
+      if (byFact !== 0) return byFact;
+      return compareDates(right.createdAt, left.createdAt);
+    })[0];
+    if (latestLot) {
+      await tx.inventoryItem.update({
+        where: { id: item.id },
+        data: { lastPurchasePrice: decimalNumber(latestLot.unitCost) },
+      });
+    }
   }
 
   private async createMovementInTx(tx: Tx, tenantId: string, raw: AnyRecord) {
@@ -440,9 +600,12 @@ export class InventoryService {
       },
     });
 
+    const affectedInternalIds = new Set<string>();
     for (let position = 0; position < lines.length; position += 1) {
       const line = lines[position];
       const item = itemById.get(line.itemId) as AnyRecord;
+      affectedInternalIds.add(item.id);
+
       if (line.direction === 'IN') {
         const unitCost = line.unitCost ?? decimalNumber(item.lastPurchasePrice);
         const lineRow = await tx.inventoryMovementLine.create({
@@ -488,35 +651,10 @@ export class InventoryService {
             amount: line.quantity * unitCost,
           },
         });
-        await tx.inventoryItem.update({
-          where: { id: item.id },
-          data: { lastPurchasePrice: unitCost },
-        });
         continue;
       }
 
-      const lots = await tx.inventoryLot.findMany({
-        where: { tenantId, inventoryItemId: item.id, quantityRemaining: { gt: 0 } },
-        orderBy: [{ receivedAt: 'asc' }, { createdAt: 'asc' }],
-      });
-      const available = (lots as AnyRecord[]).reduce((sum, lot) => sum + decimalNumber(lot.quantityRemaining), 0);
-      if (available + 0.000001 < line.quantity) {
-        throw new BadRequestException(`Недостаточно остатка: ${item.name}`);
-      }
-
-      let remaining = line.quantity;
-      let cost = 0;
-      const allocations: Array<{ lot: AnyRecord; quantity: number; unitCost: number }> = [];
-      for (const lot of lots as AnyRecord[]) {
-        if (remaining <= 0.000001) break;
-        const quantity = Math.min(remaining, decimalNumber(lot.quantityRemaining));
-        const unitCost = decimalNumber(lot.unitCost);
-        allocations.push({ lot, quantity, unitCost });
-        cost += quantity * unitCost;
-        remaining -= quantity;
-      }
-      const averageUnitCost = line.quantity > 0 ? cost / line.quantity : 0;
-      const lineRow = await tx.inventoryMovementLine.create({
+      await tx.inventoryMovementLine.create({
         data: {
           tenantId,
           inventoryMovementId: movement.id,
@@ -525,30 +663,17 @@ export class InventoryService {
           position,
           direction: 'OUT',
           quantity: line.quantity,
-          unitCost: averageUnitCost,
-          amount: cost,
+          unitCost: 0,
+          amount: 0,
           expectedQuantity: line.expectedQuantity,
           actualQuantity: line.actualQuantity,
           note: line.note,
         },
       });
-      for (const allocation of allocations) {
-        await tx.inventoryMovementAllocation.create({
-          data: {
-            tenantId,
-            inventoryMovementLineId: lineRow.id,
-            inventoryLotId: allocation.lot.id,
-            allocationId: randomUUID(),
-            quantity: allocation.quantity,
-            unitCost: allocation.unitCost,
-            amount: allocation.quantity * allocation.unitCost,
-          },
-        });
-        await tx.inventoryLot.update({
-          where: { id: allocation.lot.id },
-          data: { quantityRemaining: decimalNumber(allocation.lot.quantityRemaining) - allocation.quantity },
-        });
-      }
+    }
+
+    for (const inventoryItemId of affectedInternalIds) {
+      await this.rebuildItemCostingInTx(tx, tenantId, inventoryItemId);
     }
 
     return movement;
