@@ -58,6 +58,14 @@ async function bootstrap() {
     if (!['GET', 'HEAD'].includes(request.method)) return next();
 
     const host = requestHost(request);
+    const landingPreviewPath = request.path === '/landing'
+      || request.path === '/landing/'
+      || request.path.startsWith('/landing/');
+
+    if (landingPreviewPath) {
+      if (request.path === '/landing') return response.redirect(302, '/landing/');
+      return staticSite(request, response, () => response.status(404).send('Not Found'));
+    }
 
     if (host === API_HOST) {
       if (request.path === '/') return response.redirect(302, '/admin/');
