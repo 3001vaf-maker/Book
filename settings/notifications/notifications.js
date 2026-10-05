@@ -1,6 +1,5 @@
 import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
 import {
-  button,
   emptyState,
   field,
   initV2ListReorder,
@@ -49,15 +48,49 @@ function editPolicy(root, routing, event) {
   const current = normalizedPolicy(routing, event.type);
   const state = { mode: current.mode, channels: [...current.channels] };
   const layer = mountModal(document.body, modal(`
-    <form class="form-grid" data-notification-policy-form>
-      ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate, required: true })}
-      ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 5, required: true })}
+    <div class="form-grid" data-notification-policy>
+      ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate })}
+      ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 5 })}
       <div class="muted">Доступно: {{date}}, {{time}}, {{workplace}}, {{person.name}}, {{person.surname}}</div>
       <div data-notification-modes></div>
       <div data-notification-channels></div>
-      ${button('Сохранить', { type: 'submit' })}
-    </form>
+      <div class="muted" data-notification-save-status></div>
+    </div>
   `, { title: event.title, variant: 'q', surface: 'app' }));
+
+  const status = () => layer?.querySelector('[data-notification-save-status]');
+  const templateValue = (name) => String(layer?.querySelector(`[name="${name}"]`)?.value || '').trim();
+
+  const persist = async () => {
+    const node = status();
+    if (node) node.textContent = 'Сохраняем…';
+    try {
+      const saved = await saveNotificationRouting(event.type, {
+        mode: state.mode,
+        channels: state.channels,
+        titleTemplate: templateValue('titleTemplate'),
+        bodyTemplate: templateValue('bodyTemplate'),
+      });
+      if (Array.isArray(routing)) {
+        const index = routing.findIndex((item) => item?.eventType === event.type);
+        const next = saved && typeof saved === 'object'
+          ? saved
+          : {
+              eventType: event.type,
+              mode: state.mode,
+              channels: [...state.channels],
+              titleTemplate: templateValue('titleTemplate'),
+              bodyTemplate: templateValue('bodyTemplate'),
+            };
+        if (index >= 0) routing[index] = next;
+        else routing.push(next);
+      }
+      if (node) node.textContent = 'Сохранено.';
+      await render(root);
+    } catch (error) {
+      if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось сохранить.';
+    }
+  };
 
   const drawChannels = () => {
     const host = layer?.querySelector('[data-notification-channels]');
@@ -95,6 +128,7 @@ function editPolicy(root, routing, event) {
         if (state.channels.includes(key)) state.channels = state.channels.filter((value) => value !== key);
         else state.channels.push(key);
         drawChannels();
+        void persist();
       });
     });
 
@@ -105,6 +139,7 @@ function editPolicy(root, routing, event) {
         onReorder: (ids) => {
           state.channels = ids.filter((key) => CHANNELS.some(([value]) => value === key));
           drawChannels();
+          void persist();
         },
       });
     }
@@ -131,22 +166,12 @@ function editPolicy(root, routing, event) {
       state.mode = node.dataset.notificationMode === 'fallback' ? 'fallback' : 'always';
       drawModes();
       drawChannels();
+      void persist();
     }));
   };
 
-  layer?.querySelector('[data-notification-policy-form]')?.addEventListener('submit', async (submitEvent) => {
-    submitEvent.preventDefault();
-    const form = submitEvent.currentTarget;
-    const data = new FormData(form);
-    await saveNotificationRouting(event.type, {
-      mode: state.mode,
-      channels: state.channels,
-      titleTemplate: data.get('titleTemplate'),
-      bodyTemplate: data.get('bodyTemplate'),
-    });
-    layer?.remove();
-    await render(root);
-  });
+  layer?.querySelector('[name="titleTemplate"]')?.addEventListener('change', () => void persist());
+  layer?.querySelector('[name="bodyTemplate"]')?.addEventListener('change', () => void persist());
   drawModes();
   drawChannels();
 }
