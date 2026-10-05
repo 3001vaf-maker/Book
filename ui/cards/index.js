@@ -1,8 +1,6 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { entityVisualCard } from './entity-card-constructor.js';
 
-// Compatibility adapter only. The old entityCard renderer was removed.
-// Any remaining historical call is rendered through the single canonical card.
 export function entityCard({
   title = '',
   subtitle = '',
