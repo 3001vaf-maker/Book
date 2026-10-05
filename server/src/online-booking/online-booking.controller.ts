@@ -349,13 +349,16 @@ export class OnlineBookingController {
   async createRequest(@Param('tenantId') tenantId: string, @Req() request: AccountRequest, @Body() body: Record<string, any>) {
     const accountId = request.accountAuth!.accountId;
     const created = await this.booking.createRequest(tenantId, accountId, body || {});
-    await this.notifications.createForAccount(tenantId, accountId, {
-      purpose: 'SERVICE',
+    await this.notifications.createEventForPerson(tenantId, { accountId }, {
       type: 'booking.created',
-      title: 'Запись создана',
-      body: 'Новая запись добавлена в ваш аккаунт.',
       entityType: 'record',
       entityId: String((created as any)?.recordId || ''),
+      context: {
+        date: String((created as any)?.date || '').slice(0, 10),
+        time: String((created as any)?.from || ''),
+        workplace: String((created as any)?.workplaceKey || ''),
+        record: { id: String((created as any)?.recordId || '') },
+      },
     });
     return created;
   }

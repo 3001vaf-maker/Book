@@ -19,7 +19,7 @@ export class NotificationController {
   saveRouting(
     @Req() request: OwnerRequest,
     @Param('eventType') eventType: string,
-    @Body() body: { mode?: unknown; channels?: unknown },
+    @Body() body: { mode?: unknown; channels?: unknown; titleTemplate?: unknown; bodyTemplate?: unknown },
   ) {
     return this.notifications.saveRoutingPolicy(request.auth!.tenantId, eventType, body || {});
   }

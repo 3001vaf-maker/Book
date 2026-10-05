@@ -1,14 +1,59 @@
 import { Body, Controller, Delete, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { NotificationService } from '../notification/notification.service';
+import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from './business-state.service';
 
+type JsonObject = Record<string, any>;
 type AuthenticatedRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
+
+function objectValue(value: unknown): JsonObject {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
+}
+
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function scheduleChanged(leftValue: unknown, rightValue: unknown) {
+  const left = objectValue(leftValue);
+  const right = objectValue(rightValue);
+  return text(left.date).slice(0, 10) !== text(right.date).slice(0, 10)
+    || text(left.workplaceId) !== text(right.workplaceId)
+    || text(left.from) !== text(right.from)
+    || text(left.to) !== text(right.to);
+}
 
 @Controller('business-state')
 @UseGuards(JwtAuthGuard)
 export class BusinessStateController {
-  constructor(private readonly businessState: BusinessStateService) {}
+  constructor(
+    private readonly businessState: BusinessStateService,
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationService,
+  ) {}
+
+  private async notifyRecordEvent(tenantId: string, type: string, recordValue: unknown) {
+    const record = objectValue(recordValue);
+    const person = objectValue(record.person);
+    if (!text(record.id) || (!text(person.phone) && !text(person.accountId) && !Array.isArray(person.accounts))) return;
+    const workplaceKey = text(record.workplaceId);
+    const workplace = workplaceKey
+      ? await this.prisma.workplace.findUnique({ where: { tenantId_key: { tenantId, key: workplaceKey } } }).catch(() => null)
+      : null;
+    await this.notifications.createEventForPerson(tenantId, person, {
+      type,
+      entityType: 'record',
+      entityId: text(record.id),
+      context: {
+        date: text(record.date).slice(0, 10),
+        time: text(record.from),
+        workplace: text(workplace?.name) || workplaceKey,
+        record: { id: text(record.id) },
+      },
+    });
+  }
 
   @Get()
   get(@Req() request: AuthenticatedRequest) {
@@ -31,8 +76,17 @@ export class BusinessStateController {
   }
 
   @Put('records/:recordId')
-  upsertRecord(@Req() request: AuthenticatedRequest, @Param('recordId') recordId: string, @Body() body: unknown) {
-    return this.businessState.upsertRecord(request.auth!.tenantId, recordId, body);
+  async upsertRecord(@Req() request: AuthenticatedRequest, @Param('recordId') recordId: string, @Body() body: unknown) {
+    const tenantId = request.auth!.tenantId;
+    const existing = await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId } } });
+    const saved = await this.businessState.upsertRecord(tenantId, recordId, body);
+    const eventType = !existing
+      ? 'booking.created'
+      : scheduleChanged(existing.data, saved) ? 'booking.rescheduled' : '';
+    if (eventType) {
+      await this.notifyRecordEvent(tenantId, eventType, saved).catch(() => null);
+    }
+    return saved;
   }
 
   @Delete('records/:recordId')
@@ -46,8 +100,18 @@ export class BusinessStateController {
   }
 
   @Put('record-events/:eventId')
-  upsertRecordEvent(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() body: unknown) {
-    return this.businessState.upsertRecordEvent(request.auth!.tenantId, eventId, body);
+  async upsertRecordEvent(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() body: unknown) {
+    const tenantId = request.auth!.tenantId;
+    const existed = await this.prisma.recordEvent.findUnique({ where: { tenantId_eventId: { tenantId, eventId } } });
+    const saved = await this.businessState.upsertRecordEvent(tenantId, eventId, body);
+    if (!existed && text(objectValue(saved).type) === 'cancelled') {
+      const recordId = text(objectValue(saved).recordId);
+      const record = recordId
+        ? await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId } } })
+        : null;
+      if (record) await this.notifyRecordEvent(tenantId, 'booking.cancelled', record.data).catch(() => null);
+    }
+    return saved;
   }
 
   @Get('operational')

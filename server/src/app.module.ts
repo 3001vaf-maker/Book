@@ -6,6 +6,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
 import { ProfileModule } from './profile/profile.module';
 import { OnlineBookingModule } from './online-booking/online-booking.module';
 import { BusinessStateModule } from './business-state/business-state.module';
+import { BusinessStateHttpModule } from './business-state/business-state-http.module';
 import { TenantDocumentArchiveModule } from './tenant-document-archive/tenant-document-archive.module';
 import { AuxiliaryStateModule } from './auxiliary-state/auxiliary-state.module';
 import { FinanceModule } from './finance/finance.module';
@@ -23,6 +24,7 @@ import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
     WorkspaceModule,
     ProfileModule,
     BusinessStateModule,
+    BusinessStateHttpModule,
     TenantDocumentArchiveModule,
     AuxiliaryStateModule,
     FinanceModule,
