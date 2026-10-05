@@ -30,7 +30,8 @@ assert.match(dispatch, /purpose: MessagePurpose/);
 assert.match(controller, /purpose: 'DIRECT'/);
 assert.match(broadcast, /purpose: 'MARKETING'/);
 assert.match(booking, /purpose: 'DIRECT'/);
-assert.match(booking, /purpose: 'SERVICE'[\s\S]*type: 'booking\.created'/);
+assert.match(booking, /createEventForPerson\([\s\S]*type: 'booking\.created'/);
+assert.match(notification, /createEventForPerson\([\s\S]*purpose: 'SERVICE'[\s\S]*type,/);
 
 assert.match(telegram, /const purpose: MessagePurpose = 'SYSTEM'/);
 assert.match(telegram, /purpose: 'DIRECT'/);
