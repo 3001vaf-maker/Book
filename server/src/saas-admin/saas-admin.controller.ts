@@ -95,7 +95,6 @@ export class SaasAdminController {
     return this.admin.updateTenantAccess(tenantId, body || {});
   }
 
-
   @Put('tenants/:tenantId/commercial-mode')
   setCommercialMode(
     @Req() request: AdminRequest,
@@ -103,11 +102,6 @@ export class SaasAdminController {
     @Body() body: { mode?: unknown },
   ) {
     return this.admin.setCommercialMode(tenantId, body?.mode, request.platformAdminId!);
-  }
-
-  @Post('tenants/:tenantId/demo/extend')
-  extendDemo(@Param('tenantId') tenantId: string, @Body() body: { days?: unknown }) {
-    return this.admin.extendDemo(tenantId, body?.days);
   }
 
   @Put('tenants/:tenantId/capability-order')
