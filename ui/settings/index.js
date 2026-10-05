@@ -1,4 +1,5 @@
 import { button } from '../buttons/index.js';
+import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 function text(value = '') {
@@ -16,13 +17,15 @@ export function settingsPanel(items = []) {
   }).join('')}</div>`;
 }
 
-
 export function notificationSettings(items = []) {
-  return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
-    <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
-      <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
-      <span><strong>${text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
-    </label>`).join('')}
-    <div class="muted" data-notification-status></div>
-  </div>`;
+  const rows = (Array.isArray(items) ? items : []).filter(Boolean).map((item) => v2ListEntry({
+    title: item.label || '',
+    subtitle: item.description || '',
+    interactive: false,
+    toggleData: item.data || '',
+    toggleAria: item.aria || `${item.checked ? 'Выключить' : 'Включить'} ${item.label || ''}`,
+    toggleChecked: Boolean(item.checked),
+    toggleDisabled: Boolean(item.disabled),
+  }));
+  return `<div class="app-notification-list">${v2ListEntries(rows)}<div class="muted" data-notification-status></div></div>`;
 }
