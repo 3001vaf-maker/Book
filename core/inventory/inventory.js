@@ -1,8 +1,7 @@
 import {
   button,
   emptyState,
-  entityCard,
-  entityCardStack,
+  entityVisualCard,
   field,
   modal,
   mountModal,
@@ -34,11 +33,22 @@ import {
 } from './service.js';
 
 const UNIT_OPTIONS = ['шт.', 'г', 'кг', 'мл', 'л', 'м', 'уп.'].map((value) => ({ value, label: value }));
-const STOCK_SORT = {
-  manufacturers: 'name-asc',
-  items: 'name-asc',
-};
 const EMPTY_MANUFACTURER = 'Без производителя';
+const STOCK_VIEW = {
+  manufacturersSort: 'name-asc',
+  manufacturersType: '',
+  itemsSort: 'name-asc',
+  itemsType: '',
+};
+const MANUFACTURER_CARD_APPEARANCE = {
+  lines: [
+    {}, {}, {}, {}, {},
+    { field: 'manufacturer', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true },
+    {},
+    { field: 'count', zone: 'full', align: 'left', size: 'm', color: 'white' },
+    {},
+  ],
+};
 
 function numberText(value, maximum = 3) {
   const number = Number(value) || 0;
@@ -74,7 +84,7 @@ function productTypeText(item = {}) {
   return String(item.productType || item.category || '').trim();
 }
 
-function sortItems(items = [], mode = STOCK_SORT.items) {
+function sortItems(items = [], mode = STOCK_VIEW.itemsSort) {
   const rows = [...items];
   const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' });
   if (mode === 'name-desc') return rows.sort((left, right) => byName(right, left));
@@ -84,10 +94,24 @@ function sortItems(items = [], mode = STOCK_SORT.items) {
   return rows.sort(byName);
 }
 
-function manufacturerGroups(query = '') {
+function matchesType(item, type = '') {
+  return !type || productTypeText(item) === type;
+}
+
+function stockTypeOptions(manufacturer = '') {
+  const values = [...new Set(getInventoryItems()
+    .filter((item) => !manufacturer || manufacturerName(item) === manufacturer)
+    .map(productTypeText)
+    .filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' }));
+  return [{ value: '', label: 'Все типы' }, ...values.map((value) => ({ value, label: value }))];
+}
+
+function manufacturerGroups(query = '', type = STOCK_VIEW.manufacturersType) {
   const needle = normalizedSearch(query);
   const groups = new Map();
   getInventoryItems().forEach((item) => {
+    if (!matchesType(item, type)) return;
     const manufacturer = manufacturerName(item);
     if (needle && !`${manufacturer} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle)) return;
     const rows = groups.get(manufacturer) || [];
@@ -96,9 +120,9 @@ function manufacturerGroups(query = '') {
   });
   const result = [...groups.entries()].map(([name, items]) => ({ name, items }));
   const byName = (left, right) => left.name.localeCompare(right.name, 'ru', { numeric: true, sensitivity: 'base' });
-  if (STOCK_SORT.manufacturers === 'name-desc') result.sort((left, right) => byName(right, left));
-  else if (STOCK_SORT.manufacturers === 'count-desc') result.sort((left, right) => right.items.length - left.items.length || byName(left, right));
-  else if (STOCK_SORT.manufacturers === 'count-asc') result.sort((left, right) => left.items.length - right.items.length || byName(left, right));
+  if (STOCK_VIEW.manufacturersSort === 'name-desc') result.sort((left, right) => byName(right, left));
+  else if (STOCK_VIEW.manufacturersSort === 'count-desc') result.sort((left, right) => right.items.length - left.items.length || byName(left, right));
+  else if (STOCK_VIEW.manufacturersSort === 'count-asc') result.sort((left, right) => left.items.length - right.items.length || byName(left, right));
   else result.sort(byName);
   return result;
 }
@@ -407,24 +431,28 @@ function stockSearchField(value = '', data = 'data-inventory-stock-search') {
 function stockManufacturerCardsMarkup(query = '') {
   const groups = manufacturerGroups(query);
   if (!getInventoryItems().length) return emptyState('Склад пуст', 'Добавьте первую позицию.');
-  if (!groups.length) return emptyState('Ничего не найдено', 'Измените запрос поиска.');
-  return entityCardStack(groups.map(({ name, items }) => entityCard({
-    title: name,
-    subtitle: `${items.length} ${items.length === 1 ? 'позиция' : items.length > 1 && items.length < 5 ? 'позиции' : 'позиций'}`,
-    initial: name === EMPTY_MANUFACTURER ? '?' : name.slice(0, 1).toUpperCase(),
+  if (!groups.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
+  const cards = groups.map(({ name, items }) => entityVisualCard({
+    appearance: MANUFACTURER_CARD_APPEARANCE,
+    fields: [
+      { value: 'manufacturer', label: 'Компания', text: name },
+      { value: 'count', label: 'Позиции', text: `${items.length} ${items.length === 1 ? 'позиция' : items.length > 1 && items.length < 5 ? 'позиции' : 'позиций'}` },
+    ],
     interactive: true,
     data: `data-inventory-manufacturer="${escapeHtml(name)}"`,
     aria: `Открыть товары ${name}`,
-  })));
+  }));
+  return `<div class="entity-card-rail" data-entity-card-rail>${cards.join('')}</div>`;
 }
 
 function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
   const items = sortItems(getInventoryItems().filter((item) => {
     if (manufacturerName(item) !== manufacturer) return false;
+    if (!matchesType(item, STOCK_VIEW.itemsType)) return false;
     return !needle || itemSearchText(item).includes(needle);
-  }));
-  if (!items.length) return emptyState('Ничего не найдено', 'Измените запрос поиска.');
+  }), STOCK_VIEW.itemsSort);
+  if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   return v2ListEntries(items.map((item) => v2ListEntry({
     title: item.name,
     subtitle: [productTypeText(item), item.location].filter(Boolean).join(' · '),
@@ -437,34 +465,51 @@ function stockListMarkup(manufacturer, query = '') {
   })));
 }
 
-function openStockSort(trigger, level, onChange) {
-  const manufacturerOptions = [
-    ['name-asc', 'Название А—Я'],
-    ['name-desc', 'Название Я—А'],
-    ['count-desc', 'Больше позиций сначала'],
-    ['count-asc', 'Меньше позиций сначала'],
+function stockSortOptions(level) {
+  if (level === 'manufacturers') {
+    return [
+      { value: 'name-asc', label: 'Название А—Я' },
+      { value: 'name-desc', label: 'Название Я—А' },
+      { value: 'count-desc', label: 'Больше позиций сначала' },
+      { value: 'count-asc', label: 'Меньше позиций сначала' },
+    ];
+  }
+  return [
+    { value: 'name-asc', label: 'Название А—Я' },
+    { value: 'name-desc', label: 'Название Я—А' },
+    { value: 'type-asc', label: 'По типу' },
+    { value: 'balance-desc', label: 'Остаток: больше сначала' },
+    { value: 'balance-asc', label: 'Остаток: меньше сначала' },
   ];
-  const itemOptionsList = [
-    ['name-asc', 'Название А—Я'],
-    ['name-desc', 'Название Я—А'],
-    ['type-asc', 'По типу'],
-    ['balance-desc', 'Остаток: больше сначала'],
-    ['balance-asc', 'Остаток: меньше сначала'],
-  ];
-  const options = level === 'manufacturers' ? manufacturerOptions : itemOptionsList;
-  const current = STOCK_SORT[level];
-  const content = options.map(([value, label]) => button(`${value === current ? '✓ ' : ''}${label}`, {
-    type: 'button',
-    variant: 'secondary',
-    data: `data-inventory-sort-value="${escapeHtml(value)}"`,
-  })).join('');
-  const modalRoot = mountModal(trigger, modal(content, { title: 'Сортировка', variant: 'x' }));
-  modalRoot?.querySelectorAll('[data-inventory-sort-value]').forEach((control) => {
-    control.addEventListener('click', () => {
-      STOCK_SORT[level] = control.dataset.inventorySortValue;
-      modalRoot.v2Close?.();
-      onChange?.();
-    });
+}
+
+function openStockControls(trigger, level, manufacturer, onChange) {
+  const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
+  const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
+  const content = `<div data-inventory-stock-controls>
+    ${select({
+      label: 'Сортировка',
+      name: 'inventorySort',
+      value: STOCK_VIEW[sortKey],
+      options: stockSortOptions(level),
+      aria: 'Сортировка остатков',
+    })}
+    ${select({
+      label: 'Фильтр',
+      name: 'inventoryType',
+      value: STOCK_VIEW[typeKey],
+      options: stockTypeOptions(level === 'items' ? manufacturer : ''),
+      aria: 'Фильтр по типу продукта',
+    })}
+  </div>`;
+  const modalRoot = mountModal(trigger, modal(content, { title: 'Сортировка и фильтр', variant: 'x' }));
+  modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', (event) => {
+    STOCK_VIEW[sortKey] = event.target.value;
+    onChange?.();
+  });
+  modalRoot?.querySelector('input[name="inventoryType"]')?.addEventListener('change', (event) => {
+    STOCK_VIEW[typeKey] = event.target.value;
+    onChange?.();
   });
 }
 
@@ -475,9 +520,10 @@ function bindManufacturerCards(root, host) {
 }
 
 function openManufacturerStock(root, manufacturer) {
+  STOCK_VIEW.itemsType = '';
   const markup = `
     ${context(manufacturer, {
-      a: { kind: 'settings', data: 'data-inventory-item-sort', aria: 'Сортировка товаров' },
+      a: { kind: 'settings', data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     ${stockSearchField('', 'data-inventory-company-search')}
@@ -493,7 +539,7 @@ function openManufacturerStock(root, manufacturer) {
   };
 
   layer.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderList);
-  layer.querySelector('[data-inventory-item-sort]')?.addEventListener('click', (event) => openStockSort(event.currentTarget, 'items', renderList));
+  layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'items', manufacturer, renderList));
   layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }));
   renderList();
   notifyContext();
@@ -539,8 +585,9 @@ function inventoryCountMarkup() {
 }
 
 function renderStock(root) {
+  STOCK_VIEW.manufacturersType = '';
   root.innerHTML = `${context('Остатки', {
-    a: { kind: 'settings', data: 'data-inventory-manufacturer-sort', aria: 'Сортировка производителей' },
+    a: { kind: 'settings', data: 'data-inventory-manufacturer-controls', aria: 'Сортировка и фильтр производителей' },
     c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
   })}${stockSearchField()}<div data-inventory-manufacturer-list>${stockManufacturerCardsMarkup()}</div>`;
 
@@ -552,7 +599,7 @@ function renderStock(root) {
   };
 
   root.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderManufacturers);
-  root.querySelector('[data-inventory-manufacturer-sort]')?.addEventListener('click', (event) => openStockSort(event.currentTarget, 'manufacturers', renderManufacturers));
+  root.querySelector('[data-inventory-manufacturer-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'manufacturers', '', renderManufacturers));
   root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root));
   renderManufacturers();
   notifyContext();
