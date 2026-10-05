@@ -3,7 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { PrismaService } from '../prisma.service';
 import { InventoryController } from './inventory.controller';
 import { InventoryExcelController } from './inventory-excel.controller';
-import { InventoryExcelService } from './inventory-excel.service';
+import { InventoryExcelService } from './inventory-excel-v2.service';
 import { InventoryService } from './inventory.service';
 
 @Module({
