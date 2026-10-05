@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { InventoryExcelService } from './inventory-excel.service';
+import { InventoryExcelService } from './inventory-excel-final.service';
 
 type AuthenticatedRequest = Request & {
   auth?: { platformAccountId: string; tenantId: string; role: string };
