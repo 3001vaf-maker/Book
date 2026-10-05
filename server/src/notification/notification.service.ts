@@ -78,6 +78,7 @@ type RoutedDelivery = { channel: string; recipient: string };
 const ROUTING_MODES = new Set(['always', 'fallback']);
 const ROUTING_CHANNELS = new Set(['PUSH', 'TELEGRAM', 'EMAIL']);
 const ACTIVE_EXTERNAL_CHANNELS = new Set(['TELEGRAM', 'EMAIL']);
+const DELIVERY_POLICY_TYPE = '__delivery__';
 const SYSTEM_EVENT_TYPES = ['booking.created', 'booking.rescheduled', 'booking.cancelled'] as const;
 
 const DEFAULT_TEMPLATES: Record<string, { title: string; body: string }> = {
@@ -250,11 +251,40 @@ export class NotificationService {
     };
   }
 
+  private projectDeliveryPolicy(row: RoutingPolicyRow | null) {
+    const configured = policyChannels(row?.channels, { defaultPush: true });
+    const external = configured.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
+    return {
+      eventType: DELIVERY_POLICY_TYPE,
+      mode: normalizeMode(row?.mode),
+      channels: ['PUSH', ...external],
+      titleTemplate: '',
+      bodyTemplate: '',
+    };
+  }
+
+  private async deliveryPolicyRow(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<RoutingPolicyRow[]>`
+      SELECT "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
+      FROM "NotificationRoutingPolicy"
+      WHERE "tenantId" = ${tenantId}
+        AND "eventType" IN (${DELIVERY_POLICY_TYPE}, 'booking.created')
+      ORDER BY CASE WHEN "eventType" = ${DELIVERY_POLICY_TYPE} THEN 0 ELSE 1 END
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  }
+
+  private async getDeliveryPolicy(tenantId: string) {
+    return this.projectDeliveryPolicy(await this.deliveryPolicyRow(tenantId));
+  }
+
   async listRoutingPolicies(tenantId: string) {
     const rows = await this.prisma.$queryRaw<RoutingPolicyRow[]>`
       SELECT "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
       FROM "NotificationRoutingPolicy"
       WHERE "tenantId" = ${tenantId}
+        AND "eventType" <> ${DELIVERY_POLICY_TYPE}
       ORDER BY "eventType" ASC
     `;
     const byType = new Map(rows.map((row) => [row.eventType, row]));
@@ -265,6 +295,7 @@ export class NotificationService {
 
   async getRoutingPolicy(tenantId: string, eventType: string) {
     const type = text(eventType) || 'message';
+    if (type === DELIVERY_POLICY_TYPE) return this.getDeliveryPolicy(tenantId);
     const rows = await this.prisma.$queryRaw<RoutingPolicyRow[]>`
       SELECT "id", "tenantId", "eventType", "mode", "channels", "titleTemplate", "bodyTemplate", "createdAt", "updatedAt"
       FROM "NotificationRoutingPolicy"
@@ -285,9 +316,16 @@ export class NotificationService {
     const existing = await this.getRoutingPolicy(tenantId, type);
     const fallback = defaultTemplate(type);
     const mode = normalizeMode(input?.mode ?? existing.mode);
-    const channels = input?.channels === undefined ? existing.channels : policyChannels(input?.channels);
-    const titleTemplate = text(input?.titleTemplate) || existing.titleTemplate || fallback.title;
-    const bodyTemplate = text(input?.bodyTemplate) || existing.bodyTemplate || fallback.body;
+    const requestedChannels = input?.channels === undefined ? existing.channels : policyChannels(input?.channels);
+    const channels = type === DELIVERY_POLICY_TYPE
+      ? ['PUSH', ...requestedChannels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel))]
+      : requestedChannels;
+    const titleTemplate = type === DELIVERY_POLICY_TYPE
+      ? ''
+      : text(input?.titleTemplate) || existing.titleTemplate || fallback.title;
+    const bodyTemplate = type === DELIVERY_POLICY_TYPE
+      ? ''
+      : text(input?.bodyTemplate) || existing.bodyTemplate || fallback.body;
     const id = randomUUID();
     const channelsJson = JSON.stringify(channels);
     await this.prisma.$executeRaw`
@@ -370,21 +408,27 @@ export class NotificationService {
   private async queueExternalByPolicy(
     tenantId: string,
     notificationId: string,
-    eventType: string,
+    _eventType: string,
     purpose: MessagePurpose,
     identity: AccountIdentity,
   ) {
-    const policy = await this.getRoutingPolicy(tenantId, eventType);
+    const policy = await this.getDeliveryPolicy(tenantId);
+    const routed: RoutedDelivery[] = [];
+    routed.push(...await this.queueChannel(tenantId, notificationId, 'PUSH', purpose, identity));
+
+    const externalChannels = policy.channels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
     if (policy.mode === 'fallback') {
-      for (const channel of policy.channels) {
-        const routed = await this.queueChannel(tenantId, notificationId, channel, purpose, identity);
-        if (routed.length) return routed;
+      for (const channel of externalChannels) {
+        const external = await this.queueChannel(tenantId, notificationId, channel, purpose, identity);
+        if (external.length) {
+          routed.push(...external);
+          break;
+        }
       }
-      return [];
+      return routed;
     }
 
-    const routed: RoutedDelivery[] = [];
-    for (const channel of policy.channels) {
+    for (const channel of externalChannels) {
       routed.push(...await this.queueChannel(tenantId, notificationId, channel, purpose, identity));
     }
     return routed;
@@ -393,24 +437,21 @@ export class NotificationService {
   private async queueFallbackAfter(
     tenantId: string,
     notificationId: string,
-    eventType: string,
+    _eventType: string,
     purposeValue: unknown,
     identity: AccountIdentity,
     failedChannel: string,
   ) {
     const purpose = normalizeMessagePurpose(purposeValue);
-    if (!purpose) return [];
-    const policy = await this.getRoutingPolicy(tenantId, eventType);
+    if (!purpose || !ACTIVE_EXTERNAL_CHANNELS.has(failedChannel)) return [];
+    const policy = await this.getDeliveryPolicy(tenantId);
     if (policy.mode !== 'fallback') return [];
-    const failedIndex = policy.channels.indexOf(failedChannel);
+    const externalChannels = policy.channels.filter((channel) => ACTIVE_EXTERNAL_CHANNELS.has(channel));
+    const failedIndex = externalChannels.indexOf(failedChannel);
     if (failedIndex < 0) return [];
-    for (const channel of policy.channels.slice(failedIndex + 1)) {
+    for (const channel of externalChannels.slice(failedIndex + 1)) {
       const routed = await this.queueChannel(tenantId, notificationId, channel, purpose, identity);
-      if (!routed.length) continue;
-      if (routed.some((item) => item.channel === 'PUSH')) {
-        await this.webPush.dispatchNotification(tenantId, notificationId);
-      }
-      return routed;
+      if (routed.length) return routed;
     }
     return [];
   }
@@ -456,11 +497,7 @@ export class NotificationService {
 
     const routed = routeExternal ? await this.queueExternalByPolicy(tenantId, notificationId, type, purpose, identity) : [];
     if (routeExternal && routed.some((item) => item.channel === 'PUSH')) {
-      const pushResult = await this.webPush.dispatchNotification(tenantId, notificationId);
-      const policy = await this.getRoutingPolicy(tenantId, type);
-      if (policy.mode === 'fallback' && pushResult.sent === 0 && pushResult.failed > 0) {
-        routed.push(...await this.queueFallbackAfter(tenantId, notificationId, type, purpose, identity, 'PUSH'));
-      }
+      await this.webPush.dispatchNotification(tenantId, notificationId);
     }
     return { notification: await this.getForAccount(tenantId, accountId, notificationId), routed };
   }
