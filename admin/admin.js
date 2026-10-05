@@ -33,15 +33,6 @@ async function platformNoticeRequest(path, options = {}) {
   return payload;
 }
 
-function pendingLiveRequests() {
-  return state.tenants.filter((item) => (
-    !item.isOwnerBook
-    && item.ownerProfile
-    && item.access?.commercialMode !== 'LIVE'
-    && item.liveRequestedAt
-  ));
-}
-
 function decodeBase64Url(value) {
   const padding = '='.repeat((4 - (String(value || '').length % 4)) % 4);
   const base64 = `${String(value || '').replaceAll('-', '+').replaceAll('_', '/')}${padding}`;
@@ -82,60 +73,16 @@ async function enableAdminPush(promptUser = false) {
   return true;
 }
 
-function updateLiveRequestIndicator() {
-  const count = pendingLiveRequests().length;
-  document.querySelectorAll('[data-live-request-count]').forEach((node) => {
-    node.textContent = String(count);
-    node.hidden = count === 0;
-    node.closest('[data-section="live-requests"]')?.classList.toggle('has-live-requests', count > 0);
-  });
-}
-
-async function approveLiveTenant(tenantId, control, messageNode = null) {
-  if (control) {
-    control.disabled = true;
-    control.textContent = 'Включаем LIVE…';
-  }
-  if (messageNode) {
-    messageNode.textContent = '';
-    messageNode.classList.remove('error');
-  }
-  try {
-    await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/commercial-mode`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'LIVE' }),
-    });
-    await refreshData();
-    updateLiveRequestIndicator();
-    if (messageNode) messageNode.textContent = 'LIVE включён.';
-    if (state.section === 'live-requests') renderLiveRequests();
-    if (state.section === 'tenants') renderTenants();
-    return true;
-  } catch (error) {
-    if (messageNode) {
-      messageNode.textContent = error instanceof Error ? error.message : 'Не удалось включить LIVE';
-      messageNode.classList.add('error');
-    }
-    if (control) {
-      control.disabled = false;
-      control.textContent = 'Перевести в LIVE';
-    }
-    return false;
-  }
-}
-
 function startAdminPolling() {
   if (adminPollTimer) window.clearInterval(adminPollTimer);
   adminPollTimer = window.setInterval(async () => {
     try {
       await refreshData();
-      updateLiveRequestIndicator();
-      if (state.section === 'live-requests') renderLiveRequests();
+      if (state.section === 'tenants') renderTenants();
     } catch {
-      // Фоновая проверка заявок не должна мешать работе админки.
+      // Фоновое обновление не должно мешать работе админки.
     }
-  }, 15_000);
+  }, 30_000);
 }
 
 function renderLogin(message = '') {
@@ -179,10 +126,7 @@ async function loadAdmin() {
     body: JSON.stringify({ documents: DOCUMENT_CATALOG }),
   });
   await refreshData();
-  const requestedTenantId = new URLSearchParams(window.location.search).get('liveRequest') || '';
-  if (requestedTenantId) state.section = 'live-requests';
   renderShell();
-  updateLiveRequestIndicator();
   startAdminPolling();
   void enableAdminPush(false).then((enabled) => {
     const pushButton = app.querySelector('[data-enable-admin-push]');
@@ -191,10 +135,6 @@ async function loadAdmin() {
       pushButton.disabled = true;
     }
   }).catch(() => false);
-  if (requestedTenantId && state.tenants.some((item) => item.tenantId === requestedTenantId)) {
-    window.setTimeout(() => openAccessDrawer(requestedTenantId), 0);
-    window.history.replaceState({}, '', '/admin/');
-  }
 }
 
 async function refreshData() {
@@ -207,7 +147,6 @@ async function refreshData() {
 }
 
 function renderShell() {
-  const liveRequestCount = pendingLiveRequests().length;
   app.innerHTML = `
     <div class="admin-shell">
       <aside class="admin-sidebar">
@@ -217,7 +156,6 @@ function renderShell() {
           <button data-section="owner" class="owner-link">Моё пространство</button>
           <button data-section="document-registry">Реестр документов</button>
           <button data-section="tenants">Пользователи</button>
-          <button data-section="live-requests" class="${liveRequestCount ? 'has-live-requests' : ''}">🔔 Запросы LIVE <span class="admin-live-count" data-live-request-count ${liveRequestCount ? '' : 'hidden'}>${liveRequestCount}</span></button>
           <button data-section="capabilities">Инструменты</button>
         </nav>
         <div class="admin-sidebar-foot">Управление системой</div>
@@ -232,10 +170,10 @@ function renderShell() {
   app.querySelectorAll('[data-section]').forEach((button) => {
     button.addEventListener('click', () => {
       state.section = button.dataset.section;
-      if (state.section === 'live-requests') void enableAdminPush(true).catch(() => false);
       renderCurrentSection();
     });
   });
+
   const pushButton = app.querySelector('[data-enable-admin-push]');
   const syncPushButton = (enabled = false) => {
     if (!pushButton) return;
@@ -286,7 +224,6 @@ function renderCurrentSection() {
     });
   }
   if (state.section === 'capabilities') return renderCapabilities();
-  if (state.section === 'live-requests') return renderLiveRequests();
   return renderTenants();
 }
 
@@ -303,39 +240,6 @@ function renderOverview() {
       <div class="admin-stat"><strong>${active}</strong><span>активных</span></div>
       <div class="admin-stat"><strong>${pending}</strong><span>ожидают регистрации</span></div>
     </div>`;
-}
-
-function renderLiveRequests() {
-  setActiveSection('Запросы LIVE');
-  const content = app.querySelector('[data-content]');
-  const requests = pendingLiveRequests().sort((a, b) => Date.parse(a.liveRequestedAt || 0) - Date.parse(b.liveRequestedAt || 0));
-  content.innerHTML = `
-    <div class="admin-heading"><div><h2>Запросы LIVE</h2><p>Запрос пользователя — сигнал для администратора. LIVE можно включить и без запроса.</p></div></div>
-    <div class="admin-card">
-      <table class="admin-table">
-        <thead><tr><th>Пользователь</th><th>Email</th><th>Запрос</th><th>Действие</th></tr></thead>
-        <tbody>${requests.length ? requests.map((item) => `
-          <tr data-live-request-tenant="${escapeHtml(item.tenantId)}">
-            <td><strong>${escapeHtml(item.ownerProfile?.name || item.tenantName || 'Пользователь')}</strong></td>
-            <td>${escapeHtml(item.ownerProfile?.email || '—')}</td>
-            <td>${escapeHtml(formatAdminMoment(item.liveRequestedAt))}</td>
-            <td><button class="admin-button" data-live-request-approve="${escapeHtml(item.tenantId)}">Перевести в LIVE</button></td>
-          </tr>`).join('') : '<tr><td colspan="4">Новых запросов LIVE нет.</td></tr>'}</tbody>
-      </table>
-    </div>
-    <p class="admin-inline-message" data-live-request-message></p>`;
-
-  const message = content.querySelector('[data-live-request-message]');
-  content.querySelectorAll('[data-live-request-approve]').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      await approveLiveTenant(button.dataset.liveRequestApprove, button, message);
-    });
-  });
-  content.querySelectorAll('[data-live-request-tenant]').forEach((row) => {
-    row.addEventListener('click', () => openAccessDrawer(row.dataset.liveRequestTenant));
-  });
-  updateLiveRequestIndicator();
 }
 
 function renderOwnerBook() {
@@ -417,8 +321,13 @@ function invitationToolSelector() {
     groups.get(label).push(item);
   });
   return `<div class="admin-invite-tools" data-invite-tools>
-    <h4>Инструменты DEMO</h4>
-    <p class="admin-service-note">Сначала выберите инструменты. После этого можно сформировать ссылку или отправить приглашение.</p>
+    <div class="admin-invite-tools-head">
+      <div><h4>Доступ по ссылке</h4><p class="admin-service-note">Выбери только те инструменты, которые должны быть доступны человеку в DEMO по этой ссылке.</p></div>
+      <div class="admin-inline-actions">
+        <button class="admin-button secondary" type="button" data-select-all-invite-tools>Выбрать всё</button>
+        <button class="admin-button secondary" type="button" data-clear-invite-tools>Снять всё</button>
+      </div>
+    </div>
     ${[...groups.entries()].map(([group, items]) => `<section class="admin-invite-tool-group">
       <strong>${escapeHtml(group)}</strong>
       <div class="admin-invite-tool-list">
@@ -442,18 +351,21 @@ function renderTenants() {
   const content = app.querySelector('[data-content]');
   const tenants = state.tenants.filter((item) => !item.isOwnerBook);
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Пользователи</h2><p>Каждый зарегистрированный пользователь работает в своём пространстве.</p></div></div>
+    <div class="admin-heading"><div><h2>Пользователи</h2><p>Здесь только люди, их режим и доступ. Регистрацию больше не нужно вести через email.</p></div></div>
     <section class="admin-invite-panel">
       <div class="admin-invite-head">
-        <h3>Пригласить пользователя</h3>
-        <button class="admin-button secondary" type="button" data-create-invite-link>Регистрационная ссылка</button>
+        <div>
+          <h3>Регистрационная ссылка</h3>
+          <p class="admin-service-note">Имя и email заранее не нужны. Настрой доступ, создай одноразовую ссылку и отправь её человеку любым способом.</p>
+        </div>
       </div>
-      ${invitationToolSelector()}
-      <form class="admin-invite-grid" data-invite-form>
-        <label class="admin-field"><span>Имя</span><input name="name" placeholder="Имя"></label>
-        <label class="admin-field"><span>Email</span><input name="email" type="email" placeholder="name@example.com" required></label>
-        <button class="admin-button" type="submit">Отправить приглашение</button>
-      </form>
+      <details class="admin-invite-access">
+        <summary>Настроить доступ по ссылке</summary>
+        ${invitationToolSelector()}
+      </details>
+      <div class="admin-invite-primary-actions">
+        <button class="admin-button" type="button" data-create-invite-link>Создать ссылку</button>
+      </div>
       <div class="admin-invite-link" data-invite-link hidden>
         <label class="admin-field">
           <span>Ссылка для регистрации</span>
@@ -465,24 +377,31 @@ function renderTenants() {
     </section>
     <div class="admin-card">
       <table class="admin-table">
-        <thead><tr><th>Пользователь</th><th>Email</th><th>Состояние</th><th>Набор</th></tr></thead>
+        <thead><tr><th>Пользователь</th><th>Email</th><th>Режим</th><th>Состояние</th></tr></thead>
         <tbody>${tenants.map(tenantRow).join('') || '<tr><td colspan="4">Пока нет созданных профилей.</td></tr>'}</tbody>
       </table>
     </div>`;
 
-  const form = content.querySelector('[data-invite-form]');
   const message = content.querySelector('[data-invite-message]');
   const createLinkButton = content.querySelector('[data-create-invite-link]');
   const inviteLinkBox = content.querySelector('[data-invite-link]');
   const inviteLinkInput = content.querySelector('[data-invite-link-value]');
   const copyLinkButton = content.querySelector('[data-copy-invite-link]');
 
+  content.querySelector('[data-select-all-invite-tools]')?.addEventListener('click', () => {
+    content.querySelectorAll('[data-invite-tool]').forEach((input) => { input.checked = true; });
+  });
+  content.querySelector('[data-clear-invite-tools]')?.addEventListener('click', () => {
+    content.querySelectorAll('[data-invite-tool]').forEach((input) => { input.checked = false; });
+  });
+
   createLinkButton?.addEventListener('click', async () => {
     message.textContent = '';
     message.classList.remove('error');
     const tools = selectedInvitationTools(content);
     if (!tools.length) {
-      message.textContent = 'Сначала выберите хотя бы один инструмент.';
+      content.querySelector('.admin-invite-access')?.setAttribute('open', '');
+      message.textContent = 'Выбери хотя бы один инструмент или нажми «Выбрать всё».';
       message.classList.add('error');
       return;
     }
@@ -498,14 +417,14 @@ function renderTenants() {
       if (!url) throw new Error('Ссылка не получена');
       inviteLinkInput.value = url;
       inviteLinkBox.hidden = false;
-      message.textContent = 'Ссылка создана. Она действует 7 дней и используется один раз.';
+      message.textContent = 'Ссылка готова. Она действует 7 дней и используется один раз.';
       await refreshData();
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Не удалось создать ссылку';
       message.classList.add('error');
     } finally {
       createLinkButton.disabled = false;
-      createLinkButton.textContent = 'Регистрационная ссылка';
+      createLinkButton.textContent = 'Создать ссылку';
     }
   });
 
@@ -523,69 +442,8 @@ function renderTenants() {
     window.setTimeout(() => { copyLinkButton.textContent = 'Копировать'; }, 1200);
   });
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    message.textContent = '';
-    message.classList.remove('error');
-    const button = form.querySelector('button[type="submit"]');
-    const data = new FormData(form);
-    const tools = selectedInvitationTools(content);
-    if (!tools.length) {
-      message.textContent = 'Сначала выберите хотя бы один инструмент.';
-      message.classList.add('error');
-      return;
-    }
-    button.disabled = true;
-    button.textContent = 'Отправляем…';
-    try {
-      await adminRequest('/invitations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: data.get('name'), email: data.get('email'), tools }),
-      });
-      form.reset();
-      message.textContent = 'Приглашение отправлено по email.';
-      await refreshData();
-      window.setTimeout(renderTenants, 350);
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось отправить приглашение';
-      message.classList.add('error');
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Отправить приглашение';
-    }
-  });
-
-  content.querySelectorAll('[data-email-tenant]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      openAccessDrawer(button.dataset.emailTenant);
-    });
-  });
   content.querySelectorAll('[data-tenant]').forEach((row) => {
     row.addEventListener('click', () => openAccessDrawer(row.dataset.tenant));
-  });
-  content.querySelectorAll('[data-resend]').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      button.disabled = true;
-      try {
-        await adminRequest(`/invitations/${encodeURIComponent(button.dataset.resend)}/resend`, { method: 'POST' });
-        button.textContent = 'Отправлено';
-      } catch (error) {
-        message.textContent = error instanceof Error ? error.message : 'Не удалось отправить письмо';
-        message.classList.add('error');
-        button.disabled = false;
-      }
-    });
-  });
-
-  content.querySelectorAll('[data-grant-live]').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      const tenantId = button.dataset.grantLive;
-      if (tenantId) await approveLiveTenant(tenantId, button, message);
-    });
   });
 
   content.querySelectorAll('[data-delete-tenant]').forEach((button) => {
@@ -603,21 +461,10 @@ function tenantRow(item) {
   const email = item.ownerProfile?.email || item.invitation?.email || '';
   const mode = String(item.access?.commercialMode || 'DEMO');
   const statusClass = item.status === 'SUSPENDED' ? 'suspended' : pending ? 'pending' : 'active';
-  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт входа' : item.ownerProfile ? 'Активен' : 'Создан';
-  const registrationLink = Boolean(item.invitation?.registrationLink);
-  const resolvedStatusLabel = registrationLink && pending ? 'Ждёт регистрации' : statusLabel;
-  const resend = pending && !registrationLink ? `<button class="admin-button secondary" data-resend="${escapeHtml(item.invitation.id)}">Повторить email</button>` : '';
-  const technicalEmail = item.ownerProfile?.email
-    ? `<button class="admin-button secondary" data-email-tenant="${escapeHtml(item.tenantId)}">Письмо</button>`
-    : '';
-  const liveRequest = item.liveRequestedAt && mode !== 'LIVE'
-    ? '<span class="admin-pill live-request">Запрос LIVE</span>'
-    : '';
-  const grantLive = item.ownerProfile && mode !== 'LIVE'
-    ? `<button class="admin-button" data-grant-live="${escapeHtml(item.tenantId)}">Перевести в LIVE</button>`
-    : '';
+  const statusLabel = item.status === 'SUSPENDED' ? 'Отключён' : pending ? 'Ждёт регистрации' : item.ownerProfile ? 'Активен' : 'Создан';
+  const modeClass = mode === 'LIVE' ? 'active' : 'pending';
   const remove = `<button class="admin-button danger" data-delete-tenant="${escapeHtml(item.tenantId)}">Удалить</button>`;
-  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${statusClass}">${resolvedStatusLabel}</span> ${liveRequest} ${resend} ${technicalEmail} ${grantLive} ${remove}</td><td>${escapeHtml(item.plan?.name || 'Индивидуальный')}</td></tr>`;
+  return `<tr data-tenant="${escapeHtml(item.tenantId)}"><td><strong>${escapeHtml(name)}</strong></td><td>${email ? escapeHtml(email) : '—'}</td><td><span class="admin-pill ${modeClass}">${escapeHtml(mode)}</span></td><td><span class="admin-pill ${statusClass}">${statusLabel}</span> ${remove}</td></tr>`;
 }
 
 function renderCapabilities() {
@@ -629,7 +476,7 @@ function renderCapabilities() {
     groups.get(item.groupKey).push(item);
   });
   content.innerHTML = `
-    <div class="admin-heading"><div><h2>Инструменты</h2><p>Единый каталог функций, которые можно выдавать каждому рабочему пространству.</p></div></div>
+    <div class="admin-heading"><div><h2>Инструменты</h2><p>Единый каталог функций. Здесь ничего не выдаётся пользователю — индивидуальный доступ меняется в его карточке.</p></div></div>
     ${[...groups.entries()].map(([group, items]) => `<section class="admin-card" style="padding:18px;margin-bottom:14px"><strong>${escapeHtml(group)}</strong>${items.map((item) => `<div class="admin-capability"><div>${escapeHtml(item.name)}<small>${escapeHtml(item.key)}</small></div><span>${item.valueType === 'LIMIT' ? 'лимит' : 'ON / OFF'}</span></div>`).join('')}</section>`).join('')}`;
 }
 
@@ -674,7 +521,6 @@ function openAccessDrawer(tenantId) {
   const mode = String(tenant.access?.commercialMode || 'DEMO');
   const demoActivated = tenant.access?.demoActivatedAt || tenant.invitation?.activatedAt || '';
   const demoExpires = tenant.access?.demoExpiresAt || tenant.invitation?.demoExpiresAt || '';
-  const liveRequestedAt = tenant.liveRequestedAt || '';
   const backdrop = document.createElement('div');
   backdrop.className = 'admin-drawer-backdrop';
   backdrop.innerHTML = `
@@ -688,21 +534,13 @@ function openAccessDrawer(tenantId) {
         <h4>Режим</h4>
         <div class="admin-mode-card">
           <strong>${escapeHtml(mode)}</strong>
-          <span>${demoActivated ? `DEMO активировано ${escapeHtml(formatAdminMoment(demoActivated))}` : 'DEMO ещё не активировано'}</span>
-          <span>${demoExpires ? `Срок DEMO до ${escapeHtml(formatAdminMoment(demoExpires))}` : ''}</span>
+          ${mode === 'DEMO' ? `<span>${demoActivated ? `DEMO началось ${escapeHtml(formatAdminMoment(demoActivated))}` : 'DEMO ещё не началось'}</span><span>${demoExpires ? `DEMO до ${escapeHtml(formatAdminMoment(demoExpires))}` : 'Срок появится после активации'}</span>` : '<span>Рабочий режим LIVE активен.</span>'}
         </div>
-        <div class="admin-inline-actions">
-          ${mode === 'DEMO' ? '<button class="admin-button secondary" data-extend-demo>Продлить DEMO на 14 дней</button>' : ''}
-          ${mode !== 'LIVE' && tenant.ownerProfile ? '<button class="admin-button" data-set-live>Перевести в LIVE</button>' : ''}
-          ${mode !== 'LIVE' && liveRequestedAt ? `<span class="admin-service-note">Запрос LIVE получен ${escapeHtml(formatAdminMoment(liveRequestedAt))}.</span>` : ''}
-          ${mode !== 'LIVE' && !liveRequestedAt && tenant.ownerProfile ? '<span class="admin-service-note">Запроса нет — администратор всё равно может включить LIVE.</span>' : ''}
-        </div>
-        <p class="admin-inline-message" data-mode-message></p>
       </section>
 
       <section class="admin-section">
-        <h4>Инструменты</h4>
-        <p class="admin-service-note">Порядок индивидуален для этого пользователя и не меняет функциональность инструмента.</p>
+        <h4>Инструменты пользователя</h4>
+        <p class="admin-service-note">Здесь можно вручную включить, выключить и расположить инструменты конкретного пользователя.</p>
         <div data-capability-order-list>
           ${capabilities.map((capability) => capabilityOrderRow(capability, resolved.get(capability.key))).join('')}
         </div>
@@ -716,7 +554,7 @@ function openAccessDrawer(tenantId) {
       ${tenant.ownerProfile?.email ? `
       <section class="admin-section">
         <h4>Техническое письмо</h4>
-        <p class="admin-service-note">Получатель: ${escapeHtml(tenant.ownerProfile.email)}</p>
+        <p class="admin-service-note">Это служебная отправка уже зарегистрированному пользователю: ${escapeHtml(tenant.ownerProfile.email)}</p>
         <form class="admin-form" data-technical-email-form>
           <label class="admin-field"><span>Тема</span><input name="subject" maxlength="200" required></label>
           <label class="admin-field"><span>Текст</span><textarea name="body" rows="6" maxlength="20000" required></textarea></label>
@@ -787,42 +625,6 @@ function openAccessDrawer(tenantId) {
       const message = backdrop.querySelector('[data-save-message]');
       message.textContent = error instanceof Error ? error.message : 'Не удалось изменить состояние';
       message.classList.add('error');
-    }
-  });
-
-  backdrop.querySelector('[data-extend-demo]')?.addEventListener('click', async (event) => {
-    const message = backdrop.querySelector('[data-mode-message]');
-    event.currentTarget.disabled = true;
-    try {
-      const result = await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/demo/extend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: 14 }),
-      });
-      message.textContent = `DEMO продлено до ${formatAdminMoment(result.expiresAt)}.`;
-      await refreshData();
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось продлить DEMO';
-      message.classList.add('error');
-      event.currentTarget.disabled = false;
-    }
-  });
-
-  backdrop.querySelector('[data-set-live]')?.addEventListener('click', async (event) => {
-    const message = backdrop.querySelector('[data-mode-message]');
-    event.currentTarget.disabled = true;
-    try {
-      await adminRequest(`/tenants/${encodeURIComponent(tenantId)}/commercial-mode`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'LIVE' }),
-      });
-      message.textContent = 'LIVE включён.';
-      await refreshData();
-    } catch (error) {
-      message.textContent = error instanceof Error ? error.message : 'Не удалось изменить режим';
-      message.classList.add('error');
-      event.currentTarget.disabled = false;
     }
   });
 
