@@ -386,14 +386,11 @@ function inventoryCountMarkup() {
 
 function renderStock(root) {
   root.innerHTML = `${context('Остатки', {
-    a: { kind: 'settings', data: 'data-inventory-settings', aria: 'Настройки склада' },
+    a: { kind: 'settings', aria: 'Excel склада' },
     c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
   })}${stockListMarkup()}`;
   root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root));
   root.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem)));
-  root.querySelector('[data-inventory-settings]')?.addEventListener('click', (event) => {
-    mountModal(event.currentTarget, modal('<p class="muted">Расширенные правила задаются внутри каждой позиции. Новичку их заполнять не обязательно.</p>', { title: 'Склад', variant: 'x' }));
-  });
   notifyContext();
 }
 
