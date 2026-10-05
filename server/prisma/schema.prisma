@@ -55,7 +55,7 @@ model Tenant {
   profiles                 Profile[]
   bookingPublication       BookingPublication?
   bookingPublicRoutes      BookingPublicRoute[]
-  createdAccounts          Account[]                   @relation("AccountCreatedViaTenant")
+  createdAccounts          Account[]                  @relation("AccountCreatedViaTenant")
   accountLinks             AccountTenantLink[]
   bookingRequests          BookingRequest[]
   people                   Person[]
@@ -73,49 +73,49 @@ model Tenant {
   tenantInvitations        TenantInvitation[]
   activityEvents           PlatformActivityEvent[]
   notificationPreferences  PlatformNotificationPreference[]
-  platformNotices           PlatformNotice[]
+  platformNotices          PlatformNotice[]
 }
 
 model PlatformAccount {
-  id                String           @id @default(cuid())
-  email             String           @unique
-  passwordHash      String
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  memberships       Membership[]
-  workspaceStates   WorkspaceState[]
-  profiles          Profile[]
-  platformAdmin     PlatformAdmin?
-  activityEvents    PlatformActivityEvent[]
+  id                      String                           @id @default(cuid())
+  email                   String                           @unique
+  passwordHash            String
+  createdAt               DateTime                         @default(now())
+  updatedAt               DateTime                         @updatedAt
+  memberships             Membership[]
+  workspaceStates         WorkspaceState[]
+  profiles                Profile[]
+  platformAdmin           PlatformAdmin?
+  activityEvents          PlatformActivityEvent[]
   notificationPreferences PlatformNotificationPreference[]
-  platformNotices   PlatformNotice[]
+  platformNotices         PlatformNotice[]
 }
 
 model Membership {
-  id        String         @id @default(cuid())
-  tenantId  String
-  platformAccountId    String
-  role      MembershipRole @default(OWNER)
-  createdAt DateTime       @default(now())
+  id                String         @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  role              MembershipRole @default(OWNER)
+  createdAt         DateTime       @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  account   PlatformAccount   @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, platformAccountId])
   @@index([platformAccountId])
 }
 
 model WorkspaceState {
-  id        String   @id @default(cuid())
-  tenantId  String
-  platformAccountId    String
-  data      Json
-  revision  Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  data              Json
+  revision          Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  account   PlatformAccount   @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, platformAccountId])
   @@index([tenantId])
@@ -123,30 +123,30 @@ model WorkspaceState {
 }
 
 model Profile {
-  id                  String      @id @default(cuid())
-  tenantId            String
-  platformAccountId              String
-  key                 String      @default("profile")
-  name                String      @default("")
-  surname             String      @default("")
-  phone               String      @default("")
-  phones              Json
-  telegrams           Json
-  emails              Json
-  about               String      @default("")
-  photo               String      @default("")
-  photoCropX          Int         @default(50)
-  photoCropY          Int         @default(50)
-  profession          String      @default("")
-  experience          String      @default("")
-  professionAbout     String      @default("")
-  cardAppearance      Json        @default("{}")
-  customProfessions   Json
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String
+  platformAccountId String
+  key               String   @default("profile")
+  name              String   @default("")
+  surname           String   @default("")
+  phone             String   @default("")
+  phones            Json
+  telegrams         Json
+  emails            Json
+  about             String   @default("")
+  photo             String   @default("")
+  photoCropX        Int      @default(50)
+  photoCropY        Int      @default(50)
+  profession        String   @default("")
+  experience        String   @default("")
+  professionAbout   String   @default("")
+  cardAppearance    Json     @default("{}")
+  customProfessions Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  account       PlatformAccount        @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account    PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
   workplaces Workplace[]
 
   @@unique([tenantId, platformAccountId])
@@ -169,32 +169,32 @@ model PlatformProfession {
 }
 
 model Workplace {
-  id              String   @id @default(cuid())
-  tenantId        String
-  profileId       String
-  key             String
-  position        Int      @default(0)
-  photo           String   @default("")
-  photoCropX      Int      @default(50)
-  photoCropY      Int      @default(50)
-  name            String   @default("")
-  color           String   @default("")
-  city            String   @default("")
-  address         String   @default("")
-  phone           String   @default("")
-  currency        String   @default("RUB")
-  timeZone        String   @default("Europe/Moscow")
-  from            String   @default("09:00")
-  to              String   @default("18:00")
-  links           Json
-  about           String   @default("")
-  cardAppearance  Json     @default("{}")
-  visibleInPublicBooking Boolean @default(true)
-  sourceCreatedAt String   @default("")
-  sourceUpdatedAt String   @default("")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  id                       String   @id @default(cuid())
+  tenantId                 String
+  profileId                String
+  key                      String
+  position                 Int      @default(0)
+  photo                    String   @default("")
+  photoCropX               Int      @default(50)
+  photoCropY               Int      @default(50)
+  name                     String   @default("")
+  color                    String   @default("")
+  city                     String   @default("")
+  address                  String   @default("")
+  phone                    String   @default("")
+  currency                 String   @default("RUB")
+  timeZone                 String   @default("Europe/Moscow")
+  from                     String   @default("09:00")
+  to                       String   @default("18:00")
+  links                    Json
+  about                    String   @default("")
+  cardAppearance           Json     @default("{}")
+  visibleInPublicBooking   Boolean  @default(true)
+  sourceCreatedAt          String   @default("")
+  sourceUpdatedAt          String   @default("")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  deletedAt                DateTime?
 
   profile Profile @relation(fields: [profileId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
@@ -232,7 +232,7 @@ model Account {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  createdViaTenant Tenant?          @relation("AccountCreatedViaTenant", fields: [createdViaTenantId], references: [id], onDelete: SetNull)
+  createdViaTenant Tenant?             @relation("AccountCreatedViaTenant", fields: [createdViaTenantId], references: [id], onDelete: SetNull)
   contacts         AccountContact[]
   tenantLinks      AccountTenantLink[]
   requests         BookingRequest[]
@@ -302,7 +302,7 @@ model BookingRequest {
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
-  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
@@ -370,31 +370,31 @@ model RecordEvent {
 }
 
 model BusinessOperationalState {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  data                Json
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model TenantDocumentArchive {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  data                Json
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model BusinessAuxiliaryState {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  data                Json
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -482,12 +482,12 @@ model FinanceLedgerEntry {
 }
 
 model PlatformAdmin {
-  id        String   @id @default(cuid())
-  platformAccountId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  platformAccountId String   @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  account               PlatformAccount               @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  account            PlatformAccount    @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
   createdInvitations TenantInvitation[]
 }
 
@@ -543,24 +543,24 @@ model PlanCapability {
 }
 
 model TenantAccess {
-  tenantId   String             @id
-  planId     String?
-  status     TenantAccessStatus @default(ACTIVE)
-  isOwnerBook Boolean           @default(false)
-  commercialMode String         @default("DEMO")
-  demoActivatedAt DateTime?
-  demoExpiresAt DateTime?
-  demoExtendedAt DateTime?
-  liveRequestedAt DateTime?
+  tenantId                        String             @id
+  planId                          String?
+  status                          TenantAccessStatus @default(ACTIVE)
+  isOwnerBook                     Boolean            @default(false)
+  commercialMode                  String             @default("DEMO")
+  demoActivatedAt                 DateTime?
+  demoExpiresAt                   DateTime?
+  demoExtendedAt                  DateTime?
+  liveRequestedAt                 DateTime?
   liveRequestedByPlatformAccountId String?
-  liveApprovedAt DateTime?
-  liveApprovedByAdminId String?
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  liveApprovedAt                  DateTime?
+  liveApprovedByAdminId           String?
+  createdAt                       DateTime           @default(now())
+  updatedAt                       DateTime           @updatedAt
 
-  tenant    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan      Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
-  overrides TenantCapabilityOverride[]
+  tenant          Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan            Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  overrides       TenantCapabilityOverride[]
   capabilityOrder TenantCapabilityOrder[]
 
   @@index([planId])
@@ -598,13 +598,14 @@ model TenantInvitation {
   updatedAt        DateTime               @updatedAt
   activatedAt      DateTime?
   demoExpiresAt    DateTime?
+
   tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdBy PlatformAdmin @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
   @@index([tenantId])
   @@index([email, status])
   @@index([createdByAdminId])
 }
-
 
 model PlatformActivityEvent {
   id                String   @id @default(cuid())
@@ -617,6 +618,7 @@ model PlatformActivityEvent {
 
   tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   account PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+
   @@index([tenantId, occurredAt])
   @@index([platformAccountId, occurredAt])
   @@index([eventType, occurredAt])
@@ -638,7 +640,6 @@ model TenantCapabilityOrder {
   @@index([capabilityId])
 }
 
-
 model PlatformNotificationPreference {
   id                String   @id @default(cuid())
   tenantId          String
@@ -653,7 +654,6 @@ model PlatformNotificationPreference {
   @@unique([tenantId, platformAccountId])
   @@index([platformAccountId])
 }
-
 
 model PlatformNotice {
   id                String   @id @default(cuid())
@@ -678,6 +678,8 @@ model InventoryItem {
   tenantId          String
   itemId            String
   name              String
+  manufacturer      String   @default("")
+  productType       String   @default("")
   unit              String   @default("шт.")
   category          String   @default("")
   sku               String   @default("")
@@ -687,6 +689,8 @@ model InventoryItem {
   minStock          Decimal? @db.Decimal(14, 3)
   targetStock       Decimal? @db.Decimal(14, 3)
   packageQuantity   Decimal? @db.Decimal(14, 3)
+  grossWeight       Decimal? @db.Decimal(14, 3)
+  tareWeight        Decimal? @db.Decimal(14, 3)
   lastPurchasePrice Decimal? @db.Decimal(14, 4)
   trackLots         Boolean  @default(true)
   canConsume        Boolean  @default(true)
@@ -696,12 +700,36 @@ model InventoryItem {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  lots          InventoryLot[]
-  movementLines InventoryMovementLine[]
+  lots           InventoryLot[]
+  movementLines  InventoryMovementLine[]
+  supplierOffers InventorySupplierOffer[]
 
   @@unique([tenantId, itemId])
   @@index([tenantId, archivedAt, position])
+  @@index([tenantId, manufacturer, name])
   @@index([tenantId, name])
+}
+
+model InventorySupplierOffer {
+  id                String   @id @default(cuid())
+  tenantId          String
+  offerId           String
+  inventoryItemId   String
+  supplier          String
+  listPrice         Decimal? @db.Decimal(14, 4)
+  discountPercent   Decimal? @db.Decimal(7, 4)
+  actualPrice       Decimal? @db.Decimal(14, 4)
+  supplierSku       String   @default("")
+  note              String   @default("")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  item InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, offerId])
+  @@index([tenantId, inventoryItemId, supplier])
+  @@index([tenantId, supplier])
 }
 
 model InventoryLot {
@@ -712,6 +740,8 @@ model InventoryLot {
   quantityReceived  Decimal  @db.Decimal(14, 3)
   quantityRemaining Decimal  @db.Decimal(14, 3)
   unitCost          Decimal  @db.Decimal(14, 4)
+  listPrice         Decimal? @db.Decimal(14, 4)
+  discountPercent   Decimal? @db.Decimal(7, 4)
   receivedAt        DateTime
   expiresAt         DateTime?
   supplier          String   @default("")
