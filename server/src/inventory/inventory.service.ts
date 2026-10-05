@@ -12,6 +12,9 @@ type PreparedLine = {
   unitCost: number | null;
   expectedQuantity: number | null;
   actualQuantity: number | null;
+  supplier: string;
+  listPrice: number | null;
+  discountPercent: number | null;
   note: string;
 };
 
@@ -46,6 +49,11 @@ function nullableNonNegative(value: unknown): number | null {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : null;
 }
 
+function nullablePercent(value: unknown): number | null {
+  const parsed = nullableNonNegative(value);
+  return parsed == null ? null : Math.min(100, parsed);
+}
+
 function dateValue(value: unknown, fallback = new Date()): Date {
   if (!value) return fallback;
   const parsed = new Date(String(value));
@@ -69,9 +77,12 @@ function normalizedMovementLines(kind: string, value: unknown): PreparedLine[] {
       itemId: text(row.itemId),
       quantity: Math.abs(signed),
       direction,
-      unitCost: nullableNonNegative(row.unitCost),
+      unitCost: nullableNonNegative(row.unitCost ?? row.actualPrice),
       expectedQuantity: nullableNonNegative(row.expectedQuantity),
       actualQuantity: nullableNonNegative(row.actualQuantity),
+      supplier: optionalText(row.supplier),
+      listPrice: nullableNonNegative(row.listPrice),
+      discountPercent: nullablePercent(row.discountPercent),
       note: optionalText(row.note),
     };
   }).filter((row) => row.itemId && row.quantity > 0);
@@ -87,10 +98,10 @@ export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async snapshot(tenantId: string) {
-    const [items, lots, movements, lines] = await Promise.all([
+    const [items, lots, movements, lines, supplierOffers] = await Promise.all([
       this.prisma.inventoryItem.findMany({
         where: { tenantId, archivedAt: null },
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        orderBy: [{ position: 'asc' }, { manufacturer: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.inventoryLot.findMany({
         where: { tenantId, quantityRemaining: { gt: 0 } },
@@ -105,6 +116,10 @@ export class InventoryService {
         where: { tenantId },
         orderBy: { position: 'asc' },
       }),
+      this.prisma.inventorySupplierOffer.findMany({
+        where: { tenantId, isActive: true },
+        orderBy: [{ supplier: 'asc' }, { updatedAt: 'desc' }],
+      }),
     ]);
 
     const balances = new Map<string, number>();
@@ -114,6 +129,21 @@ export class InventoryService {
     });
 
     const itemByInternal = new Map(items.map((item: AnyRecord) => [item.id, item]));
+    const offersByItem = new Map<string, AnyRecord[]>();
+    supplierOffers.forEach((offer: AnyRecord) => {
+      const rows = offersByItem.get(offer.inventoryItemId) || [];
+      rows.push({
+        offerId: offer.offerId,
+        supplier: offer.supplier,
+        listPrice: offer.listPrice == null ? null : decimalNumber(offer.listPrice),
+        discountPercent: offer.discountPercent == null ? null : decimalNumber(offer.discountPercent),
+        actualPrice: offer.actualPrice == null ? null : decimalNumber(offer.actualPrice),
+        supplierSku: offer.supplierSku,
+        note: offer.note,
+      });
+      offersByItem.set(offer.inventoryItemId, rows);
+    });
+
     const linesByMovement = new Map<string, AnyRecord[]>();
     lines.forEach((line: AnyRecord) => {
       const group = linesByMovement.get(line.inventoryMovementId) || [];
@@ -122,6 +152,7 @@ export class InventoryService {
         lineId: line.lineId,
         itemId: item?.itemId || '',
         name: item?.name || '',
+        manufacturer: item?.manufacturer || '',
         unit: item?.unit || '',
         direction: line.direction,
         quantity: decimalNumber(line.quantity),
@@ -135,32 +166,44 @@ export class InventoryService {
     });
 
     return {
-      items: items.map((item: AnyRecord) => ({
-        itemId: item.itemId,
-        name: item.name,
-        unit: item.unit,
-        category: item.category,
-        sku: item.sku,
-        barcode: item.barcode,
-        location: item.location,
-        supplier: item.supplier,
-        minStock: item.minStock == null ? null : decimalNumber(item.minStock),
-        targetStock: item.targetStock == null ? null : decimalNumber(item.targetStock),
-        packageQuantity: item.packageQuantity == null ? null : decimalNumber(item.packageQuantity),
-        lastPurchasePrice: item.lastPurchasePrice == null ? null : decimalNumber(item.lastPurchasePrice),
-        trackLots: item.trackLots,
-        canConsume: item.canConsume,
-        canSell: item.canSell,
-        balance: balances.get(item.id) || 0,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      })),
+      items: items.map((item: AnyRecord) => {
+        const grossWeight = item.grossWeight == null ? null : decimalNumber(item.grossWeight);
+        const tareWeight = item.tareWeight == null ? null : decimalNumber(item.tareWeight);
+        return {
+          itemId: item.itemId,
+          name: item.name,
+          manufacturer: item.manufacturer,
+          productType: item.productType,
+          unit: item.unit,
+          category: item.category,
+          sku: item.sku,
+          barcode: item.barcode,
+          location: item.location,
+          supplier: item.supplier,
+          minStock: item.minStock == null ? null : decimalNumber(item.minStock),
+          targetStock: item.targetStock == null ? null : decimalNumber(item.targetStock),
+          packageQuantity: item.packageQuantity == null ? null : decimalNumber(item.packageQuantity),
+          grossWeight,
+          tareWeight,
+          netPackageWeight: grossWeight != null && tareWeight != null ? Math.max(0, grossWeight - tareWeight) : null,
+          lastPurchasePrice: item.lastPurchasePrice == null ? null : decimalNumber(item.lastPurchasePrice),
+          supplierOffers: offersByItem.get(item.id) || [],
+          trackLots: item.trackLots,
+          canConsume: item.canConsume,
+          canSell: item.canSell,
+          balance: balances.get(item.id) || 0,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      }),
       lots: lots.map((lot: AnyRecord) => ({
         lotId: lot.lotId,
         itemId: (itemByInternal.get(lot.inventoryItemId) as AnyRecord | undefined)?.itemId || '',
         quantityReceived: decimalNumber(lot.quantityReceived),
         quantityRemaining: decimalNumber(lot.quantityRemaining),
         unitCost: decimalNumber(lot.unitCost),
+        listPrice: lot.listPrice == null ? null : decimalNumber(lot.listPrice),
+        discountPercent: lot.discountPercent == null ? null : decimalNumber(lot.discountPercent),
         receivedAt: lot.receivedAt,
         expiresAt: lot.expiresAt,
         supplier: lot.supplier,
@@ -193,14 +236,21 @@ export class InventoryService {
     const unit = text(source.unit) || 'шт.';
     const itemId = text(source.itemId) || randomUUID();
     const initialQuantity = nonNegative(source.quantity);
-    const purchasePrice = nullableNonNegative(source.purchasePrice ?? source.lastPurchasePrice);
+    const purchasePrice = nullableNonNegative(source.purchasePrice ?? source.actualPrice ?? source.lastPurchasePrice);
+    const grossWeight = nullableNonNegative(source.grossWeight);
+    const tareWeight = nullableNonNegative(source.tareWeight);
+    if (grossWeight != null && tareWeight != null && tareWeight > grossWeight) {
+      throw new BadRequestException('Масса тары не может быть больше массы брутто');
+    }
 
     await this.prisma.$transaction(async (tx: Tx) => {
-      const item = await tx.inventoryItem.create({
+      await tx.inventoryItem.create({
         data: {
           tenantId,
           itemId,
           name,
+          manufacturer: optionalText(source.manufacturer),
+          productType: optionalText(source.productType),
           unit,
           category: optionalText(source.category),
           sku: optionalText(source.sku),
@@ -210,6 +260,8 @@ export class InventoryService {
           minStock: nullableNonNegative(source.minStock),
           targetStock: nullableNonNegative(source.targetStock),
           packageQuantity: nullableNonNegative(source.packageQuantity),
+          grossWeight,
+          tareWeight,
           lastPurchasePrice: purchasePrice,
           trackLots: source.trackLots !== false,
           canConsume: source.canConsume !== false,
@@ -225,7 +277,14 @@ export class InventoryService {
           sourceId: itemId,
           occurredAt: source.occurredAt,
           note: 'Начальный остаток',
-          lines: [{ itemId, quantity: initialQuantity, unitCost: purchasePrice }],
+          lines: [{
+            itemId,
+            quantity: initialQuantity,
+            unitCost: purchasePrice,
+            supplier: source.supplier,
+            listPrice: source.listPrice,
+            discountPercent: source.discountPercent,
+          }],
         });
       }
     });
@@ -245,11 +304,16 @@ export class InventoryService {
       data.name = name;
     }
     if ('unit' in source) data.unit = text(source.unit) || current.unit;
-    for (const key of ['category', 'sku', 'barcode', 'location', 'supplier'] as const) {
+    for (const key of ['manufacturer', 'productType', 'category', 'sku', 'barcode', 'location', 'supplier'] as const) {
       if (key in source) data[key] = optionalText(source[key]);
     }
-    for (const key of ['minStock', 'targetStock', 'packageQuantity', 'lastPurchasePrice'] as const) {
+    for (const key of ['minStock', 'targetStock', 'packageQuantity', 'grossWeight', 'tareWeight', 'lastPurchasePrice'] as const) {
       if (key in source) data[key] = nullableNonNegative(source[key]);
+    }
+    const grossWeight = 'grossWeight' in data ? data.grossWeight : (current.grossWeight == null ? null : decimalNumber(current.grossWeight));
+    const tareWeight = 'tareWeight' in data ? data.tareWeight : (current.tareWeight == null ? null : decimalNumber(current.tareWeight));
+    if (grossWeight != null && tareWeight != null && tareWeight > grossWeight) {
+      throw new BadRequestException('Масса тары не может быть больше массы брутто');
     }
     if ('trackLots' in source) data.trackLots = source.trackLots !== false;
     if ('canConsume' in source) data.canConsume = source.canConsume !== false;
@@ -405,9 +469,11 @@ export class InventoryService {
             quantityReceived: line.quantity,
             quantityRemaining: line.quantity,
             unitCost,
+            listPrice: line.listPrice,
+            discountPercent: line.discountPercent,
             receivedAt: movement.occurredAt,
             expiresAt: raw.expiresAt ? dateValue(raw.expiresAt) : null,
-            supplier: optionalText(raw.supplier) || item.supplier,
+            supplier: line.supplier || optionalText(raw.supplier) || item.supplier,
             note: line.note,
           },
         });
