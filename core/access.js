@@ -36,7 +36,8 @@ export async function requestLiveMode() {
     body: JSON.stringify({}),
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось отправить запрос на LIVE');
+  if (!response.ok) throw new Error(payload?.message || 'Не удалось перейти в LIVE');
+  if (payload?.access) applyAccess(payload.access);
   return payload;
 }
 
@@ -69,7 +70,6 @@ export function getBookLimit(key) {
   if (!capability) return null;
   return capability.valueType === 'LIMIT' ? capability.limit : null;
 }
-
 
 export function canUseRealPersonalData() {
   if (currentAccess.status === 'SUSPENDED') return false;

@@ -15,6 +15,7 @@ const journal = source('journal/journal.js');
 const settings = source('settings/settings.js');
 const admin = source('admin/admin.js');
 const adminAccess = source('server/src/saas-admin/saas-admin.service.ts');
+const adminController = source('server/src/saas-admin/saas-admin.controller.ts');
 const cleanupMigration = source('server/prisma/migrations/20260930143000_remove_first_run_runtime/migration.sql');
 const recovery = source('server/scripts/recover-failed-prelaunch-migration.mjs');
 const dockerfile = source('Dockerfile');
@@ -25,13 +26,19 @@ assert.match(access, /const DEMO_DAYS = 14/);
 assert.match(access, /async activateDemo\(/);
 assert.match(access, /source: 'APP_OPENED'/);
 assert.match(access, /async requestLive\(/);
-assert.match(access, /eventType: 'LIVE_REQUESTED'/);
+assert.match(access, /eventType: 'LIVE_ACTIVATED_BY_USER'/);
+assert.match(access, /commercialMode: 'LIVE'/);
+assert.match(access, /liveApprovedByAdminId: null/);
+assert.match(access, /DEMO всегда длится 14 дней и не продлевается/);
+assert.doesNotMatch(access, /eventType: 'LIVE_REQUESTED'/);
 
 assert.match(accessController, /@Post\('demo\/activate'\)/);
 assert.match(accessController, /@Post\('requests\/live'\)/);
+assert.doesNotMatch(adminController, /demo\/extend/);
 
 assert.match(coreAccess, /requestLiveMode/);
 assert.match(coreAccess, /\/saas-access\/requests\/live/);
+assert.match(coreAccess, /payload\?\.access/);
 
 assert.match(registrationDocuments, /requiredForRegistration/);
 assert.match(registrationDocuments, /marketing-consent/);
@@ -103,4 +110,4 @@ assert.match(recovery, /firstRunCleanupMigration/);
 assert.match(recovery, /return 43/);
 assert.match(dockerfile, /migrate resolve --rolled-back 20260930143000_remove_first_run_runtime/);
 
-console.log('Direct DEMO entry, assigned-tool and migration recovery contract: OK');
+console.log('Direct DEMO entry, self-service LIVE transition, assigned-tool and migration recovery contract: OK');
