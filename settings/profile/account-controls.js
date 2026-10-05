@@ -110,7 +110,7 @@ async function renderPanelState(root,state,pushState=null){
 
   root.querySelector('[data-service-email]')?.addEventListener('change',async(event)=>{
     const input=event.currentTarget;
-    const status=root.querySelector('[data-controls-status]');
+    const status=root.querySelector('[data-notification-status]');
     input.disabled=true;
     if(status)status.textContent='Сохраняем…';
     try{
@@ -130,7 +130,7 @@ async function renderPanelState(root,state,pushState=null){
 
   root.querySelector('[data-service-push]')?.addEventListener('change',async(event)=>{
     const input=event.currentTarget;
-    const status=root.querySelector('[data-controls-status]');
+    const status=root.querySelector('[data-notification-status]');
     input.disabled=true;
     if(status)status.textContent='Сохраняем…';
     try{
@@ -159,7 +159,6 @@ export async function renderAccountControlsPanel(root){
     root.innerHTML=emptyState('Раздел недоступен',error instanceof Error?error.message:'Не удалось загрузить данные');
   }
 }
-
 
 export function openAccountControlsModal() {
   const layer = mountModal(document.body, modal('<div data-profile-account-controls-panel></div>', {

@@ -16,13 +16,22 @@ export function settingsPanel(items = []) {
   }).join('')}</div>`;
 }
 
+function notificationSettingEntry(item = {}) {
+  const checked = Boolean(item.checked);
+  const disabled = Boolean(item.disabled);
+  return `<label class="list-entry app-notification-row${disabled ? ' is-disabled' : ''}">
+    <span class="list-entry__background" aria-hidden="true"></span>
+    <span class="list-entry__content">
+      <span class="list-entry__main"><span class="list-entry__text"><strong>${text(item.label || '')}</strong><small>${text(item.description || '') || '&nbsp;'}</small></span></span>
+      <span class="list-entry__toggle${checked ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}">
+        <input class="app-notification-input" type="checkbox" ${item.data || ''}${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}${item.aria ? ` aria-label="${text(item.aria)}"` : ''}>
+        <span class="app-setting-toggle__switch${checked ? ' is-on' : ''}" aria-hidden="true"><span></span></span>
+      </span>
+    </span>
+  </label>`;
+}
 
 export function notificationSettings(items = []) {
-  return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
-    <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
-      <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
-      <span><strong>${text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
-    </label>`).join('')}
-    <div class="muted" data-notification-status></div>
-  </div>`;
+  const rows = (Array.isArray(items) ? items : []).filter(Boolean).map(notificationSettingEntry).join('');
+  return `<div class="app-notification-list"><div class="list-entries">${rows}</div><div class="muted" data-notification-status></div></div>`;
 }

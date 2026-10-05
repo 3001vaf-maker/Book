@@ -8,6 +8,7 @@ const accountRuntime = fs.readFileSync('online-booking/account-runtime.js', 'utf
 const browserPush = fs.readFileSync('core/notifications/web-push.js', 'utf8');
 const routingUi = fs.readFileSync('core/notifications/routing.js', 'utf8');
 const notificationSettingsUi = fs.readFileSync('settings/notifications/notifications.js', 'utf8');
+const sharedNotificationSettingsUi = fs.readFileSync('ui/settings/index.js', 'utf8');
 const serviceWorker = fs.readFileSync('service-worker.js', 'utf8');
 const notificationService = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const pushService = fs.readFileSync('server/src/notification/web-push.service.ts', 'utf8');
@@ -67,6 +68,13 @@ assert.match(notificationSettingsUi, /Во все выбранные/);
 assert.match(notificationSettingsUi, /По очереди/);
 assert.match(notificationSettingsUi, /initV2ListReorder/);
 assert.match(notificationSettingsUi, /В приложении/);
+assert.doesNotMatch(notificationSettingsUi, /button\('Сохранить'/);
+assert.match(notificationSettingsUi, /void persist\(\)/);
+
+assert.match(sharedNotificationSettingsUi, /class=\"list-entry app-notification-row/);
+assert.match(sharedNotificationSettingsUi, /class=\"list-entry__toggle/);
+assert.match(sharedNotificationSettingsUi, /app-setting-toggle__switch/);
+assert.doesNotMatch(sharedNotificationSettingsUi, /<label class=\"app-notification-row/);
 
 assert.match(pushService, /webpush\.sendNotification/);
 assert.match(pushService, /WEB_PUSH_VAPID_PUBLIC_KEY/);
