@@ -35,9 +35,15 @@ assert.match(adminModule, /TransactionalEmailModule/);
 
 assert.match(adminUi, /data-create-invite-link/);
 assert.match(adminUi, /Регистрационная ссылка/);
-assert.match(adminUi, /data-email-tenant/);
-assert.match(adminUi, />Письмо<\/button>/);
+assert.match(adminUi, /Имя и email заранее не нужны/);
+assert.match(adminUi, /Настроить доступ по ссылке/);
+assert.match(adminUi, /data-select-all-invite-tools/);
 assert.match(adminUi, /\/invitations\/link/);
+assert.doesNotMatch(adminUi, /data-invite-form/);
+assert.doesNotMatch(adminUi, /Отправить приглашение/);
+assert.doesNotMatch(adminUi, /data-resend/);
+assert.doesNotMatch(adminUi, /Повторить email/);
+assert.doesNotMatch(adminUi, /data-email-tenant/);
 assert.match(adminUi, /data-technical-email-form/);
 assert.match(adminUi, /\/technical-email/);
 assert.doesNotMatch(adminUi, /data-section="communications"/);
