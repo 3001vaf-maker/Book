@@ -15,6 +15,14 @@ export class NotificationController {
     return this.notifications.listRoutingPolicies(request.auth!.tenantId);
   }
 
+  @Get('routing/:eventType')
+  routingPolicy(
+    @Req() request: OwnerRequest,
+    @Param('eventType') eventType: string,
+  ) {
+    return this.notifications.getRoutingPolicy(request.auth!.tenantId, eventType);
+  }
+
   @Put('routing/:eventType')
   saveRouting(
     @Req() request: OwnerRequest,

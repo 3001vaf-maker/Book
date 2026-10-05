@@ -14,6 +14,7 @@ assert.equal(buildBookingLink({ origin: 'https://client.va-tools.ru' }), '');
 
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
 const bookingSource = readFileSync(new URL('../settings/online-booking/online-booking.js', import.meta.url), 'utf8');
+const notificationSource = readFileSync(new URL('../settings/notifications/notifications.js', import.meta.url), 'utf8');
 const buttonsSource = readFileSync(new URL('../ui/buttons/index.js', import.meta.url), 'utf8');
 const accountSource = readFileSync(new URL('../core/account/index.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
@@ -65,17 +66,21 @@ console.log('online booking links tests: OK');
 
 assert.match(bookingSource, /openSharedProfileSettingsMenu/);
 assert.match(bookingSource, /label: 'Приветствие'/);
-assert.match(bookingSource, /label: 'Настройки уведомлений'/);
+assert.doesNotMatch(bookingSource, /label: 'Настройки уведомлений'/);
 assert.match(bookingSource, /variant: 'q'/);
 assert.match(bookingSource, /data-online-booking-welcome-save/);
 assert.match(bookingSource, /<span>Шаг записи<\/span>/);
 assert.match(bookingSource, /smallActionButton\(\{[\s\S]*icon: 'info'/);
 assert.doesNotMatch(bookingSource, /iconButton\(|v2ListEntry\(|v2ListEntries\(|twoColumnLayout\(/);
-assert.match(bookingSource, /label: 'Порядок отправки'/);
-assert.match(bookingSource, /label: 'Канал 1'/);
-assert.match(bookingSource, /label: 'Канал 2'/);
-assert.match(bookingSource, /label: 'Канал 3'/);
-assert.match(bookingSource, /value: 'PUSH', label: 'Push'/);
+assert.doesNotMatch(bookingSource, /label: 'Порядок отправки'|label: 'Канал 1'|label: 'Канал 2'|label: 'Канал 3'|getNotificationRouting|saveNotificationRouting/);
+assert.match(notificationSource, /data-notification-delivery-settings-open/);
+assert.match(notificationSource, /label: 'Порядок отправки'/);
+assert.match(notificationSource, /label: 'Канал 1'/);
+assert.match(notificationSource, /label: 'Канал 2'/);
+assert.doesNotMatch(notificationSource, /label: 'Канал 3'/);
+assert.match(notificationSource, /Push — всегда/);
+assert.match(notificationSource, /className: 'modal--form-sheet'/);
+assert.doesNotMatch(notificationSource, /initV2ListReorder|data-notification-modes|data-notification-channels/);
 assert.doesNotMatch(bookingSource, /Внешний вид|renderAppearance|BOOKING_SHAPES|BOOKING_CHOICE_STYLES|bookingThemePreview/);
 assert.doesNotMatch(settingsSource, /'communications', 'Уведомления'/);
 

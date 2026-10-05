@@ -7,9 +7,7 @@ import {
   normalizeBookingSettings,
   saveBookingSettings,
 } from '../../core/booking-settings/index.js';
-import { getNotificationRouting, saveNotificationRouting } from '../../core/notifications/routing.js';
 import {
-  button,
   copyIconButton,
   copyTextToClipboard,
   emptyState,
@@ -25,18 +23,6 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
-
-const CHANNEL_OPTIONS = Object.freeze([
-  { value: 'PUSH', label: 'Push' },
-  { value: 'TELEGRAM', label: 'Telegram' },
-  { value: 'EMAIL', label: 'Email' },
-  { value: '', label: 'Не использовать' },
-]);
-
-const ROUTING_MODE_OPTIONS = Object.freeze([
-  { value: 'always', label: 'Во все выбранные каналы' },
-  { value: 'fallback', label: 'По очереди, если предыдущий не доставлен' },
-]);
 
 let publicRouteState = { profileSlug: '', workplaces: [] };
 
@@ -145,98 +131,6 @@ function openWelcomeQ(root) {
   return layer;
 }
 
-function notificationPolicy(items = []) {
-  const current = (Array.isArray(items) ? items : []).find((item) => item.eventType === 'booking.created');
-  return {
-    eventType: 'booking.created',
-    mode: current?.mode === 'fallback' ? 'fallback' : 'always',
-    channels: current ? (Array.isArray(current.channels) ? current.channels : []) : ['PUSH'],
-  };
-}
-
-function channelValues(policy = {}) {
-  const values = [];
-  for (const value of Array.isArray(policy.channels) ? policy.channels : []) {
-    const channel = String(value || '').trim().toUpperCase();
-    if (!['PUSH', 'TELEGRAM', 'EMAIL'].includes(channel) || values.includes(channel)) continue;
-    values.push(channel);
-  }
-  while (values.length < 3) values.push('');
-  return values.slice(0, 3);
-}
-
-function selectedChannels(form) {
-  const data = new FormData(form);
-  const values = ['channel1', 'channel2', 'channel3']
-    .map((name) => String(data.get(name) || '').trim().toUpperCase())
-    .filter((value) => ['PUSH', 'TELEGRAM', 'EMAIL'].includes(value));
-  return [...new Set(values)];
-}
-
-function openPushInfo() {
-  const content = `<div class="modal-title"><h2>Push</h2><p>Push — дополнительное уведомление. Если выбран режим «По очереди», успешный Push не останавливает отправку: основной результат определяется Telegram или Email.</p></div>`;
-  return mountModal(document.body, modal(content, {
-    title: 'О Push',
-    variant: 's',
-    surface: 'app',
-  }));
-}
-
-async function openNotificationSettings() {
-  const items = await getNotificationRouting();
-  const policy = notificationPolicy(items);
-  const channels = channelValues(policy);
-  const pushInfo = `<div class="field-inline-label"><span>Push</span>${smallActionButton({
-    icon: 'info',
-    data: 'data-online-booking-push-info',
-    aria: 'О Push',
-  })}</div>`;
-  const body = `<div data-online-booking-notifications>
-    <form class="form-grid" data-online-booking-notification-form>
-      ${pushInfo}
-      ${select({
-        label: 'Порядок отправки',
-        name: 'mode',
-        value: policy.mode,
-        options: ROUTING_MODE_OPTIONS,
-      })}
-      ${select({ label: 'Канал 1', name: 'channel1', value: channels[0], options: CHANNEL_OPTIONS })}
-      ${select({ label: 'Канал 2', name: 'channel2', value: channels[1], options: CHANNEL_OPTIONS })}
-      ${select({ label: 'Канал 3', name: 'channel3', value: channels[2], options: CHANNEL_OPTIONS })}
-      <div class="muted" data-online-booking-notification-status aria-live="polite"></div>
-      ${button('Сохранить', { type: 'submit' })}
-    </form>
-  </div>`;
-  const layer = mountModal(document.body, modal(body, {
-    title: 'Настройки уведомлений',
-    variant: 'x',
-    className: 'modal--form-sheet',
-  }));
-  if (!layer) return null;
-
-  layer.querySelector('[data-online-booking-push-info]')?.addEventListener('click', openPushInfo);
-  const form = layer.querySelector('[data-online-booking-notification-form]');
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const status = layer.querySelector('[data-online-booking-notification-status]');
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
-    if (status) status.textContent = 'Сохраняем…';
-    try {
-      const data = new FormData(form);
-      await saveNotificationRouting('booking.created', {
-        mode: String(data.get('mode') || 'always'),
-        channels: selectedChannels(form),
-      });
-      layer.v2Close?.();
-    } catch (error) {
-      if (submit) submit.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
-    }
-  });
-  return layer;
-}
-
 function openOnlineBookingSettings(root) {
   return openSharedProfileSettingsMenu({
     title: 'Настройки онлайн-записи',
@@ -245,11 +139,6 @@ function openOnlineBookingSettings(root) {
         id: 'welcome',
         label: 'Приветствие',
         onSelect: () => openWelcomeQ(root),
-      },
-      {
-        id: 'notifications',
-        label: 'Настройки уведомлений',
-        onSelect: () => void openNotificationSettings(),
       },
     ],
   });
