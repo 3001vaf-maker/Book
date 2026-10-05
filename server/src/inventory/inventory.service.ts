@@ -268,6 +268,15 @@ export class InventoryService {
     return this.snapshot(tenantId);
   }
 
+  async createMovements(tenantId: string, bodies: unknown[]) {
+    const sources = (Array.isArray(bodies) ? bodies : []).map(objectValue);
+    if (!sources.length) return this.snapshot(tenantId);
+    await this.prisma.$transaction(async (tx: Tx) => {
+      for (const source of sources) await this.createMovementInTx(tx, tenantId, source);
+    });
+    return this.snapshot(tenantId);
+  }
+
   async correctMovement(tenantId: string, movementId: string, body: unknown) {
     const source = objectValue(body);
     const original = await this.prisma.inventoryMovement.findFirst({
