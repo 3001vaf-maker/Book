@@ -70,7 +70,6 @@ function editPolicy(root, routing, event) {
       title: channelName(key),
       subtitle: state.mode === 'fallback' ? `Приоритет ${state.channels.indexOf(key) + 1}` : 'Включён',
       interactive: false,
-      data: `data-reorder-id="${key}"`,
       toggleData: `data-notification-channel-toggle="${key}"`,
       toggleAria: `Выключить ${channelName(key)}`,
       toggleChecked: true,
@@ -92,12 +91,16 @@ function editPolicy(root, routing, event) {
       disabled.length ? v2ListEntries(disabled) : '',
     ].join('');
 
-    host.querySelectorAll('[data-notification-channel-toggle]').forEach((node) => node.addEventListener('click', () => {
+    host.querySelectorAll('[data-notification-channel-toggle]').forEach((node) => {
       const key = node.dataset.notificationChannelToggle;
-      if (state.channels.includes(key)) state.channels = state.channels.filter((value) => value !== key);
-      else state.channels.push(key);
-      drawChannels();
-    }));
+      const row = node.closest('.list-entry');
+      if (row && state.channels.includes(key)) row.dataset.reorderId = key;
+      node.addEventListener('click', () => {
+        if (state.channels.includes(key)) state.channels = state.channels.filter((value) => value !== key);
+        else state.channels.push(key);
+        drawChannels();
+      });
+    });
 
     if (state.mode === 'fallback' && enabled.length) {
       const lists = host.querySelectorAll('.list-entries');
