@@ -94,10 +94,7 @@ export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () =
     });
     if (navigationRoot) {
       const header = calendarRoot.querySelector('.calendar__header');
-      if (header) {
-        header.classList.add('calendar__header--compact');
-        navigationRoot.replaceChildren(header);
-      }
+      if (header) navigationRoot.replaceChildren(header);
     }
   };
 
