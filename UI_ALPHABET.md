@@ -63,6 +63,15 @@
 | UI utilities only | `ui/utils` |
 | Visual reference only, never runtime owner | `ui/reference` |
 
+## Calendar
+
+- `ui/calendar` — единственный владелец `Calendar`, `DatePicker`, `DateNavigator` и геометрии навигации по дню / месяцу / году.
+- Одна и та же Shared-навигация `← label →` используется независимо от данных: день, месяц, дата рождения, дата операции, дата записи и любой другой календарный контекст.
+- Размер, border, radius, gap, typography и расположение стрелок задаются только `ui/calendar/calendar.css`; feature-код не имеет права переопределять их CSS, inline-style или modifier-классом.
+- Feature-код может передать дату, режим, ограничения, callbacks и перенести уже готовый Shared calendar header в свой `Z Header`, но не имеет права менять его классы или визуальную геометрию.
+- Локальные варианты вроде `compact`, feature-specific calendar navigation и собственные стрелки периода запрещены. Изменение Shared Calendar должно автоматически проявляться у всех его потребителей.
+- Каноническая геометрия навигации Calendar: стрелки `36×36`, glyph `18`, border `1`, radius `8`, gap `4`; label `14/700`.
+
 ## Z Header / Z Body
 
 - Каждый Z1/Z2/Z3… всегда состоит из двух Shared-частей: `Z Header` и `Z Body`.
