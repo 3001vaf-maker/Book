@@ -1,0 +1,31 @@
+name: Diagnose professional Settings E
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run professional browser and print active F/E on failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/tests/professional-core-runtime-browser.html >/dev/null && break || sleep .25; done
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          "$chrome" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --window-size=390,844 --force-device-scale-factor=1 --touch-events=enabled --virtual-time-budget=12000 --dump-dom http://127.0.0.1:4173/tests/professional-core-runtime-browser.html > /tmp/dom.html || true
+          grep -o 'data-professional-runtime-stage="[^"]*"' /tmp/dom.html || true
+          echo 'ROOT CARDS:'
+          grep -o 'data-v2-root-item="[^"]*"' /tmp/dom.html | sort -u || true
+          echo 'SECONDARY CARDS:'
+          grep -o 'data-v2-secondary-item="[^"]*"' /tmp/dom.html | sort -u || true
+          echo 'RESULT:'
+          grep -A2 -B1 '<pre id="result"' /tmp/dom.html || true
