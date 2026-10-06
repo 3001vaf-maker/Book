@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Settings access at browser failure
+      - name: Inspect Settings root and E deck at browser failure
         shell: bash
         run: |
           set -euo pipefail
@@ -21,7 +21,7 @@ jobs:
           path = Path('tests/professional-core-runtime-browser.html')
           text = path.read_text()
           needle = """if (!target) {\n    ok(false, label + ' target card missing before selection');\n    return;\n  }"""
-          replacement = """if (!target) {\n    const accessDebug = await import('/core/access.js');\n    const settingsDebug = await import('/settings/settings.js');\n    const caps = (accessDebug.getBookAccess()?.capabilities || []).map((item) => `${item.key}:${item.enabled}`).join('|');\n    const items = settingsDebug.settingsNavigationItems().map((item) => item.id).join('|');\n    result.textContent = `MISSING ${label} SETTINGS=${items} CAPS=${caps}`;\n    document.documentElement.dataset.professionalRuntimeStage = 'missing-' + label;\n    ok(false, label + ' target card missing before selection');\n    return;\n  }"""
+          replacement = """if (!target) {\n    const accessDebug = await import('/core/access.js');\n    const settingsDebug = await import('/settings/settings.js');\n    const appDebug = shell();\n    const caps = (accessDebug.getBookAccess()?.capabilities || []).map((item) => `${item.key}:${item.enabled}`).join('|');\n    const items = settingsDebug.settingsNavigationItems().map((item) => item.id).join('|');\n    const roots = [...(appDebug?.querySelectorAll('[data-v2-root-item]') || [])].map((node) => `${node.dataset.v2RootItem}:${node.getAttribute('aria-current') || ''}`).join('|');\n    const secondary = [...(appDebug?.querySelectorAll('[data-v2-secondary-item]') || [])].map((node) => node.dataset.v2SecondaryItem).join('|');\n    const state = `CLASS=${appDebug?.className || ''} MODAL=${appDebug?.classList.contains('has-v2-modal')} Q=${appDebug?.classList.contains('has-v2-q-modal')} ROOTS=${roots} E=${secondary}`;\n    result.textContent = `MISSING ${label} SETTINGS=${items} ${state} CAPS=${caps}`;\n    document.documentElement.dataset.professionalRuntimeStage = 'missing-' + label;\n    ok(false, label + ' target card missing before selection');\n    return;\n  }"""
           if needle not in text:
               raise SystemExit('diagnostic insertion point not found')
           path.write_text(text.replace(needle, replacement, 1))
