@@ -23,9 +23,16 @@ function closeSelector(surface) {
 }
 
 function commitSelectorValue(surface, value, label, meta = '', indicatorColor = '') {
-  const input = document.getElementById(surface?.dataset.inputId || '');
-  const trigger = input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
-  if (!input || !trigger) return;
+  // Opening Shared Select from an existing X replaces that X by contract. Keep
+  // direct references captured before replacement so the detached owning input
+  // can still receive the committed value/change event without creating a
+  // nested modal stack.
+  const input = surface?.uiSourceInput || document.getElementById(surface?.dataset.inputId || '');
+  const trigger = surface?.uiSourceTrigger || input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+  if (!input || !trigger) {
+    closeSelector(surface);
+    return;
+  }
   input.value = String(value ?? '');
   const valueNode = trigger.querySelector('.ui-select__value');
   const metaNode = trigger.querySelector('.ui-select__meta');
@@ -39,9 +46,6 @@ function commitSelectorValue(surface, value, label, meta = '', indicatorColor = 
     indicatorNode.hidden = !indicatorColor;
     indicatorNode.style.setProperty('--ui-select-indicator', String(indicatorColor || 'transparent'));
   }
-  // Close the nested selector layer before notifying the owning control.
-  // Some owners close their parent X on change; notifying first can remove the
-  // parent while the nested modal still owns an interaction lock.
   closeSelector(surface);
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -136,6 +140,8 @@ function openSelector(trigger) {
   const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор' }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
+  surface.uiSourceInput = input;
+  surface.uiSourceTrigger = trigger;
   surface.dataset.options = JSON.stringify(options);
   surface.dataset.allowCustom = allowCustom ? 'true' : 'false';
 
