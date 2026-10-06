@@ -1,4 +1,5 @@
 import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
+import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseBookCapability } from '../core/access.js';
@@ -198,11 +199,16 @@ export function renderJournal(root, options = {}) {
 
   const renderView = () => {
     if (!root.isConnected) return;
-    const listModeNavigation = activeView === 'list'
-      ? `<div class="journal-list-mode-navigation" data-journal-list-mode-navigation>${viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })}</div>`
-      : '';
-    const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
     const primaryNavigation = viewNavigation({ views: availableViews, activeView });
+    const secondaryNavigation = activeView === 'list'
+      ? viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })
+      : '<div data-journal-period-navigation></div>';
+    const headerRows = setV2ZHeaderRows(root, [primaryNavigation, secondaryNavigation]);
+    const primaryNavigationRoot = headerRows[0] || null;
+    const secondaryNavigationRoot = headerRows[1] || null;
+    const periodNavigationRoot = secondaryNavigationRoot?.querySelector('[data-journal-period-navigation]') || null;
+    const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
+
     root.innerHTML = `${workspaceHeaderContext({
       title: activeView === 'day' ? journalTitle() : 'Журнал',
       a: {
@@ -211,12 +217,13 @@ export function renderJournal(root, options = {}) {
         data: 'data-journal-settings',
         aria: 'Настройки журнала',
       },
-    })}${primaryNavigation}${listModeNavigation}<div data-journal-view${viewClass}></div>`;
+    })}<div data-journal-view${viewClass}></div>`;
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       renderJournalDay(viewRoot, {
         date: selectedDate,
         workplaceId: selectedWorkplaceId,
+        navigationRoot: periodNavigationRoot,
         onWorkplaceFieldClick: openDayTime,
         onChange: (nextDate) => {
           selectedDate = nextDate;
@@ -227,6 +234,7 @@ export function renderJournal(root, options = {}) {
     } else if (activeView === 'month') {
       renderJournalMonth(viewRoot, {
         workplaceId: selectedWorkplaceId,
+        navigationRoot: periodNavigationRoot,
         onDateSelect: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
@@ -238,9 +246,8 @@ export function renderJournal(root, options = {}) {
     } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
 
     root.querySelector('[data-journal-settings]')?.addEventListener('click', openJournalSettings);
-    const listModeRoot = root.querySelector('[data-journal-list-mode-navigation]');
-    if (listModeRoot) {
-      initViewNavigation(listModeRoot, {
+    if (activeView === 'list' && secondaryNavigationRoot) {
+      initViewNavigation(secondaryNavigationRoot, {
         views: listModes,
         activeView: listMode,
         onChange: (nextMode) => {
@@ -249,11 +256,13 @@ export function renderJournal(root, options = {}) {
         },
       });
     }
-    initViewNavigation(root, { views: availableViews, activeView, onChange: (nextView) => {
-      activeView = nextView;
-      options.onViewChange?.(activeView);
-      renderView();
-    } });
+    if (primaryNavigationRoot) {
+      initViewNavigation(primaryNavigationRoot, { views: availableViews, activeView, onChange: (nextView) => {
+        activeView = nextView;
+        options.onViewChange?.(activeView);
+        renderView();
+      } });
+    }
   };
 
   let refreshQueued = false;
@@ -279,6 +288,6 @@ export function renderJournal(root, options = {}) {
 
   return () => {
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
+    clearV2ZHeaderRows(root);
   };
 }
-
