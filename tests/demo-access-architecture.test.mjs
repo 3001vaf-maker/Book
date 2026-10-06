@@ -89,7 +89,10 @@ assert.match(finance, /finance\.investment\.external\.access/);
 assert.match(finance, /finance\.z_report\.access/);
 assert.match(journal, /journal\.day\.access/);
 assert.match(journal, /journal\.list\.access/);
-assert.match(settings, /services\.access/);
+assert.match(core, /\{ id: 'service', label: 'Сервис', capability: 'services\.access' \}/);
+assert.doesNotMatch(settings, /services\.access/);
+assert.doesNotMatch(settings, /['"]service['"]/);
+assert.doesNotMatch(settings, /['"]profile['"]/);
 assert.match(settings, /online_booking\.access/);
 assert.match(profile, /workplaces\.access/);
 
