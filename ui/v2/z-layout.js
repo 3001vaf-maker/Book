@@ -25,7 +25,23 @@ const Z_HEADER_CONTENT_STYLE = [
 const Z_BODY_STYLE = [
   'min-width:0',
   'box-sizing:border-box',
+  '--v2-z-body-section-gap:20px',
 ].join(';');
+
+const Z_BODY_SECTIONS_STYLE = [
+  'min-width:0',
+  'box-sizing:border-box',
+  'display:flex',
+  'flex-direction:column',
+  'gap:var(--v2-z-body-section-gap,20px)',
+].join(';');
+
+const Z_BODY_SECTION_STYLE = [
+  'min-width:0',
+  'box-sizing:border-box',
+].join(';');
+
+const Z_BODY_KINDS = new Set(['content', 'full', 'list']);
 
 export function v2ZHeader(content = '') {
   return `<div data-v2-z-header style="${Z_HEADER_STYLE}">${v2ZDismissAffordance()}<div data-v2-z-header-content style="${Z_HEADER_CONTENT_STYLE}">${content}</div></div>`;
@@ -33,6 +49,24 @@ export function v2ZHeader(content = '') {
 
 export function v2ZBody(content = '') {
   return `<div data-v2-z-body style="${Z_BODY_STYLE}">${content}</div>`;
+}
+
+export function v2ZBodySection(content = '', { kind = 'content' } = {}) {
+  const normalizedKind = Z_BODY_KINDS.has(kind) ? kind : 'content';
+  return `<section data-v2-z-body-section="${normalizedKind}" style="${Z_BODY_SECTION_STYLE}">${String(content || '')}</section>`;
+}
+
+export function v2ZBodySections(sections = []) {
+  const values = (Array.isArray(sections) ? sections : [sections])
+    .map((section) => section && typeof section === 'object' && !Array.isArray(section)
+      ? { content: section.content ?? '', kind: section.kind ?? 'content' }
+      : { content: section ?? '', kind: 'content' })
+    .filter((section) => String(section.content || '').trim());
+  const listIndex = values.findIndex((section) => section.kind === 'list');
+  if (listIndex >= 0 && listIndex !== values.length - 1) {
+    throw new Error('Z Body list section must be terminal.');
+  }
+  return `<div data-v2-z-body-sections style="${Z_BODY_SECTIONS_STYLE}">${values.map((section) => v2ZBodySection(section.content, { kind: section.kind })).join('')}</div>`;
 }
 
 export function v2ZFrame(content = '', { header = '' } = {}) {
