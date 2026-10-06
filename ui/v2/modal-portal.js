@@ -130,12 +130,28 @@ export function mountV2Layer(html, { root = null } = {}) {
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   const app = technical ? null : host.closest?.('[data-v2-app]');
+  const locksHeader = Boolean(app && kind === 'standard' && !qLayer);
+  const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
   const lockedStage = technical ? null : lockV2StageInteraction(app);
-  const releaseHeaderLock = technical ? () => {} : lockModalHeader(app, { allowC: qLayer });
+  const releaseHeaderLock = technical
+    ? () => {}
+    : (qLayer
+        ? lockModalHeader(app, { allowC: true })
+        : (locksHeader
+            ? () => {
+                if (!header) return;
+                header.inert = false;
+                header.classList.remove('is-modal-locked');
+              }
+            : lockModalHeader(app)));
   const portalOwner = technical ? null : mountV2ModalPortal(host);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
   if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) lockV2ModalSurface(host);
+  if (header) {
+    header.inert = true;
+    header.classList.add('is-modal-locked');
+  }
   mountHost.appendChild(node);
   node.v2Portal = portalOwner?.portal || null;
   if (qLayer) {
