@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { NotificationService } from '../notification/notification.service';
+import { NotificationEventService } from '../notification/notification-event.service';
 import { PrismaService } from '../prisma.service';
 import { BusinessStateService } from './business-state.service';
 
@@ -31,7 +31,7 @@ export class BusinessStateController {
   constructor(
     private readonly businessState: BusinessStateService,
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationService,
+    private readonly notifications: NotificationEventService,
   ) {}
 
   private async notifyRecordEvent(tenantId: string, type: string, recordValue: unknown) {
@@ -104,12 +104,20 @@ export class BusinessStateController {
     const tenantId = request.auth!.tenantId;
     const existed = await this.prisma.recordEvent.findUnique({ where: { tenantId_eventId: { tenantId, eventId } } });
     const saved = await this.businessState.upsertRecordEvent(tenantId, eventId, body);
-    if (!existed && text(objectValue(saved).type) === 'cancelled') {
+    const eventType = text(objectValue(saved).type);
+    const notificationType = eventType === 'cancelled'
+      ? 'booking.cancelled'
+      : eventType === 'confirmed'
+        ? 'booking.confirmed'
+        : eventType === 'no-show'
+          ? 'booking.no-show'
+          : '';
+    if (!existed && notificationType) {
       const recordId = text(objectValue(saved).recordId);
       const record = recordId
         ? await this.prisma.record.findUnique({ where: { tenantId_recordId: { tenantId, recordId } } })
         : null;
-      if (record) await this.notifyRecordEvent(tenantId, 'booking.cancelled', record.data).catch(() => null);
+      if (record) await this.notifyRecordEvent(tenantId, notificationType, record.data).catch(() => null);
     }
     return saved;
   }
