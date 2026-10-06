@@ -2,7 +2,6 @@ import { canUseBookCapability } from '../core/access.js';
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['service', 'Сервис', '◫', () => import('./service/service.js'), 'services.access'],
   ['online-booking', 'Онлайн-запись', '◫', () => import('./online-booking/online-booking.js'), 'online_booking.access'],
   ['notifications', 'Уведомления', '◫', () => import('./notifications/notifications.js'), 'online_booking.access'],
   ['integrations', 'Интеграции', '◫', () => import('./integrations/integrations.js'), 'integrations.access'],
