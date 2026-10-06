@@ -2,8 +2,6 @@ import { canUseBookCapability } from '../core/access.js';
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
-  ['profile', 'Профиль', '◫', () => import('./profile/profile.js'), 'profile.access'],
-  ['service', 'Сервис', '◫', () => import('./service/service.js'), 'services.access'],
   ['online-booking', 'Онлайн-запись', '◫', () => import('./online-booking/online-booking.js'), 'online_booking.access'],
   ['notifications', 'Уведомления', '◫', () => import('./notifications/notifications.js'), 'online_booking.access'],
   ['integrations', 'Интеграции', '◫', () => import('./integrations/integrations.js'), 'integrations.access'],
@@ -16,7 +14,7 @@ function availableFolders() {
 }
 
 function workspaceFolders() {
-  return availableFolders().filter(([key]) => key !== 'profile');
+  return availableFolders();
 }
 
 export function settingsNavigationItems() {

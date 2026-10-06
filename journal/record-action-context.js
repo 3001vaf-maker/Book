@@ -1,4 +1,4 @@
-import { getProfile } from '../settings/profile/data.js';
+import { getProfile } from '../core/profile/data.js';
 
 export function journalRecordActionContext() {
   const profile = getProfile();

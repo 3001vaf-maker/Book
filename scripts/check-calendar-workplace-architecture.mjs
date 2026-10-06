@@ -17,8 +17,8 @@ function walkCss(dir) {
   return result;
 }
 
-const workplaceData = read('settings/profile/workplaces/data.js');
-const workplaceEditor = read('settings/profile/workplaces/workplaces.js');
+const workplaceData = read('core/profile/workplaces/data.js');
+const workplaceEditor = read('core/profile/workplaces/workplaces.js');
 const workplaceUi = read('ui/workplaces/index.js');
 const calendarUi = read('ui/calendar/calendar.js');
 const calendarCss = read('ui/calendar/calendar.css');
@@ -40,10 +40,10 @@ const timeUsage = read('core/time/usage.js');
 const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
 
-if (!/color:\s*String\(workplace\.color/.test(workplaceData)) fail('settings/profile/workplaces/data.js', 'Workplace must own its color field');
-if (!/indicatorColor:\s*workplace\.color\s*\|\|\s*WORKPLACE_FALLBACK_COLOR/.test(workplaceData)) fail('settings/profile/workplaces/data.js', 'missing Workplace color must resolve to the canonical black indicator fallback');
-if (!/WORKPLACE_FALLBACK_COLOR\s*=\s*['"]#212529['"]/.test(workplaceData)) fail('settings/profile/workplaces/data.js', 'canonical missing-color indicator must be black (#212529)');
-if (!/colorPicker\(\{name:'workplaceColor'[^}]*required:true/.test(workplaceEditor)) fail('settings/profile/workplaces/workplaces.js', 'Workplace editor must use shared required colorPicker()');
+if (!/color:\s*String\(workplace\.color/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'Workplace must own its color field');
+if (!/indicatorColor:\s*workplace\.color\s*\|\|\s*WORKPLACE_FALLBACK_COLOR/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'missing Workplace color must resolve to the canonical black indicator fallback');
+if (!/WORKPLACE_FALLBACK_COLOR\s*=\s*['"]#212529['"]/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'canonical missing-color indicator must be black (#212529)');
+if (!/colorPicker\(\{name:'workplaceColor'[^}]*required:true/.test(workplaceEditor)) fail('core/profile/workplaces/workplaces.js', 'Workplace editor must use shared required colorPicker()');
 
 if (!/resolveDateIndicators/.test(calendarUi) || !/calendar__date-indicator/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar must own generic date indicator manifestation');
 if (!/mode\s*===\s*['"]date['"]\s*\?\s*dateIndicatorsMarkup/.test(calendarUi)) fail('ui/calendar/calendar.js', 'date indicators must belong to the full Calendar and stay out of MonthDayPicker mode');

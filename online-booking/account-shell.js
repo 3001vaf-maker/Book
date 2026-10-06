@@ -51,7 +51,7 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { openAccountConsentSettings } from './consent-settings.js';
 import { openAccountPasswordSettings } from './password-settings.js';
 import { openAccountPersonalDataZ } from './personal-data.js';
-import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
+import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../core/profile/card-presentation.js';
 import {
   calculateInvestmentState,
   cashEntityCardAppearance,

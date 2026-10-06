@@ -5,9 +5,6 @@ import {
   viewNavigation,
 } from '../../ui/ui.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
-import { openServiceAppearanceQ } from './appearance.js';
-import { openProcedureEditor, renderProcedureCatalog } from './procedures/procedures.js';
-import { openProductEditor, renderProductCatalog } from './products/products.js';
 
 const views = [
   { id: 'procedures', label: 'Процедуры' },
@@ -15,6 +12,24 @@ const views = [
 ];
 
 let activeView = 'procedures';
+let appearanceModulePromise = null;
+let proceduresModulePromise = null;
+let productsModulePromise = null;
+
+function loadAppearanceModule() {
+  appearanceModulePromise ||= import('./appearance.js');
+  return appearanceModulePromise;
+}
+
+function loadProceduresModule() {
+  proceduresModulePromise ||= import('./procedures/procedures.js');
+  return proceduresModulePromise;
+}
+
+function loadProductsModule() {
+  productsModulePromise ||= import('./products/products.js');
+  return productsModulePromise;
+}
 
 function openServiceSettings(root, rerender) {
   return openSharedProfileSettingsMenu({
@@ -23,7 +38,11 @@ function openServiceSettings(root, rerender) {
       {
         id: 'appearance',
         label: 'Вид',
-        onSelect: () => openServiceAppearanceQ(root, { onSaved: rerender }),
+        onSelect: async () => {
+          const { openServiceAppearanceQ } = await loadAppearanceModule();
+          if (!root?.isConnected) return;
+          openServiceAppearanceQ(root, { onSaved: rerender });
+        },
       },
     ],
   });
@@ -31,9 +50,12 @@ function openServiceSettings(root, rerender) {
 
 export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
+  let renderVersion = 0;
 
   const renderCurrent = () => {
+    const version = ++renderVersion;
     disposeCatalog?.();
+    disposeCatalog = () => {};
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
     const title = view === 'products' ? 'Товары' : 'Процедуры';
 
@@ -65,21 +87,32 @@ export function renderService(root, navigateBack = () => {}) {
 
     const catalog = root.querySelector('[data-service-catalog]');
     if (catalog) {
-      disposeCatalog = view === 'products'
-        ? renderProductCatalog(catalog, { root, onChanged: renderCurrent })
-        : renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
+      const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
+      void modulePromise.then((module) => {
+        if (version !== renderVersion || !catalog.isConnected) return;
+        disposeCatalog = view === 'products'
+          ? module.renderProductCatalog(catalog, { root, onChanged: renderCurrent })
+          : module.renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
+      }).catch((error) => {
+        console.error('Service catalog load failed', error);
+      });
     }
 
-    root.querySelector('[data-service-add]')?.addEventListener('click', () => {
-      if (view === 'products') openProductEditor(root, null, { onChanged: renderCurrent });
-      else openProcedureEditor(root, null, { onChanged: renderCurrent });
+    root.querySelector('[data-service-add]')?.addEventListener('click', async () => {
+      const module = view === 'products' ? await loadProductsModule() : await loadProceduresModule();
+      if (!root?.isConnected || version !== renderVersion) return;
+      if (view === 'products') module.openProductEditor(root, null, { onChanged: renderCurrent });
+      else module.openProcedureEditor(root, null, { onChanged: renderCurrent });
     });
 
     notifyServiceContext();
   };
 
   renderCurrent();
-  return () => disposeCatalog?.();
+  return () => {
+    renderVersion += 1;
+    disposeCatalog?.();
+  };
 }
 
 export { renderService as render };

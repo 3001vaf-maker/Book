@@ -9,7 +9,7 @@ const accessController = source('server/src/saas-access/saas-access.controller.t
 const coreAccess = source('core/access.js');
 const registrationDocuments = source('server/src/document-registry/registration-document.service.ts');
 const invitation = source('server/src/tenant-invitation/tenant-invitation.service.ts');
-const profile = source('settings/profile/profile.js');
+const profile = source('core/profile/profile.js');
 const finance = source('core/finance/finance.js');
 const journal = source('journal/journal.js');
 const settings = source('settings/settings.js');
@@ -89,7 +89,10 @@ assert.match(finance, /finance\.investment\.external\.access/);
 assert.match(finance, /finance\.z_report\.access/);
 assert.match(journal, /journal\.day\.access/);
 assert.match(journal, /journal\.list\.access/);
-assert.match(settings, /services\.access/);
+assert.match(core, /\{ id: 'service', label: 'Сервис', capability: 'services\.access' \}/);
+assert.doesNotMatch(settings, /services\.access/);
+assert.doesNotMatch(settings, /['"]service['"]/);
+assert.doesNotMatch(settings, /['"]profile['"]/);
 assert.match(settings, /online_booking\.access/);
 assert.match(profile, /workplaces\.access/);
 

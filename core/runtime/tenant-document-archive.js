@@ -1,7 +1,7 @@
 import { apiRequest } from '../auth.js';
 import { queueDocumentDataset } from '../business-persistence.js';
 import { hydrateConsentsFromServer } from '../../settings/documents/consents.js';
-import { getProfile } from '../../settings/profile/data.js';
+import { getProfile } from '../../core/profile/data.js';
 import { buildTenantDocumentsFromPlatformBases, configurePlatformDocumentBases, configureDocumentPersistence, hydrateDocumentsFromServer, reconcileTenantDocumentsWithPlatformBases } from '../../settings/documents/data.js';
 import { configureDocumentHistoryPersistence, hydrateDocumentHistoryFromServer } from '../../settings/documents/history.js';
 configureDocumentPersistence((value)=>queueDocumentDataset('documents',value));configureDocumentHistoryPersistence((value)=>queueDocumentDataset('history',value));

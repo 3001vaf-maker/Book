@@ -2,7 +2,7 @@ import { apiRequest } from '../auth.js';
 import { queueOperationalDataset } from '../business-persistence.js';
 import { hydrateDaysFromServer } from '../day/index.js';
 import { configureBreakPersistence, hydrateBreaksFromServer } from '../../journal/break-data.js';
-import { hydrateProceduresFromServer } from '../../settings/service/procedures/data.js';
+import { hydrateProceduresFromServer } from '../../core/service/procedures/data.js';
 import { hydrateBookingSettingsFromServer } from '../booking-settings/index.js';
 configureBreakPersistence((rows)=>queueOperationalDataset('breaks',rows));
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}

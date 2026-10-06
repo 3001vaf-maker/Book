@@ -20,7 +20,7 @@ import { personDisplay } from '../core/people/presentation.js';
 import { getRecords } from '../core/record/index.js';
 import { updateRecord, cancelRecord, deleteRecord, refreshRecordsFromServer } from '../core/record/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
-import { getProfile } from '../settings/profile/data.js';
+import { getProfile } from '../core/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
 import { openRecordEditFlow } from './record.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';

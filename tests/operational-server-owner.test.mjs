@@ -26,7 +26,7 @@ const persistence = await import('../core/business-persistence.js');
 await import('../core/runtime/operational-state.js');
 const day = await import('../core/day/index.js');
 const breaks = await import('../journal/break-data.js');
-const procedures = await import('../settings/service/procedures/data.js');
+const procedures = await import('../core/service/procedures/data.js');
 const booking = await import('../core/booking-settings/index.js');
 
 const legacyDaysRaw = localStorage.getItem('book:timetable-state');

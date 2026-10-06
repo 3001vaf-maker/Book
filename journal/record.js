@@ -5,14 +5,14 @@ import { getPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
 import { openPersonCreate } from '../core/people/create.js';
 import { openPerson } from '../core/people/people.js';
-import { getProcedures } from '../settings/service/procedures/data.js';
-import { openProcedureEditor } from '../settings/service/procedures/procedures.js';
-import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
+import { getProcedures } from '../core/service/procedures/data.js';
+import { openProcedureEditor } from '../core/service/procedures/procedures.js';
+import { assignProceduresToWorkplace } from '../core/service/procedures/service.js';
 import { checkTimeAvailability, listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
-import { getProfile } from '../settings/profile/data.js';
+import { getProfile } from '../core/profile/data.js';
 import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
 
 const RECORD_MODES = [

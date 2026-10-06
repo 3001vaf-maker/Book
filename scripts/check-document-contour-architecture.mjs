@@ -8,7 +8,7 @@ const files = {
   v2Css: readFileSync('ui/v2/v2.css','utf8'),
   ui: readFileSync('ui/ui.js','utf8'),
   profile: readFileSync('ui/profile/index.js','utf8'),
-  accountControls: readFileSync('settings/profile/account-controls.js','utf8'),
+  accountControls: readFileSync('core/profile/account-controls.js','utf8'),
   booking: readFileSync('online-booking/booking.js','utf8'),
   consentSettings: readFileSync('online-booking/consent-settings.js','utf8'),
   people: readFileSync('core/people/people.js','utf8'),

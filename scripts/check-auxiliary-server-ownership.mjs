@@ -11,7 +11,7 @@ const wallets = text('core/finance/cash/data.js');
 const cashEntities = text('core/finance/cash/entities.js');
 const auxiliaryService = text('server/src/auxiliary-state/auxiliary-state.service.ts');
 const tags = text('settings/tags/data.js');
-const products = text('settings/service/products/data.js');
+const products = text('core/service/products/data.js');
 const schema = text('server/prisma/schema.prisma');
 const moduleFile = text('server/src/auxiliary-state/auxiliary-state.module.ts');
 

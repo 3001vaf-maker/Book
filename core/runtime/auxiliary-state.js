@@ -1,6 +1,6 @@
 import { apiRequest } from '../auth.js';
 import { hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from '../finance/index.js';
-import { hydrateProductsFromServer } from '../../settings/service/products/data.js';
+import { hydrateProductsFromServer } from '../../core/service/products/data.js';
 import { hydrateTagsFromServer } from '../../settings/tags/data.js';
 import { hydrateCardAppearanceTemplates } from '../card-appearance-templates.js';
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}

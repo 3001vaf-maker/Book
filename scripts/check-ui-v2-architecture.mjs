@@ -30,8 +30,8 @@ const modals = fs.readFileSync('ui/modals/index.js', 'utf8');
 const headerUi = fs.readFileSync('ui/header/index.js', 'utf8');
 const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
 const colorUi = fs.readFileSync('ui/colors/index.js', 'utf8');
-const workplacesUi = fs.readFileSync('settings/profile/workplaces/workplaces.js', 'utf8');
-const accountControlsUi = fs.readFileSync('settings/profile/account-controls.js', 'utf8');
+const workplacesUi = fs.readFileSync('core/profile/workplaces/workplaces.js', 'utf8');
+const accountControlsUi = fs.readFileSync('core/profile/account-controls.js', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
 const people = fs.readFileSync('core/people/people.js', 'utf8');
@@ -48,7 +48,7 @@ const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 const timeCss = fs.readFileSync('ui/time/time.css', 'utf8');
 const journalList = fs.readFileSync('journal/список.js', 'utf8');
-const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
+const profile = fs.readFileSync('core/profile/profile.js', 'utf8');
 const sharedProfile = fs.readFileSync('ui/profile/index.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const entityCardUi = fs.readFileSync('ui/cards/index.js', 'utf8');
@@ -84,17 +84,21 @@ function jsFilesUnder(directory) {
   });
 }
 
-const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('settings/profile')];
+const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('core/profile')];
 const runtimeJsFiles = [
   'core.js',
   ...jsFilesUnder('ui'),
   ...jsFilesUnder('online-booking'),
+  ...jsFilesUnder('core/profile'),
+  ...jsFilesUnder('core/service'),
   ...jsFilesUnder('settings'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
 ];
 
 const workspaceJsFiles = [
+  ...jsFilesUnder('core/profile'),
+  ...jsFilesUnder('core/service'),
   ...jsFilesUnder('settings'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
@@ -260,7 +264,7 @@ expect(ui.includes("const horizontal = Math.abs(nextX) >= Math.abs(nextY) * .72"
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(sharedSwipe.includes("const dragSurface = isBaseZ && front ? front : surface") && sharedSwipe.includes("const dragProperty = isBaseZ && front ? '--v2-front-drag-x' : '--v2-drag-x'") && sharedSwipe.includes("dragSurface.style.setProperty(dragProperty"), 'Shared edge swipe must move the whole front for Z1 and only the sheet for Z2/Z3.');
 expect(ui.includes('let suppressNextClick = false;') && ui.includes("gestureHost.addEventListener('click', click, true)") && ui.includes('event.preventDefault();') && ui.includes('event.stopPropagation();'), 'Shared Z edge swipe must suppress the accidental interactive click generated after a horizontal drag.');
-expect(ui.includes('.slice(0, 7)') && ui.includes('data-v2-card-index="${index}"') && ui.includes('data-v2-deck-level="${text(level)}"'), 'Shared CardDeck must keep peer cards with explicit F/E level data and no visual F1/F2/F3 hierarchy.');
+expect(ui.includes('data-v2-card-index="${index}"') && ui.includes('data-v2-deck-level="${text(level)}"'), 'Shared CardDeck must keep all real peer cards with explicit F/E level data and no visual F1/F2/F3 hierarchy.');
 expect(ui.includes("edgeHost.addEventListener('pointerdown', zDown)") && ui.includes("edgeHost.addEventListener('pointermove', zMove") && ui.includes("deck.addEventListener('scroll', refresh, { passive: true })") && !ui.slice(ui.indexOf('export function initV2WorkspaceInteraction'), ui.indexOf('export function initV2StickerSwipe')).includes('initV2DeckSwipe('), 'Workspace must separate ownership cleanly: the dedicated edge host owns Z return while CardDeck owns native F/E scrolling.');
 expect(!ui.includes('initV2DeckSwipe') && !facade.includes('initV2DeckSwipe'), 'Legacy deck swipe owner must not exist or be exported; workspace interaction is the only FEZ owner.');
 expect(ui.includes('data-v2-front') && /\.v2-fe-deck\{[\s\S]*?position:absolute;z-index:2;inset:0/.test(css) && css.includes('.v2-app.is-deck-open > .v2-app__stage > .v2-front{transform:translate3d(100%,0,0)}') && !/\.v2-app\.is-deck-open[^\{]*\.v2-z[^\{]*\{[^}]*transform:/s.test(css), 'FE must stay on H while the unchanged shared front/Z moves fully offscreen right; Z may not own a separate navigation transform.');
@@ -298,7 +302,7 @@ expect(css.includes('--v2-base:var(--surface-dark)') && css.includes('.v2-header
 expect(!account.includes('appHeader(') && !account.includes('appShell('), 'End-user account must not create a parallel local H/Header/Z shell.');
 expect(!core.includes('appHeader(') && !core.includes('appShell('), 'Professional workspace must not create a parallel local H/Header/Z shell.');
 
-for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
+for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'service', label: 'Сервис'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
 expect(!core.includes('bottomNavigation(') && !core.includes('renderMain'), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
@@ -315,7 +319,7 @@ expect(finance.includes('export function financeNavigationItems()') && finance.i
 for (const label of ['Касса', 'ДДС', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance E is missing ${label}.`);
 for (const label of ['Доход / Расход', 'Статьи', 'Прочие операции']) expect(!finance.includes(`label: '${label}'`), `Finance must not expose ${label} as E navigation.`);
 expect(!core.includes("if (section === 'journal') return journalNavigationItems();") && !core.includes('secondary.journal') && core.includes("journalView: 'day'") && core.includes('return renderJournal(surface, {') && journal.includes('viewNavigation({ views: availableViews, activeView })') && !journal.includes('export function journalNavigationItems()') && !journal.includes('export function renderJournalView('), 'Journal Day/Month/List must stay as one compact Shared View Navigation inside Z and must never return as E cards or secondary navigation state.');
-expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
+expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && !settings.includes("'profile'") && !settings.includes("'service'"), 'Settings E must route only Settings-owned children while Profile and Service stay standalone root F folders.');
 expect(onlineBookingSettings.includes('workspaceHeaderContext({') && !onlineBookingSettings.includes('data-online-booking-back') && onlineBookingSettings.includes('data-online-booking-welcome-save') && onlineBookingSettings.includes("variant: 'q'"), 'Online booking settings must feed Welcome Save through Shared Q Header C while return navigation remains gesture-owned.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
 expect(!fs.existsSync('settings/online-booking/online-booking.css'), 'Online booking settings must not own a local stylesheet.');

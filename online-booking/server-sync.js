@@ -10,10 +10,10 @@ import { hydrateBreaksFromServer } from '../journal/break-data.js';
 import { hydrateConsentsFromServer } from '../settings/documents/consents.js';
 import { hydrateDocumentsFromServer } from '../settings/documents/data.js';
 import { hydrateDocumentHistoryFromServer } from '../settings/documents/history.js';
-import { hydrateProfileFromServer } from '../settings/profile/data.js';
-import { hydrateWorkplacesFromServer } from '../settings/profile/workplaces/data.js';
-import { hydrateProceduresFromServer } from '../settings/service/procedures/data.js';
-import { hydrateProductsFromServer } from '../settings/service/products/data.js';
+import { hydrateProfileFromServer } from '../core/profile/data.js';
+import { hydrateWorkplacesFromServer } from '../core/profile/workplaces/data.js';
+import { hydrateProceduresFromServer } from '../core/service/procedures/data.js';
+import { hydrateProductsFromServer } from '../core/service/products/data.js';
 import { hydrateTagsFromServer } from '../settings/tags/data.js';
 
 const POLL_MS = 4000;
