@@ -12,8 +12,8 @@ const financeService = source('core/finance/service.js');
 const recordView = source('journal/record-view.js');
 const journal = source('journal/journal.js');
 const timetable = source('timetable/timetable.js');
-const profile = source('settings/profile/data.js');
-const workplaces = source('settings/profile/workplaces/data.js');
+const profile = source('core/profile/data.js');
+const workplaces = source('core/profile/workplaces/data.js');
 
 const frontendSources = [
   persistence,

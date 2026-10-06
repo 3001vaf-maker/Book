@@ -39,7 +39,7 @@ import { personDisplay } from '../core/people/presentation.js';
 import { getRecord, refreshRecordsFromServer, setRecordConfirmed, updateRecord } from '../core/record/index.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { journalRecordActionContext } from './record-action-context.js';
-import { getProfile } from '../settings/profile/data.js';
+import { getProfile } from '../core/profile/data.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;

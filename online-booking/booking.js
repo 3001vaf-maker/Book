@@ -61,7 +61,7 @@ import {
   requiredBookingDocuments,
 } from './model.js';
 import { renderGlobalAccount } from './account-shell.js';
-import { workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
+import { workplaceCardAppearance, workplaceCardFields } from '../core/profile/card-presentation.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);

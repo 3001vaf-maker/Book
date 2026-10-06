@@ -165,7 +165,7 @@ if (!/\bmountModal\s*\(/.test(journalWorkplaceSource) || !/\bselect\s*\(/.test(j
   report(journalWorkplaceControl, 'Journal workplace manifestation must reuse Shared Select inside canonical X');
 }
 
-const workplaceOwner = 'settings/profile/workplaces/data.js';
+const workplaceOwner = 'core/profile/workplaces/data.js';
 for (const file of allFiles) {
   const source = text(file);
   if (!source.includes('book.workplaces')) continue;
@@ -255,8 +255,8 @@ if (/\bworkingDates\b/.test(text(dayOwner)) || text(dayOwner).includes('book.tim
 }
 
 const settingsControllers = [
-  'settings/profile/profile.js',
-  'settings/service/service.js',
+  'core/profile/profile.js',
+  'core/service/service.js',
   'settings/documents/documents.js',
   'settings/tags/tags.js',
 ];
@@ -283,7 +283,7 @@ for (const file of allFiles) {
 const uiFacade = join(root, 'ui/ui.js');
 if (/export\s+function\b/.test(text(uiFacade))) report(uiFacade, 'ui/ui.js must remain a pure import/re-export facade');
 
-const profileController = join(root, 'settings/profile/profile.js');
+const profileController = join(root, 'core/profile/profile.js');
 if (!/\bworkplaceAddButton\s*\(/.test(text(profileController))) {
   report(profileController, 'Profile must use the shared workplace add button from ui/workplaces');
 }

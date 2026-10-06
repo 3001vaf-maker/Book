@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { initialProcedure } from '../settings/service/procedures/form.js';
+import { initialProcedure } from '../core/service/procedures/form.js';
 
 const fresh = initialProcedure();
 assert.deepEqual(fresh.groupBooking, { enabled: false, capacity: 2 });
@@ -13,7 +13,7 @@ const existing = initialProcedure({
 });
 assert.deepEqual(existing.groupBooking, { enabled: true, capacity: 6 });
 
-const formSource = readFileSync(new URL('../settings/service/procedures/form.js', import.meta.url), 'utf8');
+const formSource = readFileSync(new URL('../core/service/procedures/form.js', import.meta.url), 'utf8');
 assert.match(formSource, /title:\s*'Групповая запись'/);
 assert.match(formSource, /data-procedure-group-toggle/);
 assert.match(formSource, /name:\s*'procedureGroupCapacity'/);

@@ -30,8 +30,8 @@ const modals = fs.readFileSync('ui/modals/index.js', 'utf8');
 const headerUi = fs.readFileSync('ui/header/index.js', 'utf8');
 const timeUi = fs.readFileSync('ui/time/index.js', 'utf8');
 const colorUi = fs.readFileSync('ui/colors/index.js', 'utf8');
-const workplacesUi = fs.readFileSync('settings/profile/workplaces/workplaces.js', 'utf8');
-const accountControlsUi = fs.readFileSync('settings/profile/account-controls.js', 'utf8');
+const workplacesUi = fs.readFileSync('core/profile/workplaces/workplaces.js', 'utf8');
+const accountControlsUi = fs.readFileSync('core/profile/account-controls.js', 'utf8');
 const accountMobileCss = fs.readFileSync('ui/booking/account-mobile.css', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
 const people = fs.readFileSync('core/people/people.js', 'utf8');
@@ -48,7 +48,7 @@ const recordRuntime = fs.readFileSync('ui/record/runtime.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 const timeCss = fs.readFileSync('ui/time/time.css', 'utf8');
 const journalList = fs.readFileSync('journal/список.js', 'utf8');
-const profile = fs.readFileSync('settings/profile/profile.js', 'utf8');
+const profile = fs.readFileSync('core/profile/profile.js', 'utf8');
 const sharedProfile = fs.readFileSync('ui/profile/index.js', 'utf8');
 const style = fs.readFileSync('css/style.css', 'utf8');
 const entityCardUi = fs.readFileSync('ui/cards/index.js', 'utf8');
@@ -84,7 +84,7 @@ function jsFilesUnder(directory) {
   });
 }
 
-const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('settings/profile')];
+const sharedCssFiles = ['css/style.css', ...cssFilesUnder('ui'), ...cssFilesUnder('core/profile')];
 const runtimeJsFiles = [
   'core.js',
   ...jsFilesUnder('ui'),

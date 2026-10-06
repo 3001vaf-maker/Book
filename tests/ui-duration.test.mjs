@@ -8,7 +8,7 @@ assert.equal(durationText(60), '1 ч');
 assert.equal(durationText(90), '1 ч 30 мин');
 assert.equal(durationText('135'), '2 ч 15 мин');
 
-const procedureFormSource = readFileSync(new URL('../settings/service/procedures/form.js', import.meta.url), 'utf8');
+const procedureFormSource = readFileSync(new URL('../core/service/procedures/form.js', import.meta.url), 'utf8');
 const recordCreationSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
 const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 

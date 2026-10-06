@@ -183,11 +183,11 @@ assert.doesNotMatch(daySource, /journal\//);
 const timeSource = readFileSync(new URL('../ui/time/index.js', import.meta.url), 'utf8');
 assert.match(timeSource, /dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
 
-const workplaceDataSource = readFileSync(new URL('../settings/profile/workplaces/data.js', import.meta.url), 'utf8');
+const workplaceDataSource = readFileSync(new URL('../core/profile/workplaces/data.js', import.meta.url), 'utf8');
 assert.match(workplaceDataSource, /color:\s*String\(workplace\.color/);
 assert.match(workplaceDataSource, /indicatorColor:\s*workplace\.color\s*\|\|\s*WORKPLACE_FALLBACK_COLOR/);
 
-const workplaceEditorSource = readFileSync(new URL('../settings/profile/workplaces/workplaces.js', import.meta.url), 'utf8');
+const workplaceEditorSource = readFileSync(new URL('../core/profile/workplaces/workplaces.js', import.meta.url), 'utf8');
 assert.match(workplaceEditorSource, /colorPicker\(\{name:'workplaceColor'/);
 assert.match(workplaceEditorSource, /Название, город и цвет обязательны/);
 

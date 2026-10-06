@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { ENTITY_CARD_LINE_COUNT, normalizeEntityCardAppearance, entityVisualCard } from '../ui/cards/entity-card-constructor.js';
-import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../settings/profile/card-presentation.js';
+import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields } from '../core/profile/card-presentation.js';
 
 assert.equal(ENTITY_CARD_LINE_COUNT, 9);
 
@@ -44,8 +44,8 @@ assert.match(css,/width:min\(338px,100%\)/);
 assert.match(css,/aspect-ratio:338\/213/);
 assert.match(css,/v2-profile-workplaces>\.entity-visual-card/);
 
-const profileSource=fs.readFileSync(new URL('../settings/profile/profile.js',import.meta.url),'utf8');
-const workplaceSource=fs.readFileSync(new URL('../settings/profile/workplaces/workplaces.js',import.meta.url),'utf8');
+const profileSource=fs.readFileSync(new URL('../core/profile/profile.js',import.meta.url),'utf8');
+const workplaceSource=fs.readFileSync(new URL('../core/profile/workplaces/workplaces.js',import.meta.url),'utf8');
 const constructorSource=fs.readFileSync(new URL('../ui/cards/entity-card-constructor.js',import.meta.url),'utf8');
 const appearanceQSource=fs.readFileSync(new URL('../ui/cards/appearance-q.js',import.meta.url),'utf8');
 const v2Source=['index.js','shell.js','swipe.js','workspace-navigation.js'].map((file)=>fs.readFileSync(new URL(`../ui/v2/${file}`,import.meta.url),'utf8')).join('\n');

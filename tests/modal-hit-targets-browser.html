@@ -13,8 +13,8 @@
 <div id="host"></div>
 <script type="module">
 import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Header, v2Shell } from '/ui/ui.js';
-import { hydrateWorkplacesFromServer } from '/settings/profile/workplaces/data.js';
-import { openServiceWorkplaceSelection } from '/settings/service/workplace-selection.js';
+import { hydrateWorkplacesFromServer } from '/core/profile/workplaces/data.js';
+import { openServiceWorkplaceSelection } from '/core/service/workplace-selection.js';
 import { openJournalWorkplaceControl } from '/journal/workplace-control.js';
 
 hydrateWorkplacesFromServer([{ key: 'test-space', name: 'Тестовое пространство' }]);
