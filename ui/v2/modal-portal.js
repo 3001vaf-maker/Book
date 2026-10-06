@@ -153,6 +153,8 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
 
   let disposeGesture = () => {};
+  let consumeClickTimer = 0;
+  let consumedPointerTarget = null;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -160,9 +162,44 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   const nativeRemove = node.remove.bind(node);
   let closed = false;
+
+  const eventIsOwnedByModal = (event) => {
+    const sheet = node.querySelector(':scope > .v2-layer');
+    if (sheet?.contains(event.target)) return true;
+    if (!qLayer) return false;
+    const qAction = event.target.closest?.('[data-v2-header] .v2-header__slot--c .v2-header__control');
+    return Boolean(qAction && app?.contains?.(qAction));
+  };
+
+  const consumeFollowUpClick = (event) => {
+    if (!consumedPointerTarget) return;
+    const sameTarget = event.target === consumedPointerTarget
+      || consumedPointerTarget.contains?.(event.target)
+      || event.target?.contains?.(consumedPointerTarget);
+    if (!sameTarget) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    consumedPointerTarget = null;
+    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
+    consumeClickTimer = 0;
+    document.removeEventListener('click', consumeFollowUpClick, true);
+  };
+
+  const armFollowUpClickGuard = (target) => {
+    consumedPointerTarget = target;
+    document.addEventListener('click', consumeFollowUpClick, true);
+    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
+    consumeClickTimer = window.setTimeout(() => {
+      consumedPointerTarget = null;
+      consumeClickTimer = 0;
+      document.removeEventListener('click', consumeFollowUpClick, true);
+    }, 700);
+  };
+
   const close = () => {
     if (closed) return;
     closed = true;
+    document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
     document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
     if (node.isConnected) nativeRemove();
@@ -176,16 +213,16 @@ export function mountV2Layer(html, { root = null } = {}) {
     }
   };
 
+  const handleOutsidePointerDown = (event) => {
+    if (closed || technical || eventIsOwnedByModal(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    armFollowUpClickGuard(event.target);
+    close();
+  };
+
   const handleOutsideClick = (event) => {
-    if (closed || technical) return;
-    const sheet = node.querySelector(':scope > .v2-layer');
-    if (sheet?.contains(event.target)) return;
-
-    if (qLayer) {
-      const qAction = event.target.closest?.('[data-v2-header] .v2-header__slot--c .v2-header__control');
-      if (qAction && app?.contains?.(qAction)) return;
-    }
-
+    if (closed || technical || eventIsOwnedByModal(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     close();
@@ -193,6 +230,7 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   node.v2Close = close;
   node.remove = close;
+  document.addEventListener('pointerdown', handleOutsidePointerDown, true);
   document.addEventListener('click', handleOutsideClick, true);
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,
