@@ -1,0 +1,63 @@
+name: Root ownership migration
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: root-ownership-migration-staging
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Move all references to standalone owners
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_profile="settings""/profile"
+          old_service="settings""/service"
+          new_profile="core/profile"
+          new_service="core/service"
+
+          while IFS= read -r -d '' file; do
+            sed -i "s#${old_profile}#${new_profile}#g; s#${old_service}#${new_service}#g" "$file"
+          done < <(git grep -Ilz -e "$old_profile" -e "$old_service" -- . ":!${old_profile}/**" ":!${old_service}/**" || true)
+
+          git rm -r "$old_profile" "$old_service"
+
+          if git grep -n -e "$old_profile" -e "$old_service" -- .; then
+            echo "Retired Settings ownership references still exist"
+            exit 1
+          fi
+
+          test -f core/profile/profile.js
+          test -f core/profile/runtime.js
+          test -f core/service/service.js
+          test -f core/service/procedures/data.js
+          git diff --check
+
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "Finalize standalone profile and service ownership"
+          git push origin HEAD:staging
