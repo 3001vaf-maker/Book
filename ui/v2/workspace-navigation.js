@@ -1,4 +1,5 @@
 import { retainV2EdgeHost } from './lifecycle.js';
+import { bindV2ZDismissAffordance } from './z-affordance.js';
 
 export function setV2DeckOpen(root, open) {
   const app = root?.matches?.('[data-v2-app]')
@@ -388,6 +389,23 @@ export function initV2WorkspaceInteraction(root, {
     app.classList.remove('is-revealing-deck');
   };
 
+  const dismissBaseZ = () => {
+    if (onZRight) onZRight();
+    else {
+      setOpen(true);
+      setEOpen(false, false);
+    }
+  };
+
+  const disposeZDismissAffordance = bindV2ZDismissAffordance(z, {
+    onDismiss: dismissBaseZ,
+    isEnabled: () => bindZ
+      && !deckIsOpen()
+      && !app.classList.contains('has-v2-modal')
+      && !app.querySelector('[data-v2-z-layer]'),
+  });
+  disposers.push(disposeZDismissAffordance);
+
   const zDown = (event) => {
     if (app.classList.contains('has-v2-modal')) return;
     if (!bindZ || deckIsOpen() || zGesture || app.querySelector('[data-v2-z-layer]')) return;
@@ -434,11 +452,7 @@ export function initV2WorkspaceInteraction(root, {
     const current = zGesture;
     clearZGesture();
     if (current.axis !== 'horizontal' || current.dx < threshold) return;
-    if (onZRight) onZRight();
-    else {
-      setOpen(true);
-      setEOpen(false, false);
-    }
+    dismissBaseZ();
   };
   const zCancel = () => clearZGesture();
 
