@@ -174,8 +174,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const consumeFollowUpClick = (event) => {
     if (!consumedPointerTarget) return;
     const sameTarget = event.target === consumedPointerTarget
-      || consumedPointerTarget.contains?.(event.target)
-      || event.target?.contains?.(consumedPointerTarget);
+      || consumedPointerTarget.contains?.(event.target);
     if (!sameTarget) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -215,7 +214,9 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   const handleOutsidePointerDown = (event) => {
     if (closed || technical || eventIsOwnedByModal(event)) return;
-    event.preventDefault();
+    // Do not prevent the browser's pointer/touch sequence here. WebKit may
+    // otherwise suppress the next trusted tap after the veil dismissal. We
+    // stop propagation now and consume the resulting click for the same target.
     event.stopImmediatePropagation();
     armFollowUpClickGuard(event.target);
     close();
