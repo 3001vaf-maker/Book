@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { hydrateProceduresFromServer, getProcedures, reorderProcedures } from '../settings/service/procedures/data.js';
-import { hydrateProductsFromServer, getProducts, reorderProducts } from '../settings/service/products/data.js';
+import { hydrateProceduresFromServer, getProcedures, reorderProcedures } from '../core/service/procedures/data.js';
+import { hydrateProductsFromServer, getProducts, reorderProducts } from '../core/service/products/data.js';
 
 hydrateProceduresFromServer({
   procedures: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }],
@@ -17,13 +17,13 @@ hydrateProductsFromServer({
 assert.equal(reorderProducts(['y', 'x']), true);
 assert.deepEqual(getProducts().map((item) => item.id), ['y', 'x']);
 
-const service = readFileSync(new URL('../settings/service/service.js', import.meta.url), 'utf8');
-const procedures = readFileSync(new URL('../settings/service/procedures/procedures.js', import.meta.url), 'utf8');
-const procedureForm = readFileSync(new URL('../settings/service/procedures/form.js', import.meta.url), 'utf8');
-const products = readFileSync(new URL('../settings/service/products/products.js', import.meta.url), 'utf8');
-const workplaceSelection = readFileSync(new URL('../settings/service/workplace-selection.js', import.meta.url), 'utf8');
-const appearance = readFileSync(new URL('../settings/service/appearance.js', import.meta.url), 'utf8');
-const cardPresentation = readFileSync(new URL('../settings/service/card-presentation.js', import.meta.url), 'utf8');
+const service = readFileSync(new URL('../core/service/service.js', import.meta.url), 'utf8');
+const procedures = readFileSync(new URL('../core/service/procedures/procedures.js', import.meta.url), 'utf8');
+const procedureForm = readFileSync(new URL('../core/service/procedures/form.js', import.meta.url), 'utf8');
+const products = readFileSync(new URL('../core/service/products/products.js', import.meta.url), 'utf8');
+const workplaceSelection = readFileSync(new URL('../core/service/workplace-selection.js', import.meta.url), 'utf8');
+const appearance = readFileSync(new URL('../core/service/appearance.js', import.meta.url), 'utf8');
+const cardPresentation = readFileSync(new URL('../core/service/card-presentation.js', import.meta.url), 'utf8');
 const listEntry = readFileSync(new URL('../ui/lists/list-entry.js', import.meta.url), 'utf8');
 const appearanceQ = readFileSync(new URL('../ui/cards/appearance-q.js', import.meta.url), 'utf8');
 const entityCardConstructor = readFileSync(new URL('../ui/cards/entity-card-constructor.js', import.meta.url), 'utf8');
