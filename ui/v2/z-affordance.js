@@ -1,8 +1,4 @@
 const Z_DISMISS_STYLE = [
-  'position:sticky',
-  'top:22px',
-  'left:0',
-  'z-index:20',
   'box-sizing:border-box',
   'display:grid',
   'place-items:center',
@@ -12,9 +8,8 @@ const Z_DISMISS_STYLE = [
   'height:20px',
   'min-height:20px',
   'max-height:20px',
-  'margin:0 0 -20px -18px',
+  'margin:0',
   'padding:0',
-  'transform:translateY(-22px)',
   'border:0',
   'border-radius:0',
   'background:transparent',
@@ -31,7 +26,7 @@ export function v2ZDismissAffordance() {
 }
 
 export function bindV2ZDismissAffordance(surface, { onDismiss = null, isEnabled = null } = {}) {
-  const control = surface?.querySelector?.(':scope > [data-v2-z-dismiss]');
+  const control = surface?.querySelector?.('[data-v2-z-header] > [data-v2-z-dismiss]');
   if (!control || typeof onDismiss !== 'function') return () => {};
   const click = (event) => {
     if (typeof isEnabled === 'function' && !isEnabled()) return;

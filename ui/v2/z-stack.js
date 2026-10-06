@@ -1,6 +1,7 @@
 import { text } from './html.js';
 import { initV2Swipe } from './swipe.js';
-import { bindV2ZDismissAffordance, v2ZDismissAffordance } from './z-affordance.js';
+import { bindV2ZDismissAffordance } from './z-affordance.js';
+import { v2ZFrame } from './z-layout.js';
 
 function syncV2ZStackInteraction(app, host) {
   if (!app || !host) return;
@@ -15,7 +16,7 @@ function syncV2ZStackInteraction(app, host) {
 }
 
 export function v2ZLayer(content = '', { className = '' } = {}) {
-  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${v2ZDismissAffordance()}${content}</main>`;
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer style="padding-top:0">${v2ZFrame(content)}</main>`;
 }
 
 export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
