@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from './notification.service';
 import { NOTIFICATION_EVENT_CATALOG, NOTIFICATION_EVENT_TYPES, notificationEventDefinition } from './notification-events';
@@ -75,7 +76,7 @@ export class NotificationEventService {
     if (input.enabled !== undefined) {
       const existing = await this.notifications.getRoutingPolicy(tenantId, type);
       const definition = notificationEventDefinition(type);
-      const id = crypto.randomUUID();
+      const id = randomUUID();
       const channelsJson = JSON.stringify(Array.isArray((existing as any)?.channels) ? (existing as any).channels : ['PUSH']);
       const titleTemplate = text((existing as any)?.titleTemplate) || definition?.defaultTitle || 'Уведомление';
       const bodyTemplate = text((existing as any)?.bodyTemplate) || definition?.defaultBody || '';
