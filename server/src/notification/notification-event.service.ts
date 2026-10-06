@@ -5,7 +5,6 @@ import { NotificationService } from './notification.service';
 import { NOTIFICATION_EVENT_CATALOG, NOTIFICATION_EVENT_TYPES, notificationEventDefinition } from './notification-events';
 
 type JsonObject = Record<string, any>;
-
 type EnabledRow = { eventType: string; enabled: boolean };
 
 function text(value: unknown) {
@@ -25,8 +24,7 @@ export class NotificationEventService {
       this.prisma.$queryRaw<EnabledRow[]>`
         SELECT "eventType", "enabled"
         FROM "NotificationRoutingPolicy"
-        WHERE "tenantId" = ${tenantId}
-          AND "eventType" <> '__delivery__'
+        WHERE "tenantId" = ${tenantId} AND "eventType" <> '__delivery__'
       `,
     ]);
     const byType = new Map((Array.isArray(policies) ? policies : []).map((policy: any) => [text(policy?.eventType), policy]));
@@ -69,17 +67,15 @@ export class NotificationEventService {
       || input.channels !== undefined
       || input.titleTemplate !== undefined
       || input.bodyTemplate !== undefined;
-    if (hasTemplateOrRoutingChange) {
-      await this.notifications.saveRoutingPolicy(tenantId, type, input);
-    }
+    if (hasTemplateOrRoutingChange) await this.notifications.saveRoutingPolicy(tenantId, type, input);
 
     if (input.enabled !== undefined) {
       const existing = await this.notifications.getRoutingPolicy(tenantId, type);
       const definition = notificationEventDefinition(type);
       const id = randomUUID();
       const channelsJson = JSON.stringify(Array.isArray((existing as any)?.channels) ? (existing as any).channels : ['PUSH']);
-      const titleTemplate = text((existing as any)?.titleTemplate) || definition?.defaultTitle || 'Уведомление';
-      const bodyTemplate = text((existing as any)?.bodyTemplate) || definition?.defaultBody || '';
+      const titleTemplate = definition?.defaultTitle || text((existing as any)?.titleTemplate) || 'Уведомление';
+      const bodyTemplate = definition?.defaultBody || text((existing as any)?.bodyTemplate) || '';
       const mode = text((existing as any)?.mode) || 'always';
       const enabled = Boolean(input.enabled);
       await this.prisma.$executeRaw`
