@@ -4,11 +4,12 @@ import { inventoryNavigationItems, renderInventorySection } from './core/invento
 import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
-import { render as renderProfile } from './settings/profile/profile.js';
-import { getProfile } from './settings/profile/data.js';
+import { render as renderProfile } from './core/profile/profile.js';
+import { getProfile } from './core/profile/data.js';
+import { render as renderService } from './core/service/service.js';
 import { renderChat } from './chat/chat.js';
-import { getWorkplaces as getWorkplaceEntities } from './settings/profile/workplaces/data.js';
-import { loadProfileState } from './settings/profile/runtime.js';
+import { getWorkplaces as getWorkplaceEntities } from './core/profile/workplaces/data.js';
+import { loadProfileState } from './core/profile/runtime.js';
 import { loadBusinessState } from './core/runtime/business-state.js';
 import { loadOperationalState } from './core/runtime/operational-state.js';
 import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
@@ -36,6 +37,7 @@ const ROOT_SECTIONS = [
   { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
   { id: 'profile', label: 'Профиль', capability: '' },
+  { id: 'service', label: 'Сервис', capability: 'services.access' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
@@ -50,7 +52,7 @@ const state = {
   secondary: {
     finance: 'cash',
     inventory: 'stock',
-    settings: 'service',
+    settings: 'online-booking',
   },
 };
 const app = document.querySelector('#app');
@@ -467,6 +469,7 @@ function renderActiveWorkspaceSurface(surface) {
     });
   }
   if (section === 'profile') return renderProfile(surface, openNavigation);
+  if (section === 'service') return renderService(surface, openNavigation);
   if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
   if (section === 'chat') return renderChat(surface, { personKey: state.chatPersonKey });
   return renderPeople(surface);
