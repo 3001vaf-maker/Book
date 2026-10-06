@@ -89,12 +89,16 @@ const runtimeJsFiles = [
   'core.js',
   ...jsFilesUnder('ui'),
   ...jsFilesUnder('online-booking'),
+  ...jsFilesUnder('core/profile'),
+  ...jsFilesUnder('core/service'),
   ...jsFilesUnder('settings'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
 ];
 
 const workspaceJsFiles = [
+  ...jsFilesUnder('core/profile'),
+  ...jsFilesUnder('core/service'),
   ...jsFilesUnder('settings'),
   ...jsFilesUnder('journal'),
   ...jsFilesUnder('timetable'),
@@ -298,7 +302,7 @@ expect(css.includes('--v2-base:var(--surface-dark)') && css.includes('.v2-header
 expect(!account.includes('appHeader(') && !account.includes('appShell('), 'End-user account must not create a parallel local H/Header/Z shell.');
 expect(!core.includes('appHeader(') && !core.includes('appShell('), 'Professional workspace must not create a parallel local H/Header/Z shell.');
 
-for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'settings', label: 'Настройки'"]) {
+for (const marker of ["{ id: 'people', label: 'Клиенты'", "{ id: 'finance', label: 'Финансы'", "{ id: 'timetable', label: 'График'", "{ id: 'journal', label: 'Журнал'", "{ id: 'profile', label: 'Профиль'", "{ id: 'service', label: 'Сервис'", "{ id: 'settings', label: 'Настройки'"]) {
   expect(core.includes(marker), `Workspace root F is missing ${marker}.`);
 }
 expect(!core.includes('bottomNavigation(') && !core.includes('renderMain'), 'Workspace V2 must not retain legacy bottom navigation or Main hub routing.');
@@ -315,7 +319,7 @@ expect(finance.includes('export function financeNavigationItems()') && finance.i
 for (const label of ['Касса', 'ДДС', 'Z-отчёт']) expect(finance.includes(`label: '${label}'`), `Finance E is missing ${label}.`);
 for (const label of ['Доход / Расход', 'Статьи', 'Прочие операции']) expect(!finance.includes(`label: '${label}'`), `Finance must not expose ${label} as E navigation.`);
 expect(!core.includes("if (section === 'journal') return journalNavigationItems();") && !core.includes('secondary.journal') && core.includes("journalView: 'day'") && core.includes('return renderJournal(surface, {') && journal.includes('viewNavigation({ views: availableViews, activeView })') && !journal.includes('export function journalNavigationItems()') && !journal.includes('export function renderJournalView('), 'Journal Day/Month/List must stay as one compact Shared View Navigation inside Z and must never return as E cards or secondary navigation state.');
-expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && settings.includes("key !== 'profile'"), 'Settings E must route existing settings children while Profile stays a root F folder.');
+expect(settings.includes('export function settingsNavigationItems()') && settings.includes('export async function renderSettingsSection(') && !settings.includes("'profile'") && !settings.includes("'service'"), 'Settings E must route only Settings-owned children while Profile and Service stay standalone root F folders.');
 expect(onlineBookingSettings.includes('workspaceHeaderContext({') && !onlineBookingSettings.includes('data-online-booking-back') && onlineBookingSettings.includes('data-online-booking-welcome-save') && onlineBookingSettings.includes("variant: 'q'"), 'Online booking settings must feed Welcome Save through Shared Q Header C while return navigation remains gesture-owned.');
 expect(!/\b(?:appShell|appHeader)\s*\(/.test(onlineBookingSettings) && !onlineBookingSettings.includes('app-content--book-shell'), 'Online booking settings must not recreate a full-screen shell inside Z.');
 expect(!fs.existsSync('settings/online-booking/online-booking.css'), 'Online booking settings must not own a local stylesheet.');
