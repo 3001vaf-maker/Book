@@ -46,7 +46,7 @@ export function v2CardDeck(items = [], {
   role = '',
   level = 'f',
 } = {}) {
-  const values = (Array.isArray(items) ? items : []).filter(Boolean).slice(0, 7);
+  const values = (Array.isArray(items) ? items : []).filter(Boolean);
   if (!values.length) return '';
   const resolvedAxis = axis === 'y' ? 'y' : 'x';
   const activeId = String(active || values[0]?.id || '0');
