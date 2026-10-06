@@ -8,6 +8,10 @@ async function payload(response) {
   return value;
 }
 
+export async function getNotificationCatalog() {
+  return payload(await apiRequest('/notifications/catalog'));
+}
+
 export async function getNotificationRouting() {
   return payload(await apiRequest('/notifications/routing'));
 }
@@ -18,6 +22,7 @@ export async function getNotificationDeliveryRouting() {
 
 export async function saveNotificationRouting(eventType, input = {}) {
   const body = {};
+  if (input.enabled !== undefined) body.enabled = Boolean(input.enabled);
   if (input.mode !== undefined) body.mode = input.mode;
   if (input.channels !== undefined) {
     body.channels = [...new Set((Array.isArray(input.channels) ? input.channels : [])
@@ -31,6 +36,10 @@ export async function saveNotificationRouting(eventType, input = {}) {
     method: 'PUT',
     body: JSON.stringify(body),
   }));
+}
+
+export async function setNotificationEnabled(eventType, enabled) {
+  return saveNotificationRouting(eventType, { enabled });
 }
 
 export async function saveNotificationDeliveryRouting(input = {}) {
