@@ -90,21 +90,14 @@ function lockModalHeader(app, { allowC = false } = {}) {
       ].filter(Boolean)
     : [header];
 
-  const states = targets.map((target) => ({
-    target,
-    inert: Boolean(target.inert),
-  }));
-
-  targets.forEach((target) => {
-    target.inert = true;
-    target.classList.add('is-modal-locked');
-  });
+  // Header remains pointer-addressable on purpose: outside input must reach the
+  // Shared modal owner so the veil can dismiss the active modal. The capture
+  // handler below consumes that input before any underlying Header action runs.
+  // Using inert here would make A/B/D dead zones instead of veil-dismiss zones.
+  targets.forEach((target) => target.classList.add('is-modal-locked'));
 
   return () => {
-    states.forEach(({ target, inert }) => {
-      target.inert = inert;
-      target.classList.remove('is-modal-locked');
-    });
+    targets.forEach((target) => target.classList.remove('is-modal-locked'));
   };
 }
 
