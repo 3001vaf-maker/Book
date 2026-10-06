@@ -1,5 +1,6 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
+import { v2ZBodySections } from '../v2/z-layout.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
@@ -156,10 +157,10 @@ export function recordConfirmationMiniCard({
     ],
   });
 
-  return `<div class="record-confirmation-view">
-    <div class="record-confirmation-view__card">${card}</div>
-    <div class="record-confirmation-view__procedures">${services}</div>
-  </div>`;
+  return `<div class="record-confirmation-view">${v2ZBodySections([
+    { kind: 'content', content: `<div class="record-confirmation-view__card">${card}</div>` },
+    { kind: 'content', content: `<div class="record-confirmation-view__procedures">${services}</div>` },
+  ])}</div>`;
 }
 
 export function mountRecordZ({
