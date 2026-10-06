@@ -78,6 +78,37 @@ function mountV2ModalPortal(host) {
   };
 }
 
+function lockModalHeader(app, { allowC = false } = {}) {
+  const header = app?.querySelector?.('[data-v2-header]');
+  if (!header) return () => {};
+
+  const targets = allowC
+    ? [
+        header.querySelector('.v2-header__slot--a'),
+        header.querySelector('.v2-header__title'),
+        header.querySelector('.v2-header__slot--d'),
+      ].filter(Boolean)
+    : [header];
+
+  // Header remains pointer-addressable on purpose: outside input must reach the
+  // Shared modal owner so the veil can dismiss the active modal. The capture
+  // handler below consumes that input before any underlying Header action runs.
+  // Using inert here would make A/B/D dead zones instead of veil-dismiss zones.
+  targets.forEach((target) => target.classList.add('is-modal-locked'));
+
+  return () => {
+    targets.forEach((target) => target.classList.remove('is-modal-locked'));
+  };
+}
+
+function closeExistingApplicationModal() {
+  const layers = [...document.querySelectorAll('[data-v2-layer]:not([data-v2-layer-kind="technical"])')];
+  const current = layers.at(-1);
+  if (!current) return;
+  if (typeof current.v2Close === 'function') current.v2Close();
+  else current.remove();
+}
+
 export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
@@ -86,12 +117,26 @@ export function mountV2Layer(html, { root = null } = {}) {
   const kind = node.dataset.v2LayerKind || 'standard';
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
+
+  if (!technical) closeExistingApplicationModal();
+
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const locksHeader = Boolean(app && kind === 'standard' && !qLayer);
   const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
   const lockedStage = technical ? null : lockV2StageInteraction(app);
+  const releaseHeaderLock = technical
+    ? () => {}
+    : (qLayer
+        ? lockModalHeader(app, { allowC: true })
+        : (locksHeader
+            ? () => {
+                if (!header) return;
+                header.inert = false;
+                header.classList.remove('is-modal-locked');
+              }
+            : lockModalHeader(app)));
   const portalOwner = technical ? null : mountV2ModalPortal(host);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
@@ -102,9 +147,14 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
   mountHost.appendChild(node);
   node.v2Portal = portalOwner?.portal || null;
-  if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  if (qLayer) {
+    app?.classList.add('has-v2-q-modal');
+    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  }
 
   let disposeGesture = () => {};
+  let consumeClickTimer = 0;
+  let consumedPointerTarget = null;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -112,25 +162,77 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   const nativeRemove = node.remove.bind(node);
   let closed = false;
+
+  const eventIsOwnedByModal = (event) => {
+    const sheet = node.querySelector(':scope > .v2-layer');
+    if (sheet?.contains(event.target)) return true;
+    if (!qLayer) return false;
+    const qAction = event.target.closest?.('[data-v2-header] .v2-header__slot--c .v2-header__control');
+    return Boolean(qAction && app?.contains?.(qAction));
+  };
+
+  const consumeFollowUpClick = (event) => {
+    if (!consumedPointerTarget) return;
+    const sameTarget = event.target === consumedPointerTarget
+      || consumedPointerTarget.contains?.(event.target);
+    if (!sameTarget) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    consumedPointerTarget = null;
+    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
+    consumeClickTimer = 0;
+    document.removeEventListener('click', consumeFollowUpClick, true);
+  };
+
+  const armFollowUpClickGuard = (target) => {
+    consumedPointerTarget = target;
+    document.addEventListener('click', consumeFollowUpClick, true);
+    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
+    consumeClickTimer = window.setTimeout(() => {
+      consumedPointerTarget = null;
+      consumeClickTimer = 0;
+      document.removeEventListener('click', consumeFollowUpClick, true);
+    }, 700);
+  };
+
   const close = () => {
     if (closed) return;
     closed = true;
+    document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
     if (node.isConnected) nativeRemove();
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
     if (!technical) unlockV2StageInteraction(app, lockedStage);
-    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-    if (locksHeader && app && !app.querySelector('[data-v2-layer-kind="standard"]')) {
-      const currentHeader = app.querySelector?.('[data-v2-header]');
-      if (currentHeader) {
-        currentHeader.inert = false;
-        currentHeader.classList.remove('is-modal-locked');
-      }
+    releaseHeaderLock();
+    if (qLayer) {
+      app?.classList.remove('has-v2-q-modal');
+      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
     }
   };
+
+  const handleOutsidePointerDown = (event) => {
+    if (closed || technical || eventIsOwnedByModal(event)) return;
+    // Do not prevent the browser's pointer/touch sequence here. WebKit may
+    // otherwise suppress the next trusted tap after the veil dismissal. We
+    // stop propagation now and consume the resulting click for the same target.
+    event.stopImmediatePropagation();
+    armFollowUpClickGuard(event.target);
+    close();
+  };
+
+  const handleOutsideClick = (event) => {
+    if (closed || technical || eventIsOwnedByModal(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    close();
+  };
+
   node.v2Close = close;
   node.remove = close;
+  document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+  document.addEventListener('click', handleOutsideClick, true);
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,
     onDismiss: () => node.v2Close?.(),

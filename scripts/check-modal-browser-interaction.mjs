@@ -36,6 +36,11 @@ for (const [name, engine, contextOptions] of [
       if (contextOptions.hasTouch) await page.touchscreen.tap(point.x, point.y);
       else await page.mouse.click(point.x, point.y);
     };
+    const activateSelector = async (selector) => {
+      const box = await page.locator(selector).boundingBox();
+      assert.ok(box, `${name}: missing ${selector}`);
+      await activate({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+    };
     const closeSheet = async () => {
       // Dismiss through the real pointer handler, including pointer capture.
       const zone = await page.locator('[data-v2-layer-gesture-zone]').boundingBox();
@@ -80,8 +85,29 @@ for (const [name, engine, contextOptions] of [
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
     await closeSheet();
 
-    // Journal keeps Shared Select inside the canonical X. Repeated switching
-    // must close the nested selector before the owning X reacts to change.
+    // X veil: tapping Header A while X is active must only dismiss the X.
+    // The underlying A action must never fire from the same input.
+    if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
+    else await page.locator('[data-test-settings]').click();
+    await page.locator('[data-modal]').waitFor();
+    await activateSelector('[data-test-header-a]');
+    await page.locator('[data-modal]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through X veil`);
+
+    // Q owns only Header C outside its sheet. C must remain live and must not dismiss Q;
+    // tapping A is veil input: Q closes and A still must not fire.
+    if (contextOptions.hasTouch) await page.locator('[data-test-open-q]').tap();
+    else await page.locator('[data-test-open-q]').click();
+    await page.locator('[data-test-q-content]').waitFor();
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
+    await activateSelector('[data-test-header-c]');
+    assert.equal(await page.locator('[data-test-header-c-count]').textContent(), '1', `${name}: Q-owned Header C did not fire`);
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q-owned Header C dismissed Q`);
+    await activateSelector('[data-test-header-a]');
+    await page.locator('[data-modal]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
+
+    // Journal Shared Select replaces the owning X. A nested Q/X/S stack is forbidden.
     for (let cycle = 0; cycle < 3; cycle += 1) {
       const journalTrigger = page.locator('[data-test-journal-workplace]');
       if (contextOptions.hasTouch) await journalTrigger.tap();
@@ -94,7 +120,7 @@ for (const [name, engine, contextOptions] of [
       if (contextOptions.hasTouch) await journalSelect.tap();
       else await journalSelect.click();
       await page.locator('[data-ui-selector]').waitFor();
-      assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal nested Shared Select did not open exactly once`);
+      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal Shared Select stacked over parent X`);
 
       const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
       const option = page.locator(`[data-ui-select-option][data-value="${targetValue}"]`);
@@ -120,7 +146,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (trusted input, menu → workplaces, selection, reopen, dismissal, 10 sheet variants)`);
+    console.log(`${name}: PASS (exclusive modal, veil dismissal, Q C ownership, trusted input, menu → workplaces, selection, reopen, dismissal, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
