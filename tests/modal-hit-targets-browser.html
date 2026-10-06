@@ -12,17 +12,45 @@
 <body>
 <div id="host"></div>
 <script type="module">
-import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Shell } from '/ui/ui.js';
+import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Header, v2Shell } from '/ui/ui.js';
 import { hydrateWorkplacesFromServer } from '/settings/profile/workplaces/data.js';
 import { openServiceWorkplaceSelection } from '/settings/service/workplace-selection.js';
 import { openJournalWorkplaceControl } from '/journal/workplace-control.js';
 
 hydrateWorkplacesFromServer([{ key: 'test-space', name: 'Тестовое пространство' }]);
 let selection = [];
+let headerACount = 0;
+let headerCCount = 0;
 const host = document.querySelector('#host');
-host.innerHTML = v2Shell({ body: button('Настройки', { data: 'data-test-settings' })
-  + button('Журнал: пространство', { data: 'data-test-journal-workplace' })
-  + '<output data-test-selection>0</output><output data-test-journal-selection>__all__</output>' });
+const header = v2Header({
+  a: { kind: 'settings', aria: 'A', data: 'data-test-header-a' },
+  b: 'Проверка modal',
+  c: { label: 'C', aria: 'C', data: 'data-test-header-c' },
+});
+host.innerHTML = v2Shell({
+  header,
+  body: button('Настройки', { data: 'data-test-settings' })
+    + button('Журнал: пространство', { data: 'data-test-journal-workplace' })
+    + button('Открыть Q', { data: 'data-test-open-q' })
+    + '<output data-test-selection>0</output><output data-test-journal-selection>__all__</output>'
+    + '<output data-test-header-a-count>0</output><output data-test-header-c-count>0</output>',
+});
+
+host.querySelector('[data-test-header-a]').addEventListener('click', () => {
+  headerACount += 1;
+  host.querySelector('[data-test-header-a-count]').textContent = String(headerACount);
+});
+host.querySelector('[data-test-header-c]').addEventListener('click', () => {
+  headerCCount += 1;
+  host.querySelector('[data-test-header-c-count]').textContent = String(headerCCount);
+});
+host.querySelector('[data-test-open-q]').addEventListener('click', () => {
+  mountModal(host, modal(button('Q content', { data: 'data-test-q-content' }), {
+    variant: 'q',
+    title: 'Q',
+  }));
+});
+
 host.querySelector('[data-test-journal-workplace]').addEventListener('click', () => {
   const output = host.querySelector('[data-test-journal-selection]');
   openJournalWorkplaceControl({
