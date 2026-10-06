@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { NOTIFICATION_EVENT_CATALOG } from './notification-events';
 import { NotificationService } from './notification.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
@@ -9,6 +10,11 @@ type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: st
 @UseGuards(JwtAuthGuard)
 export class NotificationController {
   constructor(private readonly notifications: NotificationService) {}
+
+  @Get('catalog')
+  catalog() {
+    return NOTIFICATION_EVENT_CATALOG;
+  }
 
   @Get('routing')
   routing(@Req() request: OwnerRequest) {
@@ -27,7 +33,7 @@ export class NotificationController {
   saveRouting(
     @Req() request: OwnerRequest,
     @Param('eventType') eventType: string,
-    @Body() body: { mode?: unknown; channels?: unknown; titleTemplate?: unknown; bodyTemplate?: unknown },
+    @Body() body: { enabled?: unknown; mode?: unknown; channels?: unknown; titleTemplate?: unknown; bodyTemplate?: unknown },
   ) {
     return this.notifications.saveRoutingPolicy(request.auth!.tenantId, eventType, body || {});
   }
