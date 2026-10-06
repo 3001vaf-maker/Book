@@ -12,6 +12,7 @@ import {
   setRecordPrimaryAction,
   bindRecordSettings,
 } from '../ui/ui.js';
+import { setV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getRecordPaymentState, recordSettlementItems, repriceSettlement, refreshFinanceState } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getAllPeople } from '../core/people/data.js';
@@ -351,17 +352,16 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
 
     const started = hasAppointmentStarted(state);
     const effectiveAttendance = normalizedAttendance(state.attendance) || (started ? 'arrived' : '');
-    const statusControl = `<div class="record-status-controls">
-      <div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
-        <button type="button" class="${paid || state.confirmed ? 'is-active' : ''}" aria-pressed="${paid || state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
-      </div>
-      <div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
-        <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${!started ? ' disabled' : ''}>Пришел</button>
-        <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${!started ? ' disabled' : ''}>Не пришел</button>
-      </div>
+    const confirmedControl = `<div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
+      <button type="button" class="${paid || state.confirmed ? 'is-active' : ''}" aria-pressed="${paid || state.confirmed}" data-record-view-confirmed${paid ? ' disabled' : ''}>Подтвердил</button>
     </div>`;
+    const attendanceControl = `<div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
+      <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${!started ? ' disabled' : ''}>Пришел</button>
+      <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${!started ? ' disabled' : ''}>Не пришел</button>
+    </div>`;
+    setV2ZHeaderRows(m, [confirmedControl, attendanceControl]);
     const dirty = stateSnapshot(state) !== baseline;
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${statusControl}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
     if (dirty) {
       setRecordPrimaryAction(m, {
         label: 'Сохранить',
@@ -381,11 +381,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }
 
-    root.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
+    m.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
       if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
     });
-    root.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
+    m.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
       if (!hasAppointmentStarted(state)) return;
       const next = normalizedAttendance(node.dataset.recordViewAttendance);
       const current = normalizedAttendance(state.attendance) || 'arrived';
