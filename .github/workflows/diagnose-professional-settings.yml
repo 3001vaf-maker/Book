@@ -16,6 +16,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tests/professional-core-runtime-browser.html')
+          text = path.read_text()
+          old = """  if (!target) {
+            ok(false, label + ' target card missing before selection');
+            return;
+          }"""
+          new = """  if (!target) {
+            const accessDebug = await import('/core/access.js');
+            const settingsDebug = await import('/settings/settings.js');
+            const capabilitiesDebug = (accessDebug.getBookAccess()?.capabilities || []).map((item) => item.key + ':' + item.enabled).join('|');
+            const settingsItemsDebug = settingsDebug.settingsNavigationItems().map((item) => item.id).join('|');
+            result.textContent = 'MISSING ' + label + ' SETTINGS=' + settingsItemsDebug + ' CAPS=' + capabilitiesDebug;
+            document.documentElement.dataset.professionalRuntimeStage = 'missing-' + label;
+            ok(false, label + ' target card missing before selection');
+            return;
+          }"""
+          if old not in text:
+              raise SystemExit('tapAndOpen missing-target block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
           pid=$!
           trap 'kill "$pid" >/dev/null 2>&1 || true' EXIT
