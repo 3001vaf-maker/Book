@@ -3,6 +3,9 @@
 .calendar__month-button{box-sizing:border-box;width:48px;height:48px;border:2px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:24px;line-height:1}
 .calendar__month-button:active{background:transparent}
 .calendar__month{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:clip;text-align:center;font-size:16px;font-weight:700;line-height:1.2}
+.calendar__header--compact,.calendar__header:has([data-date-navigator-prev]){grid-template-columns:36px minmax(0,1fr) 36px;gap:4px;margin:0}
+.calendar__header--compact .calendar__month-button,.calendar__header:has([data-date-navigator-prev]) .calendar__month-button{width:36px;height:36px;border-width:1px;font-size:18px}
+.calendar__header--compact .calendar__month,.calendar__header:has([data-date-navigator-prev]) .calendar__month{font-size:14px;line-height:1}
 .calendar__weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:4px}
 .calendar__weekdays span{min-width:0;padding:4px 2px;text-align:center;color:var(--text-secondary);font-size:12px;font-weight:650}
 .calendar__grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(74px,auto);gap:2px}
