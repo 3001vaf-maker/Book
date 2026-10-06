@@ -24,6 +24,36 @@ function escapeRecordText(value = '') {
   }[char]));
 }
 
+function promoteRecordHeaderControls(layerRoot, host) {
+  queueMicrotask(() => {
+    const header = layerRoot?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
+    if (!header || !host?.isConnected) return;
+
+    const controls = [];
+    const modeControl = host.querySelector('[aria-label="Режим записи"]');
+    if (modeControl) controls.push(modeControl);
+
+    const searchInput = host.querySelector('[data-record-person-search]');
+    const searchControl = searchInput?.closest?.('.ui-search-field') || null;
+    if (searchControl) controls.push(searchControl);
+
+    if (!controls.length) return;
+
+    header.replaceChildren();
+    controls.forEach((control, index) => {
+      control.dataset.v2ZHeaderControl = '';
+      control.style.margin = '0';
+      const row = document.createElement('div');
+      row.dataset.v2ZHeaderRow = String(index);
+      row.style.minWidth = '0';
+      row.append(control);
+      header.append(row);
+    });
+
+    if (searchControl) host.querySelector('.ui-search-divider')?.remove();
+  });
+}
+
 export function recordWorkplaceCards(items = [], {
   data = 'data-record-workplace',
 } = {}) {
@@ -220,6 +250,7 @@ export function renderRecordZ(layerRoot, content = '') {
   const host = recordZHost(layerRoot);
   if (!host) return null;
   host.innerHTML = String(content || '');
+  promoteRecordHeaderControls(layerRoot, host);
   return host;
 }
 
