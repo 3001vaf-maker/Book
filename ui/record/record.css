@@ -29,7 +29,7 @@
 .v2-service-sticker__selector{width:24px;height:24px;border:1px solid var(--v2-ink);display:grid;place-items:center;font-size:13px;font-weight:850}
 .v2-service-sticker.is-selected .v2-service-sticker__selector{background:var(--v2-ink);color:#fff}.v2-service-sticker.is-selected .v2-service-sticker__selector::after{content:'✓'}
 
-.record-confirmation-view{display:grid;gap:20px;width:100%;min-width:0}
+.record-confirmation-view{width:100%;min-width:0}
 .record-confirmation-view__card{display:flex;justify-content:center;width:100%;min-width:0}
 .record-confirmation-mini-card.mini-card--lines{width:var(--mini-card-width);min-width:var(--mini-card-width);max-width:var(--mini-card-width);height:var(--mini-card-height);min-height:var(--mini-card-height);max-height:var(--mini-card-height);padding:12px 14px;grid-template-rows:1fr}
 .record-confirmation-mini-card .mini-card__lines{height:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:repeat(5,minmax(0,1fr));gap:0 8px;align-items:center}
