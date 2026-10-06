@@ -10,7 +10,7 @@ const folders = [
 ];
 
 function availableFolders() {
-  return folders.filter((folder) => canUseBookCapability(folder[4]));
+  return folders.filter(([key, , , , capability]) => key !== 'profile' && key !== 'service' && canUseBookCapability(capability));
 }
 
 function workspaceFolders() {
