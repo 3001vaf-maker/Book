@@ -1,29 +1,28 @@
 import {
+  getNotificationCatalog,
   getNotificationDeliveryRouting,
   getNotificationRouting,
   saveNotificationDeliveryRouting,
   saveNotificationRouting,
+  setNotificationEnabled,
 } from '../../core/notifications/routing.js';
 import {
   button,
   emptyState,
+  escapeHtml,
   field,
   modal,
   mountModal,
+  mountV2ZLayer,
   page,
   select,
   smallActionButton,
   textareaField,
-  v2ListEntry,
-  v2ListEntries,
+  v2Section,
+  v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
-
-const EVENTS = [
-  { type: 'booking.created', title: 'Запись создана', body: 'После создания записи' },
-  { type: 'booking.rescheduled', title: 'Запись перенесена', body: 'После изменения даты или времени' },
-  { type: 'booking.cancelled', title: 'Запись отменена', body: 'После отмены записи' },
-];
+import { messageBubble } from '../../ui/chat/index.js';
 
 const EXTERNAL_CHANNEL_OPTIONS = Object.freeze([
   { value: 'TELEGRAM', label: 'Telegram' },
@@ -36,11 +35,25 @@ const ROUTING_MODE_OPTIONS = Object.freeze([
   { value: 'fallback', label: 'По очереди, если предыдущий не доставлен' },
 ]);
 
-function normalizedPolicy(routing, type) {
-  const source = Array.isArray(routing) ? routing.find((item) => item?.eventType === type) : null;
+const PREVIEW_VALUES = Object.freeze({
+  date: '18 октября',
+  time: '14:30',
+  workplace: 'Рабочее пространство',
+  amount: '5 000 ₽',
+  document: 'Согласие на обработку данных',
+  person: { name: 'Александр', surname: 'Иванов' },
+});
+
+function text(value = '') {
+  return String(value ?? '').trim();
+}
+
+function policyFor(routing, event) {
+  const source = Array.isArray(routing) ? routing.find((item) => item?.eventType === event.type) : null;
   return {
-    titleTemplate: String(source?.titleTemplate || '').trim(),
-    bodyTemplate: String(source?.bodyTemplate || '').trim(),
+    enabled: source?.enabled === true,
+    titleTemplate: text(source?.titleTemplate) || text(event.defaultTitle) || event.title,
+    bodyTemplate: text(source?.bodyTemplate) || text(event.defaultBody),
   };
 }
 
@@ -125,27 +138,159 @@ async function openDeliverySettings() {
   return layer;
 }
 
-function editPolicy(root, routing, event) {
-  const current = normalizedPolicy(routing, event.type);
-  const layer = mountModal(document.body, modal(`
-    <form class="form-grid" data-notification-policy-form>
-      ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate, required: true })}
-      ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 5, required: true })}
-      <div class="muted">Доступно: {{date}}, {{time}}, {{workplace}}, {{person.name}}, {{person.surname}}</div>
-      ${button('Сохранить', { type: 'submit' })}
-    </form>
-  `, { title: event.title, variant: 'q', surface: 'app' }));
+function renderTemplate(template, values = PREVIEW_VALUES) {
+  return String(template || '').replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path) => {
+    const value = String(path || '').split('.').reduce((current, key) => current && typeof current === 'object' ? current[key] : '', values);
+    return String(value ?? '');
+  });
+}
 
-  layer?.querySelector('[data-notification-policy-form]')?.addEventListener('submit', async (submitEvent) => {
-    submitEvent.preventDefault();
-    const form = submitEvent.currentTarget;
+function previewMarkup(titleTemplate, bodyTemplate) {
+  const title = renderTemplate(titleTemplate);
+  const body = renderTemplate(bodyTemplate);
+  return `<div data-notification-preview>${messageBubble({
+    direction: 'outbound',
+    body: [title, body].filter(Boolean).join('\n\n'),
+  }, { viewer: 'profile' })}</div>`;
+}
+
+function editorSignature(form) {
+  if (!form) return '';
+  const data = new FormData(form);
+  return JSON.stringify([
+    String(data.get('titleTemplate') || ''),
+    String(data.get('bodyTemplate') || ''),
+  ]);
+}
+
+function editorMarkup(event, current) {
+  const variableText = (Array.isArray(event.variables) ? event.variables : [])
+    .map((value) => `{{${escapeHtml(value)}}}`)
+    .join(', ');
+  return `${workspaceHeaderContext({ title: event.title })}
+    ${v2Section('Предпросмотр', previewMarkup(current.titleTemplate, current.bodyTemplate))}
+    ${v2Section('Сообщение', `
+      <form class="form-grid" data-notification-policy-form>
+        ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate, required: true })}
+        ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 7, required: true })}
+        ${variableText ? `<div class="muted">Доступно: ${variableText}</div>` : ''}
+        <div class="muted" data-notification-editor-status aria-live="polite"></div>
+        <button type="button" class="v2-workspace-source-hidden" data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="false" aria-label="Сохранить сообщение">Сохранить</button>
+      </form>
+    `)}`;
+}
+
+function openEditor(root, routing, event) {
+  const current = policyFor(routing, event);
+  const layer = mountV2ZLayer(root, v2ZLayer(editorMarkup(event, current), { className: 'notification-editor-z' }), { stack: true });
+  if (!layer) return null;
+
+  const form = layer.querySelector('[data-notification-policy-form]');
+  const preview = layer.querySelector('[data-notification-preview]');
+  const primary = layer.querySelector('[data-v2-primary-action]');
+  const status = layer.querySelector('[data-notification-editor-status]');
+  const initial = editorSignature(form);
+
+  const redraw = () => {
+    if (!form) return;
     const data = new FormData(form);
-    await saveNotificationRouting(event.type, {
-      titleTemplate: data.get('titleTemplate'),
-      bodyTemplate: data.get('bodyTemplate'),
+    if (preview) {
+      preview.innerHTML = messageBubble({
+        direction: 'outbound',
+        body: [
+          renderTemplate(data.get('titleTemplate')),
+          renderTemplate(data.get('bodyTemplate')),
+        ].filter(Boolean).join('\n\n'),
+      }, { viewer: 'profile' });
+    }
+    if (primary) primary.dataset.v2PrimaryVisible = editorSignature(form) !== initial ? 'true' : 'false';
+    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  };
+
+  form?.addEventListener('input', redraw);
+  primary?.addEventListener('click', () => form?.requestSubmit());
+  form?.addEventListener('submit', async (submitEvent) => {
+    submitEvent.preventDefault();
+    if (!form) return;
+    if (primary) primary.disabled = true;
+    if (status) status.textContent = 'Сохраняем…';
+    const data = new FormData(form);
+    try {
+      await saveNotificationRouting(event.type, {
+        titleTemplate: data.get('titleTemplate'),
+        bodyTemplate: data.get('bodyTemplate'),
+      });
+      layer.v2Close?.();
+      await render(root);
+    } catch (error) {
+      if (primary) primary.disabled = false;
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить сообщение';
+      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    }
+  });
+  redraw();
+  return layer;
+}
+
+function groupedEvents(catalog = []) {
+  const groups = new Map();
+  for (const event of Array.isArray(catalog) ? catalog : []) {
+    const group = text(event?.group) || 'Другие';
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(event);
+  }
+  return groups;
+}
+
+function eventRow(event, policy) {
+  return `<div class="app-notification-row" data-notification-row="${escapeHtml(event.type)}">
+    <input type="checkbox" data-notification-enabled="${escapeHtml(event.type)}" aria-label="Отправлять: ${escapeHtml(event.title)}" ${policy.enabled ? 'checked' : ''}>
+    <span data-notification-open="${escapeHtml(event.type)}" role="button" tabindex="0" aria-label="Редактировать: ${escapeHtml(event.title)}">
+      <strong>${escapeHtml(event.title)}</strong>
+      ${event.description ? `<small>${escapeHtml(event.description)}</small>` : ''}
+    </span>
+  </div>`;
+}
+
+function catalogMarkup(catalog, routing) {
+  return [...groupedEvents(catalog).entries()].map(([group, events]) => v2Section(
+    group,
+    `<div class="app-notification-list">${events.map((event) => eventRow(event, policyFor(routing, event))).join('')}</div>`,
+  )).join('');
+}
+
+function bindCatalog(root, host, catalog, routing) {
+  const byType = new Map(catalog.map((event) => [event.type, event]));
+  host.querySelectorAll('[data-notification-enabled]').forEach((checkbox) => {
+    checkbox.addEventListener('click', (event) => event.stopPropagation());
+    checkbox.addEventListener('change', async () => {
+      const type = checkbox.dataset.notificationEnabled || '';
+      const previous = !checkbox.checked;
+      checkbox.disabled = true;
+      try {
+        const saved = await setNotificationEnabled(type, checkbox.checked);
+        const policy = routing.find((item) => item?.eventType === type);
+        if (policy) policy.enabled = saved?.enabled === true;
+        else routing.push(saved);
+      } catch {
+        checkbox.checked = previous;
+      } finally {
+        checkbox.disabled = false;
+      }
     });
-    layer?.remove();
-    await render(root);
+  });
+
+  const open = (node) => {
+    const event = byType.get(node.dataset.notificationOpen || '');
+    if (event) openEditor(root, routing, event);
+  };
+  host.querySelectorAll('[data-notification-open]').forEach((node) => {
+    node.addEventListener('click', () => open(node));
+    node.addEventListener('keydown', (event) => {
+      if (!['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      open(node);
+    });
   });
 }
 
@@ -164,20 +309,16 @@ export async function render(root) {
   root.querySelector('[data-notification-delivery-settings-open]')?.addEventListener('click', () => void openDeliverySettings());
 
   const host = root.querySelector('[data-notification-routing]');
-  if (host) host.innerHTML = emptyState('Загрузка', 'Загружаем сообщения.');
+  if (host) host.innerHTML = emptyState('Загрузка', 'Загружаем уведомления.');
 
   try {
-    const routing = await getNotificationRouting();
+    const [catalog, routing] = await Promise.all([
+      getNotificationCatalog(),
+      getNotificationRouting(),
+    ]);
     if (!host) return;
-    host.innerHTML = v2ListEntries(EVENTS.map((event, index) => v2ListEntry({
-      title: event.title,
-      subtitle: event.body,
-      data: `data-notification-event="${index}"`,
-    })));
-    host.querySelectorAll('[data-notification-event]').forEach((node) => node.addEventListener('click', () => {
-      const event = EVENTS[Number(node.dataset.notificationEvent)];
-      if (event) editPolicy(root, routing, event);
-    }));
+    host.innerHTML = catalogMarkup(catalog, routing);
+    bindCatalog(root, host, catalog, routing);
   } catch (error) {
     if (host) host.innerHTML = emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить уведомления.');
   }
