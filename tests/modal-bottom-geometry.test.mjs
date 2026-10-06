@@ -49,7 +49,7 @@ assert.match(v2,/closeExistingApplicationModal\(\)/);
 assert.match(v2,/document\.addEventListener\('click', handleOutsideClick, true\)/);
 assert.match(v2,/event\.stopImmediatePropagation\(\)/);
 assert.match(v2,/\.v2-header__slot--c \.v2-header__control/);
-assert.match(v2,/lockModalHeader\(app, \{ allowC: qLayer \}\)/);
+assert.match(v2,/lockModalHeader\(app, \{ allowC: true \}\)/);
 assert.match(css,/\.v2-layer-portal--viewport\{position:fixed/);
 assert.match(modals,/openNotice\(\{ title = 'Внимание', message = '', surface = 'app'/);
 assert.match(modals,/modal\(content, \{ variant: 's', surface, title \}\)/);
