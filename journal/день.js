@@ -35,9 +35,13 @@ export function renderJournalDay(root, {
   workplaceId = '',
   onChange = () => {},
   onWorkplaceFieldClick = () => {},
+  navigationRoot = null,
 } = {}) {
-  root.innerHTML = '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
-  initDateNavigator(root.querySelector('[data-journal-day-navigator]'), { date, onChange });
+  root.innerHTML = navigationRoot
+    ? '<div data-journal-day-content></div>'
+    : '<div data-journal-day-navigator></div><div data-journal-day-content></div>';
+  const navigatorRoot = navigationRoot || root.querySelector('[data-journal-day-navigator]');
+  if (navigatorRoot) initDateNavigator(navigatorRoot, { date, onChange });
   const contentRoot = root.querySelector('[data-journal-day-content]');
   const workplaces = getWorkplaces();
   const dayDate = dateKey(date);
@@ -83,7 +87,7 @@ export function renderJournalDay(root, {
   if (!time) { contentRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>'; return; }
   const usages = withFinancialState(getTimeUsagesForScope({ date: dayDate, workplaceId }));
   const usageById = new Map(usages.map((usage) => [String(usage?.sourceId || usage?.id || ''), usage]));
-  const rerender = () => renderJournalDay(root, { date, workplaceId, onChange, onWorkplaceFieldClick });
+  const rerender = () => renderJournalDay(root, { date, workplaceId, onChange, onWorkplaceFieldClick, navigationRoot });
 
   contentRoot.innerHTML = journalDayTimeline({ from: time.from, to: time.to, usages });
   initJournalDayTimeline(contentRoot, {
