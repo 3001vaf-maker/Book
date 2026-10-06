@@ -1143,9 +1143,9 @@ ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not en
 
 mark('service-z2-procedure');
 await openF(6,'service');
-await tapAndOpen(fDeck(), fCard('settings'), 20, 'settings-service-root');
-ok(shell()?.classList.contains('is-e-open'), 'Settings did not open E for Service');
-await tapAndOpen(eDeck(), eCard('service'), 21, 'settings-service');
+await tapAndOpen(fDeck(), fCard('service'), 20, 'service-root');
+ok(!shell()?.classList.contains('is-deck-open'), 'Service standalone F did not enter Z directly');
+ok(!shell()?.classList.contains('is-e-open'), 'Service standalone F must not open Settings E');
 await wait(120);
 const serviceSurface = shell()?.querySelector('[data-v2-workspace-surface]');
 const procedureEntry = serviceSurface?.querySelector('[data-procedure="runtime-journal-procedure"]');
