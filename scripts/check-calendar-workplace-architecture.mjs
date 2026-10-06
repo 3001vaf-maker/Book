@@ -17,6 +17,17 @@ function walkCss(dir) {
   return result;
 }
 
+function walkJs(dir) {
+  const result = [];
+  for (const name of readdirSync(join(root, dir))) {
+    const path = join(root, dir, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) result.push(...walkJs(relative(root, path)));
+    else if (name.endsWith('.js') || name.endsWith('.mjs')) result.push(relative(root, path).replaceAll('\\', '/'));
+  }
+  return result;
+}
+
 const workplaceData = read('core/profile/workplaces/data.js');
 const workplaceEditor = read('core/profile/workplaces/workplaces.js');
 const workplaceUi = read('ui/workplaces/index.js');
@@ -39,6 +50,16 @@ const recordService = read('core/record/service.js');
 const timeUsage = read('core/time/usage.js');
 const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
+const allRuntimeJs = [
+  'core.js',
+  ...walkJs('chat'),
+  ...walkJs('core'),
+  ...walkJs('journal'),
+  ...walkJs('online-booking'),
+  ...walkJs('settings'),
+  ...walkJs('timetable'),
+  ...walkJs('ui'),
+];
 
 if (!/color:\s*String\(workplace\.color/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'Workplace must own its color field');
 if (!/indicatorColor:\s*workplace\.color\s*\|\|\s*WORKPLACE_FALLBACK_COLOR/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'missing Workplace color must resolve to the canonical black indicator fallback');
@@ -48,8 +69,11 @@ if (!/colorPicker\(\{name:'workplaceColor'[^}]*required:true/.test(workplaceEdit
 if (!/resolveDateIndicators/.test(calendarUi) || !/calendar__date-indicator/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar must own generic date indicator manifestation');
 if (!/mode\s*===\s*['"]date['"]\s*\?\s*dateIndicatorsMarkup/.test(calendarUi)) fail('ui/calendar/calendar.js', 'date indicators must belong to the full Calendar and stay out of MonthDayPicker mode');
 if (/outline:2px|#C9A895|#DCC4B4/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar date visual states must not be hardcoded inline; Shared Calendar CSS is the sole owner');
-if (!/\.calendar__month-button\{[^}]*width:48px;[^}]*height:48px;[^}]*border:2px solid var\(--border\);[^}]*border-radius:8px;[^}]*background:transparent;[^}]*font-size:24px/s.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation arrows must be 48x48 with 24px glyph, 8px radius, transparent fill and 2px shared-border outline');
-if (!/\.calendar__month\{[^}]*font-size:16px;[^}]*font-weight:700/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar month heading must remain 16px / 700');
+if (!/function\s+calendarHeader\s*\(/.test(calendarUi) || !/export function dateNavigator[\s\S]*return calendarHeader\(/.test(calendarUi) || !/return `<section class="calendar"[\s\S]*\$\{calendarHeader\(/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar and DateNavigator must share the single calendarHeader() navigation primitive');
+if (!/\.calendar__header\{[^}]*grid-template-columns:36px minmax\(0,1fr\) 36px;[^}]*gap:4px;[^}]*margin:0/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation header must centrally own 36px controls with 4px gap');
+if (!/\.calendar__month-button\{[^}]*width:36px;[^}]*height:36px;[^}]*border:1px solid var\(--border\);[^}]*border-radius:8px;[^}]*background:transparent;[^}]*font-size:18px/s.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation arrows must be 36x36 with 18px glyph, 8px radius, transparent fill and 1px shared-border outline');
+if (!/\.calendar__month\{[^}]*font-size:14px;[^}]*font-weight:700/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation label must remain 14px / 700');
+if (/calendar__header--|:has\(\[data-date-navigator-/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation geometry must have no compact/feature-specific variant; one Shared rule applies everywhere');
 if (!/\.calendar__weekdays span\{[^}]*font-size:12px;[^}]*font-weight:650/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar weekday heading must remain 12px / 650');
 if (!/\.calendar__grid\{[^}]*grid-auto-rows:minmax\(74px,auto\);[^}]*gap:2px/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar cells must keep 74px minimum height and 2px grid gap');
 if (!/\.calendar__date:not\(\.is-neighbor\)\{[^}]*border:1px solid var\(--border\);[^}]*background:var\(--white\)/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Current-month Calendar cells must own the shared white surface and 1px border');
@@ -63,7 +87,13 @@ if (!/\.calendar__date-content\{[^}]*font-size:11px/.test(calendarCss)) fail('ui
 if (!/\.calendar__date-indicator\{[^}]*width:7px;[^}]*height:7px;[^}]*border:1px solid rgba\(0,0,0,.18\);[^}]*border-radius:50%/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar indicator must remain a 7x7 circle with the canonical border');
 for (const path of allCss) {
   if (path === 'ui/calendar/calendar.css') continue;
-  if (/\.calendar__(?:month-button|month\b|weekdays\b|grid\b|date(?:\b|[.:])|date-number\b|date-content\b|date-indicator\b)/.test(read(path))) fail(path, 'Shared Calendar visual presentation belongs only to ui/calendar/calendar.css');
+  if (/\.calendar__(?:header\b|month-button|month\b|weekdays\b|grid\b|date(?:\b|[.:])|date-number\b|date-content\b|date-indicator\b)/.test(read(path))) fail(path, 'Shared Calendar visual presentation belongs only to ui/calendar/calendar.css');
+}
+for (const path of allRuntimeJs) {
+  if (path.startsWith('ui/calendar/')) continue;
+  const source = read(path);
+  if (/calendar__header--|calendar__month-button|calendar__month\b/.test(source)) fail(path, 'Feature/runtime code must not select or create a Calendar navigation visual variant');
+  if (/classList\.(?:add|remove|toggle)\([^)]*calendar__/.test(source)) fail(path, 'Feature/runtime code must not mutate Shared Calendar classes');
 }
 
 if (!/indicatorColor/.test(listUi) || !/ui-list__indicator/.test(listUi)) fail('ui/lists/list.js', 'generic List must support a generic color indicator');
@@ -133,6 +163,7 @@ if (!/mountModal/.test(journalWorkplaceControl) || !/select\(\{/.test(journalWor
 if (!/График дня/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only the Journal day-schedule aggregate semantics');
 if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
 if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
+if (/calendar__header--|classList\.(?:add|remove|toggle)\([^)]*calendar__/.test(journalMonth)) fail('journal/месяц.js', 'Journal may relocate the Shared Calendar header but must not alter its classes or geometry');
 
 if (!/export function getJournalTimeUsages/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must expose occupancy facts, not Core conflict decisions');
 if (!/rigidity:\s*'hard'/.test(journalTimeUsage) || !/rigidity:\s*'soft'/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must classify Record as hard and Break as soft');
