@@ -1,5 +1,6 @@
 import { text } from './html.js';
 import { initV2Swipe } from './swipe.js';
+import { bindV2ZDismissAffordance, v2ZDismissAffordance } from './z-affordance.js';
 
 function syncV2ZStackInteraction(app, host) {
   if (!app || !host) return;
@@ -14,7 +15,7 @@ function syncV2ZStackInteraction(app, host) {
 }
 
 export function v2ZLayer(content = '', { className = '' } = {}) {
-  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${content}</main>`;
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer>${v2ZDismissAffordance()}${content}</main>`;
 }
 
 export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
@@ -65,12 +66,14 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
     ],
   });
   let disposeSwipe = () => {};
+  let disposeDismissAffordance = () => {};
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     contextObserver.disconnect();
     disposeSwipe();
+    disposeDismissAffordance();
     if (node.isConnected) node.remove();
     app?.classList.toggle('has-z-layer', Boolean(host.querySelector('[data-v2-z-layer]')));
     syncV2ZStackInteraction(app, host);
@@ -84,6 +87,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   node.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-v2-z-close]')) close();
   });
+  disposeDismissAffordance = bindV2ZDismissAffordance(node, { onDismiss: close });
   disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 });
   node.v2Dispose = dispose;
   node.v2Close = close;
