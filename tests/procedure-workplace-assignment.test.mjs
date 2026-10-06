@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { assignProceduresToWorkplace } from '../settings/service/procedures/service.js';
-import { getProcedures, hydrateProceduresFromServer } from '../settings/service/procedures/data.js';
+import { assignProceduresToWorkplace } from '../core/service/procedures/service.js';
+import { getProcedures, hydrateProceduresFromServer } from '../core/service/procedures/data.js';
 
 const store = new Map();
 globalThis.localStorage = {
@@ -63,7 +63,7 @@ const repeated = assignProceduresToWorkplace({
 assert.equal(repeated.length, 0);
 assert.equal(localStorage.getItem('book.procedures.history'), null);
 
-const procedureServiceSource = readFileSync(new URL('../settings/service/procedures/service.js', import.meta.url), 'utf8');
+const procedureServiceSource = readFileSync(new URL('../core/service/procedures/service.js', import.meta.url), 'utf8');
 assert.match(procedureServiceSource, /pushProcedureHistory\(previous, 'updated'\)/);
 
 const recordSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
