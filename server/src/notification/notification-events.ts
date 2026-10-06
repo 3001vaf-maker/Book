@@ -46,6 +46,15 @@ export const NOTIFICATION_EVENT_CATALOG: readonly NotificationEventDefinition[] 
     variables: ['date', 'time', 'workplace', 'person.name', 'person.surname'],
   },
   {
+    type: 'booking.no-show',
+    group: 'Запись',
+    title: 'Неявка на запись',
+    description: 'После отметки неявки',
+    defaultTitle: 'Запись не состоялась',
+    defaultBody: 'Запись {{date}} в {{time}} отмечена как не состоявшаяся.',
+    variables: ['date', 'time', 'workplace', 'person.name', 'person.surname'],
+  },
+  {
     type: 'booking.reminder',
     group: 'Запись',
     title: 'Напоминание о записи',
