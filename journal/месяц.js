@@ -68,13 +68,14 @@ function dateContent(data) {
   return `${fill}${count}`;
 }
 
-export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {} } = {}) {
+export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {}, navigationRoot = null } = {}) {
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
     root.innerHTML = '<div data-journal-month-calendar></div>';
     const workingDays = getWorkingDays();
     const workplaces = getWorkplaces();
     const allMode = workplaceId === ALL_WORKPLACES_ID;
-    initCalendar(root.querySelector('[data-journal-month-calendar]'), {
+    const calendarRoot = root.querySelector('[data-journal-month-calendar]');
+    initCalendar(calendarRoot, {
       month,
       workingDates: allMode ? getAllWorkingDates(workingDays, month) : getWorkingDates(workingDays, workplaceId, month),
       renderDateContent: ({ dateKey, isCurrentMonth }) => {
@@ -91,6 +92,13 @@ export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () =
       },
       onMonthChange: (nextMonth) => render(nextMonth),
     });
+    if (navigationRoot) {
+      const header = calendarRoot.querySelector('.calendar__header');
+      if (header) {
+        header.classList.add('calendar__header--compact');
+        navigationRoot.replaceChildren(header);
+      }
+    }
   };
 
   render();
