@@ -1,4 +1,5 @@
 import { text, dataAttributes } from './html.js';
+import { v2ZDismissAffordance } from './z-affordance.js';
 
 export function v2Shell({
   header = '',
@@ -19,10 +20,10 @@ export function v2Shell({
       ${feDeck}
       <div class="v2-front" data-v2-front>
         <main class="v2-z" ${zData}>
-${body}
+${v2ZDismissAffordance()}${body}
 </main>
       </div>
-      <div class="v2-edge-swipe-zone" data-v2-edge-swipe aria-hidden="true"></div>
+      <div class="v2-edge-swipe-zone" data-v2-edge-swipe aria-hidden="true" style="top:20px"></div>
     </div>
   </section>`;
 }
