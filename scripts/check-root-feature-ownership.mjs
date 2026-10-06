@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { v2CardDeck } from '../ui/v2/card-deck.js';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const self = relative(root, fileURLToPath(import.meta.url)).replaceAll('\\', '/');
@@ -36,6 +37,18 @@ assert.doesNotMatch(rootSections, /id:\s*'chat'/, 'D Chat must not become an F r
 assert.match(core, /state\.activeSection === 'chat' \? state\.lastRootSection : state\.activeSection/);
 assert.match(core, /book:record-chat-request/);
 assert.match(core, /renderChat\(layer/);
+
+const rootDeckProbe = v2CardDeck(
+  ['people', 'finance', 'inventory', 'timetable', 'journal', 'profile', 'service', 'settings']
+    .map((id) => ({ id, label: id })),
+  { data: 'data-root-capacity-probe', level: 'f' },
+);
+assert.equal(
+  (rootDeckProbe.match(/data-root-capacity-probe=/g) || []).length,
+  8,
+  'Shared F CardDeck must render every real root section and must not silently truncate the deck',
+);
+assert.match(rootDeckProbe, /data-root-capacity-probe="settings"/);
 
 const textExtensions = new Set(['.js', '.mjs', '.ts', '.md', '.json', '.yml', '.yaml', '.html', '.css']);
 const excluded = new Set(['.git', 'node_modules']);
