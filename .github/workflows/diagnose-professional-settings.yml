@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run professional browser and print active F/E on failure
+      - name: Inspect Settings access at browser failure
         shell: bash
         run: |
           set -euo pipefail
@@ -20,23 +20,11 @@ jobs:
           from pathlib import Path
           path = Path('tests/professional-core-runtime-browser.html')
           text = path.read_text()
-          old = """  if (!target) {
-            ok(false, label + ' target card missing before selection');
-            return;
-          }"""
-          new = """  if (!target) {
-            const accessDebug = await import('/core/access.js');
-            const settingsDebug = await import('/settings/settings.js');
-            const capabilitiesDebug = (accessDebug.getBookAccess()?.capabilities || []).map((item) => item.key + ':' + item.enabled).join('|');
-            const settingsItemsDebug = settingsDebug.settingsNavigationItems().map((item) => item.id).join('|');
-            result.textContent = 'MISSING ' + label + ' SETTINGS=' + settingsItemsDebug + ' CAPS=' + capabilitiesDebug;
-            document.documentElement.dataset.professionalRuntimeStage = 'missing-' + label;
-            ok(false, label + ' target card missing before selection');
-            return;
-          }"""
-          if old not in text:
-              raise SystemExit('tapAndOpen missing-target block not found')
-          path.write_text(text.replace(old, new, 1))
+          needle = """if (!target) {\n    ok(false, label + ' target card missing before selection');\n    return;\n  }"""
+          replacement = """if (!target) {\n    const accessDebug = await import('/core/access.js');\n    const settingsDebug = await import('/settings/settings.js');\n    const caps = (accessDebug.getBookAccess()?.capabilities || []).map((item) => `${item.key}:${item.enabled}`).join('|');\n    const items = settingsDebug.settingsNavigationItems().map((item) => item.id).join('|');\n    result.textContent = `MISSING ${label} SETTINGS=${items} CAPS=${caps}`;\n    document.documentElement.dataset.professionalRuntimeStage = 'missing-' + label;\n    ok(false, label + ' target card missing before selection');\n    return;\n  }"""
+          if needle not in text:
+              raise SystemExit('diagnostic insertion point not found')
+          path.write_text(text.replace(needle, replacement, 1))
           PY
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
           pid=$!
@@ -45,9 +33,4 @@ jobs:
           chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           "$chrome" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --window-size=390,844 --force-device-scale-factor=1 --touch-events=enabled --virtual-time-budget=12000 --dump-dom http://127.0.0.1:4173/tests/professional-core-runtime-browser.html > /tmp/dom.html || true
           grep -o 'data-professional-runtime-stage="[^"]*"' /tmp/dom.html || true
-          echo 'ROOT CARDS:'
-          grep -o 'data-v2-root-item="[^"]*"' /tmp/dom.html | sort -u || true
-          echo 'SECONDARY CARDS:'
-          grep -o 'data-v2-secondary-item="[^"]*"' /tmp/dom.html | sort -u || true
-          echo 'RESULT:'
           grep -A2 -B1 '<pre id="result"' /tmp/dom.html || true
