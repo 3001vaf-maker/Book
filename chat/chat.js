@@ -21,9 +21,11 @@ import {
   v2ListEntry,
   modal,
   mountModal,
+  mountV2ZLayer,
   openNotice,
   select,
   textareaField,
+  v2ZLayer,
   workspaceHeaderContext,
 } from '../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer } from '../ui/chat/index.js';
@@ -76,6 +78,12 @@ function peopleList() {
 
 function personByKey(key) {
   return peopleList().find((person) => String(person.key) === String(key)) || null;
+}
+
+function normalizedPersonKeys(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))];
 }
 
 function openProfessionalContacts(root, state) {
@@ -143,7 +151,7 @@ async function renderCompose(root, state, recipient) {
         ],
       });
   renderChatSurface(root, {
-    title: 'Новое сообщение',
+    title: recipient.mode === 'many' ? 'Групповой чат' : 'Новое сообщение',
     c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
     d: allowsAttachments ? { kind: 'attachment', data: 'data-profile-compose-attachment', aria: 'Вложения' } : null,
     body: `
@@ -425,8 +433,33 @@ async function renderThreads(root, state) {
   }
 }
 
-export function renderChat(root, { personKey = '' } = {}) {
+function openRecordGroupChat(personKeys = []) {
+  const keys = normalizedPersonKeys(personKeys);
+  if (keys.length < 2) return false;
+  const app = document.querySelector('#app') || document.body;
+  const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
+  if (!layer) return true;
+  const state = { view: 'compose', thread: null, recipient: null };
+  void renderCompose(layer, state, { mode: 'many', personKeys: keys });
+  return true;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('book:record-chat-request', (event) => {
+    const keys = normalizedPersonKeys(event?.detail?.personKeys);
+    if (keys.length < 2) return;
+    event.stopImmediatePropagation();
+    openRecordGroupChat(keys);
+  }, { capture: true });
+}
+
+export function renderChat(root, { personKey = '', personKeys = [] } = {}) {
   const state = { view: 'threads', thread: null, recipient: null };
+  const keys = normalizedPersonKeys(personKeys);
+  if (keys.length > 1) {
+    void renderCompose(root, state, { mode: 'many', personKeys: keys });
+    return;
+  }
   const person = personKey ? personByKey(personKey) : null;
   if (person && phoneOf(person)) {
     void openThread(root, state, {
