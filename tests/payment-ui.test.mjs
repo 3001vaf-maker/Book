@@ -100,9 +100,10 @@ assert.match(paymentSource, /priceInput[^\n]*currentState\(priceInput\)/);
 assert.match(paymentSource, /percentInput[^\n]*addEventListener\('change'/);
 assert.match(paymentSource, /moneyInput[^\n]*addEventListener\('input'/);
 assert.match(paymentSource, /onChange\?\.\(result\)/);
-assert.match(methodsSource, /const applied = Math\.min\(Math\.max\(0, total\), received\)/);
+assert.match(methodsSource, /const due = Math\.max\(0, numberValue\(total\)\)/);
+assert.match(methodsSource, /const applied = Math\.min\(due, received\)/);
 assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
-assert.match(methodsSource, /const remaining = Math\.max\(0, total - applied\)/);
+assert.match(methodsSource, /const remaining = Math\.max\(0, due - applied\)/);
 assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
 
 assert.match(paymentSource, /miniCard/);
