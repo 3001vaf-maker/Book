@@ -78,7 +78,7 @@ if (!/DATABASE_WAIT_ATTEMPTS/.test(databaseWait)
 
 if (errors.length) {
   console.error('runtime lifecycle check: FAILED');
-  for (const error of errors) console.error(`- ${error}`));
+  for (const error of errors) console.error(`- ${error}`);
   process.exit(1);
 }
 
