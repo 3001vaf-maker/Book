@@ -16,14 +16,19 @@ const html = paymentForm({
   total: 9250,
 });
 
-assert.match(html, /data-read-only-sheet/);
+assert.match(html, /data-payment-sections/);
+assert.match(html, /data-v2-z-body-sections/);
+assert.match(html, /payment-summary-mini-card/);
 assert.doesNotMatch(html, /payment-record-summary|payment-procedure__|payment-methods__/);
 assert.match(html, /Рабочее пространство/);
-assert.match(html, /11\.09\.26 - 12:00 - 13:00/);
+assert.match(html, />11\.09\.26</);
+assert.match(html, />12:00 - 13:00</);
 assert.match(html, /0278 Наталья Гусева/);
-assert.match(html, /<span>К оплате<\/span><strong>9 250 ₽<\/strong>/);
+assert.match(html, />К оплате</);
+assert.match(html, />9 250 ₽</);
 assert.equal((html.match(/data-payment-procedure="/g) || []).length, 2);
 assert.match(html, /Очень длинное название процедуры без сокращения/);
+assert.match(html, /payment-item-head/);
 assert.match(html, /data-payment-price/);
 assert.match(html, /data-payment-discount-percent/);
 assert.match(html, /data-payment-discount-money/);
@@ -54,7 +59,6 @@ assert.match(methodsHtml, /data-payment-allocation-row="0"/);
 assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
-assert.match(methodsHtml, /data-payment-tips-row hidden/);
 assert.match(methodsHtml, /data-payment-tips-row hidden/);
 assert.match(methodsHtml, />Сохранить</);
 assert.doesNotMatch(methodsHtml, /data-payment-mode|Разделить/);
@@ -101,11 +105,16 @@ assert.match(methodsSource, /const tips = Math\.max\(0, received - applied\)/);
 assert.match(methodsSource, /const remaining = Math\.max\(0, total - applied\)/);
 assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
 
-assert.match(paymentSource, /readOnlyReceipt/);
+assert.match(paymentSource, /miniCard/);
+assert.match(paymentSource, /v2ZBodySections/);
+assert.match(paymentSource, /payment-summary-mini-card/);
 assert.match(methodsSource, /readOnlyReceipt/);
 assert.match(methodsSource, /field\(\{[\s\S]*label: 'Сумма'/);
-assert.match(paymentCss, /\.payment-edit-grid\{/);
-assert.doesNotMatch(paymentCss, /payment-record-summary|payment-procedure|payment-methods|payment-allocation|font-size|min-height|padding|border-radius/);
+assert.match(paymentCss, /\.payment-summary-mini-card \.mini-card__lines\{/);
+assert.match(paymentCss, /grid-template-rows:auto auto 8px auto 8px auto/);
+assert.match(paymentCss, /\.payment-item-section\{display:grid;gap:8px/);
+assert.match(paymentCss, /\.payment-item-head\{/);
+assert.match(paymentCss, /\.payment-edit-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 assert.doesNotMatch(paymentSource, /payment-record-summary|payment-procedure__|payment-methods__/);
 assert.doesNotMatch(methodsSource, /payment-allocation-block|payment-methods__/);
 
@@ -119,11 +128,14 @@ assert.doesNotMatch(journalDaySource, /openRecordPaymentEntry/);
 assert.match(recordPaymentSource, /export function openRecordPayment/);
 assert.match(recordPaymentSource, /className: 'record-payment-z'/);
 assert.match(recordPaymentSource, /title: 'Оплата'/);
+assert.match(recordPaymentSource, /settingsTag:\s*true/);
+assert.match(recordPaymentSource, /hideD:\s*false/);
 assert.match(recordPaymentSource, /showActions: false/);
 assert.match(recordPaymentSource, /label: 'Сохранить'/);
 assert.match(recordPaymentSource, /label: 'Оплатить'/);
 assert.match(recordPaymentSource, /const canPay = state\.remaining > 0\.009 \|\| state\.fullyPaid/);
 assert.match(recordPaymentSource, /data-record-payment-chat/);
+assert.match(recordPaymentSource, /personKeys:/);
 
 for (const action of [
   "id: 'correct-payment'",
@@ -149,6 +161,8 @@ assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryCon
 
 assert.match(recordPaymentSource, /blankPaymentContext\(\)/);
 assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), total, showAction: false, showTotal: false \}\)/);
+assert.match(recordPaymentSource, /serviceAmount:\s*allocationState\.applied/);
+assert.match(recordPaymentSource, /tips:\s*allocationState\.tips/);
 assert.match(recordPaymentSource, /setRecordPrimaryAction\(layer, \{\s*label: 'Оплатить'/s);
 assert.match(recordPaymentSource, /occurredAtForDate/);
 assert.match(recordPaymentSource, /zonedDateTimeToDate/);
