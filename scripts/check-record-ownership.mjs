@@ -36,7 +36,6 @@ const sharedRecordUi = read('ui/record/runtime.js');
 const sharedRecordCss = read('ui/record/record.css');
 const sharedInputsCss = read('ui/inputs/inputs.css');
 
-
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
   errors.push('core/record/data.js: Record data must remain persistence-only');
 }
@@ -244,7 +243,6 @@ for (const [path, source] of [
   }
 }
 
-
 if (/\.record-modal--|\.record-editor-|\.record-card-|\.entity-card--record|\.record-setting-|\.record-time-slot|\.record-confirm-(?:card|summary|actions|procedure)|\.record-view(?:\{|-(?:card|actions|services))|\.record-record-services|\.record-reset|\.record-delete-button|\.record-modal-(?:next|actions)|\.record-next-top|\.record-procedure-row|\.record-screen--(?:confirmation|settings)/.test(sharedRecordCss)) {
   errors.push('Retired Record modal/editor CSS must not return; Record uses Shared Z, Shared Modal, Shared List, Shared Time and Shared Mini Card owners');
 }
@@ -277,7 +275,6 @@ for (const path of [...walk('journal'), ...walk('core/people'), ...walk('core/fi
   }
 }
 
-
 const recordStartTimesSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function recordStartTimes'),
   journalRecordUi.indexOf('function openRecordTimeNotice')
@@ -302,12 +299,30 @@ if (!/openRecordEditFlow\(/.test(journalRecordViewUi)
   || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
   errors.push('Existing specialist Record must delegate exact-time correction to the shared edit flow and stay independent from online-booking slotStep');
 }
+if (!/isRecordEditClass/.test(sharedRecordUi)
+  || !/mountRecordQ/.test(sharedRecordUi)
+  || !/title\s*!==\s*'Выбор времени'/.test(sharedRecordUi)
+  || !/v2QFrame/.test(sharedRecordUi)
+  || !/if\s*\(isRecordEditClass\(className\)\)\s*closeRecordEditQ\(\)/.test(sharedRecordUi)) {
+  errors.push('Record correction must use Shared Q for workplace/date/procedures, keep exact-time correction as the only Z+ step, and close the previous Q before exact time');
+}
+if (!/workplaceCardAppearance\(workplace\)/.test(sharedEditFlowSource)
+  || !/workplaceCardFields\(workplace,\s*profile\)/.test(sharedEditFlowSource)
+  || !/workplaceCardPhoto\(workplace\)/.test(sharedEditFlowSource)) {
+  errors.push('Record workplace correction must render the canonical Profile workplace card data instead of an empty/local card manifestation');
+}
+if (!/chatPersonKey/.test(sharedEditFlowSource)
+  || !/chatPersonKeys/.test(sharedEditFlowSource)
+  || !/chatKeysForState/.test(journalRecordViewUi)) {
+  errors.push('Record correction must preserve the current person/group chat context instead of falling back to an unrelated chat target');
+}
 
 if (!/kind:\s*'avatar'/.test(sharedRecordUi)
-  || !/hideD:\s*!chatPersonKey/.test(sharedRecordUi)
-  || !/d:\s*chatPersonKey\s*\?/.test(sharedRecordUi)
+  || !/hideD:\s*false/.test(sharedRecordUi)
+  || !/d:\s*\{[\s\S]*kind:\s*'chat'/.test(sharedRecordUi)
+  || !/personKeys:\s*normalizedChatKeys\(groupPersonKeys\)/.test(sharedRecordUi)
   || !/settings\s*\?\s*\{/.test(sharedRecordUi)) {
-  errors.push('Shared Record Header must always own A as avatar/photo, expose settings only by context, and show D only after a person is fixed');
+  errors.push('Shared Record Header must keep A as avatar/photo, expose settings only by context, and keep D chat visible for general, person and group chat contexts');
 }
 
 const sharedConfirmationSource = sharedRecordUi.slice(
