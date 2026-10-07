@@ -201,13 +201,17 @@ export function mountRecordZ({
   stack = true,
   onClose = null,
   chatPersonKey = '',
+  chatPersonKeys = [],
   aImage = '',
   aImagePosition = '',
   aInitials = '',
 } = {}) {
+  const groupPersonKeys = [...new Set((Array.isArray(chatPersonKeys) ? chatPersonKeys : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))];
   const context = workspaceHeaderContext({
     title,
-    hideD: !chatPersonKey,
+    hideD: false,
     a: {
       kind: 'avatar',
       label: 'Запись',
@@ -223,11 +227,11 @@ export function mountRecordZ({
         aria: 'Запись',
       }),
     },
-    d: chatPersonKey ? {
+    d: {
       kind: 'chat',
       data: 'data-record-owner-chat',
-      aria: 'Чат',
-    } : null,
+      aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
+    },
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
   const layer = mountV2ZLayer(recordSurface(), v2ZLayer(
@@ -236,7 +240,10 @@ export function mountRecordZ({
   ), { stack, onClose });
   layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('book:record-chat-request', {
-      detail: { personKey: String(chatPersonKey || '') },
+      detail: {
+        personKey: String(chatPersonKey || ''),
+        personKeys: groupPersonKeys,
+      },
     }));
   });
   return layer;
