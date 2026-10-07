@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, miniCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
@@ -46,12 +46,13 @@ function groupCapacityForSelectedProcedures(selectedProcedures = []) {
   return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
 }
 
-function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
+function recordOwnerOptions({ settings = false, chatPersonKey = '', chatPersonKeys = [] } = {}) {
   const profile = getProfile();
   const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
   return {
     settings,
     chatPersonKey,
+    chatPersonKeys,
     aImage: String(profile?.photo || ''),
     aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     aInitials: initials,
@@ -537,9 +538,14 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
 }
 
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedPeople = [], selectedProcedures, onCreated }) {
+  const initialChatPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
   modalRoot ||= mountRecordZ({
-    ...recordOwnerOptions({ settings: true, chatPersonKey: selectedPerson?.key || '' }),
-    title: 'Подтверждение записи',
+    ...recordOwnerOptions({
+      settings: true,
+      chatPersonKey: selectedPerson?.key || '',
+      chatPersonKeys: initialChatPeople.map((person) => person?.key || person?.id || '').filter(Boolean),
+    }),
+    title: 'Подтверждение',
     className: 'record-flow-z',
   });
   let currentDate = dateKey(date);
@@ -547,7 +553,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   let currentFrom = from;
   let currentTo = to;
   let currentPerson = selectedPerson;
-  let currentPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
+  let currentPeople = initialChatPeople;
 
   const groupCapacity = () => groupCapacityForSelectedProcedures(selectedProcedures);
   const reconcileGroup = () => {
@@ -850,7 +856,7 @@ function blockEndValues({ date, workplaceId, from }) {
 }
 
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), title: 'Запись - перерыв', className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
   const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-time-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows(values, {
     data: 'data-block-end',
@@ -865,19 +871,17 @@ function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
 }
 
 function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), title: 'Запись - перерыв', className: 'record-flow-z' });
   const host = recordZHost(modalRoot);
   if (!host) return;
-  const workplace = findWorkplaceName(workplaceId);
   const formattedDate = formatConfirmationDate(date);
-  const card = entityCard({
-    title: 'Перерыв',
-    topMeta: [{ value: workplace, row: 1 }],
-    topRightMeta: [
-      { value: formattedDate, row: 2, weight: 'regular' },
-      { value: `${from} - ${to}`, row: 3, weight: 'regular' },
+  const card = miniCard({
+    className: 'record-break-mini-card',
+    lines: [
+      { value: 'Перерыв', strong: true },
+      { value: formattedDate, align: 'right' },
+      { value: `${from} - ${to}`, align: 'right' },
     ],
-    className: 'entity-card--hero entity-card--top-dark',
   });
   host.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
   setRecordPrimaryAction(modalRoot, {
