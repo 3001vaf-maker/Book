@@ -2,6 +2,7 @@ import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { v2QFrame, v2ZBodySections } from '../v2/z-layout.js';
 import { modal, mountModal } from '../modals/index.js';
+import { bindCalendarHeaderHost } from '../calendar/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
@@ -342,24 +343,14 @@ export function mountRecordQ({
   if (!layer) return null;
   bindRecordChat(layer, context);
 
-  const host = recordZHost(layer);
-  const qHeader = recordQHeaderHost(layer);
-  const promoteCalendarHeader = () => {
-    const calendarHeader = host?.querySelector?.('.calendar__header');
-    if (!calendarHeader || !qHeader || calendarHeader.parentElement === qHeader) return;
-    calendarHeader.style.margin = '0';
-    qHeader.replaceChildren(calendarHeader);
-  };
-  const calendarObserver = title === 'Выбор даты' && host
-    ? new MutationObserver(promoteCalendarHeader)
-    : null;
-  calendarObserver?.observe(host, { childList: true, subtree: true });
-  queueMicrotask(promoteCalendarHeader);
+  const disposeCalendarHeaderHost = title === 'Выбор даты'
+    ? bindCalendarHeaderHost(recordZHost(layer), recordQHeaderHost(layer))
+    : () => {};
 
   const originalClose = layer.v2Close?.bind(layer);
   layer.v2Close = () => {
     if (!layer.isConnected) return;
-    calendarObserver?.disconnect();
+    disposeCalendarHeaderHost();
     originalClose?.();
     queueMicrotask(() => {
       window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
