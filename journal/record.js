@@ -1,4 +1,4 @@
-import { button, durationPicker, durationText, entityCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
+import { button, durationPicker, durationText, miniCard, escapeHtml, field, list, select, timePicker, initTimePickers, v2ListEntry, stateView, initStateView, initCalendar, mountModal, modal, openNotice, initDurationPickers, initMultiSelect, viewNavigation, initViewNavigation, mountRecordZ, recordZHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
 import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
@@ -13,6 +13,7 @@ import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../core/profile/data.js';
+import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../core/profile/card-presentation.js';
 import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
 
 const RECORD_MODES = [
@@ -46,12 +47,13 @@ function groupCapacityForSelectedProcedures(selectedProcedures = []) {
   return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
 }
 
-function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
+function recordOwnerOptions({ settings = false, chatPersonKey = '', chatPersonKeys = [] } = {}) {
   const profile = getProfile();
   const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
   return {
     settings,
     chatPersonKey,
+    chatPersonKeys,
     aImage: String(profile?.photo || ''),
     aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     aInitials: initials,
@@ -200,8 +202,14 @@ function renderProceduresStep(modalRoot, {
   excludeId = '',
   className = 'record-flow-z',
   allowDurationCorrection = false,
+  chatPersonKey = '',
+  chatPersonKeys = [],
 } = {}) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор процедур', className });
+  modalRoot ||= mountRecordZ({
+    ...recordOwnerOptions({ settings: true, chatPersonKey, chatPersonKeys }),
+    title: 'Выбор процедур',
+    className,
+  });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   (Array.isArray(initialSelected) ? initialSelected : []).forEach((entry) => {
@@ -537,9 +545,14 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
 }
 
 function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, selectedPerson, selectedPeople = [], selectedProcedures, onCreated }) {
+  const initialChatPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
   modalRoot ||= mountRecordZ({
-    ...recordOwnerOptions({ settings: true, chatPersonKey: selectedPerson?.key || '' }),
-    title: 'Подтверждение записи',
+    ...recordOwnerOptions({
+      settings: true,
+      chatPersonKey: selectedPerson?.key || '',
+      chatPersonKeys: initialChatPeople.map((person) => person?.key || person?.id || '').filter(Boolean),
+    }),
+    title: 'Подтверждение',
     className: 'record-flow-z',
   });
   let currentDate = dateKey(date);
@@ -547,7 +560,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
   let currentFrom = from;
   let currentTo = to;
   let currentPerson = selectedPerson;
-  let currentPeople = (Array.isArray(selectedPeople) && selectedPeople.length ? selectedPeople : [selectedPerson]).filter(Boolean);
+  let currentPeople = initialChatPeople;
 
   const groupCapacity = () => groupCapacityForSelectedProcedures(selectedProcedures);
   const reconcileGroup = () => {
@@ -598,6 +611,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         from: currentFrom,
         to: currentTo,
         selectedProcedures,
+        chatPersonKey: currentPerson?.key || currentPerson?.id || '',
+        chatPersonKeys: currentPeople.map((person) => person?.key || person?.id || '').filter(Boolean),
         onApply: (next) => {
           currentDate = next.date;
           currentWorkplaceId = next.workplaceId;
@@ -713,6 +728,8 @@ export function openRecordEditFlow({
   to,
   selectedProcedures = [],
   excludeId = '',
+  chatPersonKey = '',
+  chatPersonKeys = [],
   onApply = () => {},
 } = {}) {
   const draft = {
@@ -723,6 +740,7 @@ export function openRecordEditFlow({
     procedures: selectedRecordProcedures(selectedProcedures),
   };
   const className = 'record-edit-z';
+  const ownerOptions = () => recordOwnerOptions({ chatPersonKey, chatPersonKeys });
   const closeFlow = () => closeRecordZStack(className);
   const apply = () => {
     onApply({
@@ -750,6 +768,8 @@ export function openRecordEditFlow({
       excludeId,
       className,
       allowDurationCorrection: true,
+      chatPersonKey,
+      chatPersonKeys,
       onDone: ({ procedures: next, to: nextTo }) => {
         draft.procedures = next;
         draft.to = nextTo;
@@ -760,7 +780,7 @@ export function openRecordEditFlow({
 
   const openTime = () => {
     const duration = Math.max(5, draft.procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0));
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор времени', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор времени', showA: false, className });
     const host = renderRecordZ(layer, `<div class="record-screen record-screen--state-view"><div class="compact-form">${timePicker({
       name: 'recordEditExactTime',
       label: 'Время',
@@ -793,12 +813,12 @@ export function openRecordEditFlow({
       }
       draft.from = nextFrom;
       draft.to = nextTo;
-      openProcedures();
+      apply();
     });
   };
 
   const openDate = () => {
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор даты', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор даты', showA: false, className });
     const host = renderRecordZ(layer, '<div class="record-screen record-screen--state-view"><div data-record-edit-calendar></div></div>');
     const calendarRoot = host?.querySelector('[data-record-edit-calendar]');
     const workingDates = getWorkplaceWorkingDates(draft.workplaceId);
@@ -809,18 +829,20 @@ export function openRecordEditFlow({
       onDateSelect: (nextDate) => {
         if (!workingDates.includes(nextDate)) return;
         draft.date = nextDate;
-        openTime();
+        apply();
       },
     });
   };
 
   const openWorkplace = () => {
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор пространства', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор пространства', showA: false, className });
+    const profile = getProfile();
     const items = getWorkplaces().map((workplace) => ({
       ...workplace,
-      fields: Array.isArray(workplace.fields) ? workplace.fields : [
-        { value: workplace.name || workplace.title || 'Рабочее пространство' },
-      ],
+      appearance: workplaceCardAppearance(workplace),
+      fields: workplaceCardFields(workplace, profile),
+      photo: workplaceCardPhoto(workplace),
+      imagePosition: `${Number(workplace?.photoCropX ?? 50)}% ${Number(workplace?.photoCropY ?? 50)}%`,
     }));
     const host = renderRecordZ(layer, `<div class="record-screen record-screen--state-view">${recordWorkplaceCards(items, { data: 'data-record-edit-workplace' })}</div>`);
     host?.querySelectorAll('[data-record-edit-workplace]').forEach((node) => node.addEventListener('click', () => {
@@ -829,7 +851,7 @@ export function openRecordEditFlow({
         const catalog = procedures().find((item) => String(item?.id || '') === String(entry?.procedure?.id || ''));
         return Boolean(catalog && procedureForWorkplace(catalog, draft.workplaceId));
       });
-      openDate();
+      apply();
     }));
   };
 
@@ -850,7 +872,7 @@ function blockEndValues({ date, workplaceId, from }) {
 }
 
 function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), title: 'Запись - перерыв', className: 'record-flow-z' });
   const values = blockEndValues({ date, workplaceId, from });
   const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--time"><div class="record-time-toolbar"><strong>До скольки занять</strong></div>${recordTimeRows(values, {
     data: 'data-block-end',
@@ -865,19 +887,17 @@ function renderBlockEndStep(modalRoot, { date, workplaceId, from, onCreated }) {
 }
 
 function renderBreakConfirmationStep(modalRoot, { date, workplaceId, from, to, onCreated }) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), className: 'record-flow-z' });
+  modalRoot ||= mountRecordZ({ ...recordOwnerOptions(), title: 'Запись - перерыв', className: 'record-flow-z' });
   const host = recordZHost(modalRoot);
   if (!host) return;
-  const workplace = findWorkplaceName(workplaceId);
   const formattedDate = formatConfirmationDate(date);
-  const card = entityCard({
-    title: 'Перерыв',
-    topMeta: [{ value: workplace, row: 1 }],
-    topRightMeta: [
-      { value: formattedDate, row: 2, weight: 'regular' },
-      { value: `${from} - ${to}`, row: 3, weight: 'regular' },
+  const card = miniCard({
+    className: 'record-break-mini-card',
+    lines: [
+      { value: 'Перерыв', strong: true },
+      { value: formattedDate, align: 'right' },
+      { value: `${from} - ${to}`, align: 'right' },
     ],
-    className: 'entity-card--hero entity-card--top-dark',
   });
   host.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
   setRecordPrimaryAction(modalRoot, {

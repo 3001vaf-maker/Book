@@ -36,10 +36,11 @@ if (!/export function openRecordEditFlow/.test(recordFlow)
   || !/if \(startAt === 'workplace'\) openWorkplace\(\);\s*else if \(startAt === 'date'\) openDate\(\);\s*else if \(startAt === 'procedure'\) openProcedures\(\);\s*else openTime\(\);/s.test(recordFlow)) {
   fail('journal/record.js', 'Shared Record edit flow must own Workplace, Date, Time and Procedure entry points');
 }
-if (!/draft\.workplaceId[^\n]*[\s\S]*?openDate\(\)/.test(recordFlow)
-  || !/draft\.date\s*=\s*nextDate;\s*openTime\(\)/s.test(recordFlow)
-  || !/draft\.from\s*=\s*nextFrom;[\s\S]*?openProcedures\(\)/.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must chain Workplace → Date → Time → Procedures without partial schedule commits');
+if (!/draft\.workplaceId\s*=\s*String\([^;]+;[\s\S]*?apply\(\);/.test(recordFlow)
+  || !/draft\.date\s*=\s*nextDate;\s*apply\(\);/s.test(recordFlow)
+  || !/draft\.from\s*=\s*nextFrom;\s*draft\.to\s*=\s*nextTo;\s*apply\(\);/s.test(recordFlow)
+  || !/onDone:\s*\(\{ procedures: next, to: nextTo \}\)\s*=>\s*\{[\s\S]*?draft\.procedures\s*=\s*next;[\s\S]*?draft\.to\s*=\s*nextTo;[\s\S]*?apply\(\);/s.test(recordFlow)) {
+  fail('journal/record.js', 'Shared Record edit flow must apply only the selected Workplace, Date, Time or Procedure correction and return without replaying the booking sequence');
 }
 if (!/listAvailableStartTimes/.test(recordFlow) || !/excludeId/.test(recordFlow)) {
   fail('journal/record.js', 'Shared Record edit flow must ask canonical Availability and exclude the edited Record');
@@ -81,7 +82,6 @@ if (!/modal\(content,\{variant:'x'/.test(sharedTime) || !/className:'modal--time
 if (/modal\(content,\{variant:'s'/.test(sharedTime) || /variant:'technical'/.test(sharedTime)) fail('ui/time/index.js', 'Canonical time selection must never use S or technical modal.');
 if (!/\.time-range-fields\{display:grid;grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/.test(sharedTimeCss)) fail('ui/time/time.css', 'Work-time range boxes must stay in one horizontal row.');
 if (/\.time-range-fields \.time-picker__label\{display:none\}/.test(sharedTimeCss)) fail('ui/time/time.css', 'Work-time range must keep С and До visible above their own boxes.');
-
 
 if (errors.length) {
   console.error('time UI ownership check: FAILED');

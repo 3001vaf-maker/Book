@@ -1,16 +1,10 @@
-import { entityCard, list, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
+import { button, miniCard, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
-import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
-
-function workplaceName(workplaceId) {
-  const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(workplaceId || ''));
-  return workplace?.name || workplace?.title || 'Рабочее пространство';
 }
 
 function availableBreakStarts(item) {
@@ -70,7 +64,7 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   let current = { ...breakItem };
   const finish = () => onClose?.();
   const m = mountRecordZ({
-    title: 'Перерыв',
+    title: 'Запись - перерыв',
     settings: true,
     className: 'record-break-z',
     onClose: () => queueMicrotask(finish),
@@ -79,17 +73,15 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   const root = recordZHost(m);
 
   const render = () => {
-    const workplace = workplaceName(current.workplaceId);
     const date = formatDate(current.date);
     const period = `${current.from} - ${current.to}`;
-    const card = entityCard({
-      title: 'Перерыв',
-      topMeta: [{ value: workplace, row: 1 }],
-      topRightMeta: [
-        { value: date, row: 2, weight: 'regular' },
-        { value: period, row: 3, weight: 'regular', data: 'data-break-move', aria: `Перенести перерыв ${period}` },
+    const card = miniCard({
+      className: 'record-break-mini-card',
+      lines: [
+        { value: 'Перерыв', strong: true },
+        { value: date, align: 'right' },
+        { value: period, align: 'right', data: 'data-break-move', aria: `Перенести перерыв ${period}` },
       ],
-      className: 'entity-card--hero entity-card--top-dark',
     });
     root.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
 
@@ -101,17 +93,13 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
         render();
       });
     });
-
-
   };
 
   bindRecordSettings(m, () => {
-    const menu = list({
-      items: [
-        { title: 'Удалить перерыв', interactive: true, data: 'data-break-settings-delete', aria: 'Удалить перерыв' },
-      ],
-    });
-    const layer = mountModal(document.body, modal(menu, { variant: 'x', surface: 'app' }));
+    const layer = mountModal(document.body, modal(
+      `<div class="modal-actions">${button('Удалить перерыв', { variant: 'critical', data: 'data-break-settings-delete' })}</div>`,
+      { variant: 'x', surface: 'app' },
+    ));
     layer?.querySelector('[data-break-settings-delete]')?.addEventListener('click', () => {
       layer.v2Close?.();
       if (!removeJournalBreak(current.id)) return;

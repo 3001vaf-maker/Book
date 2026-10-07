@@ -1,6 +1,8 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
-import { v2ZBodySections } from '../v2/z-layout.js';
+import { v2QFrame, v2ZBodySections } from '../v2/z-layout.js';
+import { modal, mountModal } from '../modals/index.js';
+import { bindCalendarHeaderHost } from '../calendar/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
@@ -22,6 +24,76 @@ function escapeRecordText(value = '') {
     '"': '&quot;',
     "'": '&#039;',
   }[char]));
+}
+
+function normalizedChatKeys(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))];
+}
+
+function isRecordEditClass(className = '') {
+  return String(className || '').split(/\s+/).includes('record-edit-z');
+}
+
+function closeRecordEditQ() {
+  [...document.querySelectorAll('[data-v2-q="true"]')].reverse().forEach((layer) => {
+    if (!layer.querySelector?.('.record-edit-z')) return;
+    if (typeof layer.v2Close === 'function') layer.v2Close();
+    else layer.remove();
+  });
+}
+
+function recordHeaderContext({
+  title = 'Запись',
+  settings = false,
+  showA = true,
+  chatPersonKey = '',
+  chatPersonKeys = [],
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
+} = {}) {
+  const groupPersonKeys = normalizedChatKeys(chatPersonKeys);
+  return {
+    groupPersonKeys,
+    html: workspaceHeaderContext({
+      title,
+      hideD: false,
+      a: {
+        kind: 'avatar',
+        label: 'Запись',
+        image: aImage,
+        imagePosition: aImagePosition,
+        initials: aInitials,
+        ...(showA && settings ? {
+          settingsTag: true,
+          data: 'data-record-owner-settings',
+          aria: 'Настройки записи',
+        } : {
+          disabled: true,
+          aria: 'Запись',
+        }),
+      },
+      d: {
+        kind: 'chat',
+        data: 'data-record-owner-chat',
+        aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
+      },
+    }),
+    chatPersonKey: String(chatPersonKey || ''),
+  };
+}
+
+function bindRecordChat(layer, { chatPersonKey = '', groupPersonKeys = [] } = {}) {
+  layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+      detail: {
+        personKey: String(chatPersonKey || ''),
+        personKeys: normalizedChatKeys(groupPersonKeys),
+      },
+    }));
+  });
 }
 
 function promoteRecordHeaderControls(layerRoot, host) {
@@ -201,49 +273,100 @@ export function mountRecordZ({
   stack = true,
   onClose = null,
   chatPersonKey = '',
+  chatPersonKeys = [],
   aImage = '',
   aImagePosition = '',
   aInitials = '',
 } = {}) {
-  const context = workspaceHeaderContext({
+  if (isRecordEditClass(className) && title !== 'Выбор времени') {
+    return mountRecordQ({
+      title,
+      settings,
+      showA,
+      className,
+      onClose,
+      chatPersonKey,
+      chatPersonKeys,
+      aImage,
+      aImagePosition,
+      aInitials,
+    });
+  }
+  if (isRecordEditClass(className)) closeRecordEditQ();
+
+  const context = recordHeaderContext({
     title,
-    hideD: !chatPersonKey,
-    a: {
-      kind: 'avatar',
-      label: 'Запись',
-      image: aImage,
-      imagePosition: aImagePosition,
-      initials: aInitials,
-      ...(showA && settings ? {
-        settingsTag: true,
-        data: 'data-record-owner-settings',
-        aria: 'Настройки записи',
-      } : {
-        disabled: true,
-        aria: 'Запись',
-      }),
-    },
-    d: chatPersonKey ? {
-      kind: 'chat',
-      data: 'data-record-owner-chat',
-      aria: 'Чат',
-    } : null,
+    settings,
+    showA,
+    chatPersonKey,
+    chatPersonKeys,
+    aImage,
+    aImagePosition,
+    aInitials,
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
   const layer = mountV2ZLayer(recordSurface(), v2ZLayer(
-    `${context}<div data-record-owner-host></div>`,
+    `${context.html}<div data-record-owner-host></div>`,
     { className: classes },
   ), { stack, onClose });
-  layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
-      detail: { personKey: String(chatPersonKey || '') },
-    }));
+  bindRecordChat(layer, context);
+  return layer;
+}
+
+export function mountRecordQ({
+  title = 'Запись',
+  settings = false,
+  showA = true,
+  className = '',
+  onClose = null,
+  chatPersonKey = '',
+  chatPersonKeys = [],
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
+} = {}) {
+  const context = recordHeaderContext({
+    title,
+    settings,
+    showA,
+    chatPersonKey,
+    chatPersonKeys,
+    aImage,
+    aImagePosition,
+    aInitials,
   });
+  const classes = ['record-shared-q', className].filter(Boolean).join(' ');
+  const layer = mountModal(document.body, modal(
+    `${context.html}${v2QFrame('<div data-record-owner-host></div>')}`,
+    { variant: 'q', surface: 'app', title, className: classes },
+  ));
+  if (!layer) return null;
+  bindRecordChat(layer, context);
+
+  const disposeCalendarHeaderHost = title === 'Выбор даты'
+    ? bindCalendarHeaderHost(recordZHost(layer), recordQHeaderHost(layer))
+    : () => {};
+
+  const originalClose = layer.v2Close?.bind(layer);
+  layer.v2Close = () => {
+    if (!layer.isConnected) return;
+    disposeCalendarHeaderHost();
+    originalClose?.();
+    queueMicrotask(() => {
+      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+      onClose?.();
+    });
+  };
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   return layer;
 }
 
 export function recordZHost(layerRoot) {
   return layerRoot?.querySelector('[data-record-owner-host]') || null;
+}
+
+export function recordQHeaderHost(layerRoot) {
+  return layerRoot?.querySelector('[data-v2-q-header-content]') || null;
 }
 
 export function renderRecordZ(layerRoot, content = '') {
@@ -289,4 +412,10 @@ export function closeRecordZStack(className = 'record-flow-z') {
     ? `[data-v2-z-layer].${className}`
     : '[data-v2-z-layer].record-shared-z';
   [...document.querySelectorAll(selector)].reverse().forEach((layer) => layer.v2Close?.());
+  if (className) {
+    [...document.querySelectorAll('[data-v2-q="true"]')].reverse().forEach((layer) => {
+      if (!layer.querySelector?.(`.${className}`)) return;
+      layer.v2Close?.();
+    });
+  }
 }

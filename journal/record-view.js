@@ -25,12 +25,13 @@ import { openRecordPayment } from './record-payment.js';
 import { openRecordEditFlow } from './record.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 
-function recordOwnerOptions({ settings = false, chatPersonKey = '' } = {}) {
+function recordOwnerOptions({ settings = false, chatPersonKey = '', chatPersonKeys = [] } = {}) {
   const profile = getProfile();
   const initials = [profile?.name, profile?.surname].filter(Boolean).map((value) => String(value).trim().charAt(0)).join('').slice(0, 2).toUpperCase();
   return {
     settings,
     chatPersonKey,
+    chatPersonKeys,
     aImage: String(profile?.photo || ''),
     aImagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     aInitials: initials,
@@ -57,6 +58,13 @@ const findPerson = (record) => {
   return people().find((item) => String(item.key ?? '') === String(person.key ?? ''))
     || people().find((item) => String(item.id ?? '') === String(person.id ?? ''))
     || person;
+};
+const chatKeysForState = (state = {}) => {
+  const participants = Array.isArray(state?.group?.participants) ? state.group.participants : [];
+  const keys = participants.map((person) => String(person?.key || person?.id || '')).filter(Boolean);
+  const primary = String(state?.person?.key || state?.person?.id || '');
+  if (primary && !keys.includes(primary)) keys.unshift(primary);
+  return [...new Set(keys)];
 };
 const procedureTotalDuration = (items = []) => items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
 const normalizedAttendance = (value) => value === 'arrived' || value === 'no-show' ? value : '';
@@ -158,8 +166,13 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   let updatingFromView = false;
   let saving = false;
   let finishClose = () => {};
+  const initialChatKeys = chatKeysForState(state);
   const m = mountRecordZ({
-    ...recordOwnerOptions({ settings: true, chatPersonKey: state.person?.key || '' }),
+    ...recordOwnerOptions({
+      settings: true,
+      chatPersonKey: state.person?.key || state.person?.id || '',
+      chatPersonKeys: initialChatKeys,
+    }),
     title: personDisplay(findPerson(record) || state.person || {}).name || 'Запись',
     className: 'record-view-z',
     onClose: () => finishClose(),
@@ -266,6 +279,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         to: state.to,
         selectedProcedures: state.procedures,
         excludeId: record.id,
+        chatPersonKey: state.person?.key || state.person?.id || '',
+        chatPersonKeys: chatKeysForState(state),
         onApply: (next) => {
           state = {
             ...state,
@@ -325,7 +340,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     const workplace = workplaceName(state.workplaceId);
     const totalDuration = state.procedures.length ? procedureTotalDuration(state.procedures) : 30;
     const finance = repriceSettlement(recordSettlementItems(state), state.finance);
-    const discountTotal = Math.max(0, Number(finance?.discountTotal) || 0);
     const discountPercent = finance?.discountPercent;
     const card = recordConfirmationMiniCard({
       workplace,

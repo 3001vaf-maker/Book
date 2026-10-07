@@ -1,4 +1,5 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { minutesBetween } from '../core/time/index.js';
 import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
@@ -69,7 +70,10 @@ function dateContent(data) {
 }
 
 export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {}, navigationRoot = null } = {}) {
+  let disposeCalendarHeaderHost = () => {};
+
   const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
+    disposeCalendarHeaderHost();
     root.innerHTML = '<div data-journal-month-calendar></div>';
     const workingDays = getWorkingDays();
     const workplaces = getWorkplaces();
@@ -92,11 +96,9 @@ export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () =
       },
       onMonthChange: (nextMonth) => render(nextMonth),
     });
-    if (navigationRoot) {
-      const header = calendarRoot.querySelector('.calendar__header');
-      if (header) navigationRoot.replaceChildren(header);
-    }
+    disposeCalendarHeaderHost = bindCalendarHeaderHost(calendarRoot, navigationRoot);
   };
 
   render();
+  return () => disposeCalendarHeaderHost();
 }

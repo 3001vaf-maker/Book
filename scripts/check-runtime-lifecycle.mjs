@@ -5,6 +5,13 @@ const root = process.cwd();
 const featureRoots = ['core/people', 'core/finance', 'settings', 'timetable', 'journal', 'chat'];
 const errors = [];
 
+// Explicit module-lifetime listeners are installed exactly once by ES module loading
+// and intentionally live for the lifetime of the application. Route/view listeners
+// remain required to provide a matching cleanup.
+const applicationLifetimeWindowListeners = new Set([
+  'chat/chat.js::book:record-chat-request',
+]);
+
 function walk(dir) {
   const result = [];
   for (const name of readdirSync(dir)) {
@@ -23,6 +30,7 @@ for (const file of featureRoots.flatMap((dir) => walk(join(root, dir)))) {
   const removedWindowEvents = new Set([...source.matchAll(/window\.removeEventListener\(\s*(['"])([^'"]+)\1/g)].map((match) => match[2]));
 
   for (const eventName of new Set(addedWindowEvents)) {
+    if (applicationLifetimeWindowListeners.has(`${relativePath}::${eventName}`)) continue;
     if (!removedWindowEvents.has(eventName)) {
       errors.push(`${relativePath}: window listener "${eventName}" has no matching cleanup`);
     }

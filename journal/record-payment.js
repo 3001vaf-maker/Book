@@ -197,6 +197,7 @@ function paymentOwnerA({ settings = false } = {}) {
     imagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     initials,
     ...(settings ? {
+      settingsTag: true,
       data: 'data-record-payment-settings',
       aria: 'Настройки оплаты',
     } : {
@@ -206,31 +207,47 @@ function paymentOwnerA({ settings = false } = {}) {
   };
 }
 
+function recordChatKeys(record) {
+  return [...new Set((Array.isArray(record?.group?.participants) ? record.group.participants : [])
+    .map((person) => String(person?.key || person?.id || '').trim())
+    .filter(Boolean))];
+}
+
+function paymentChatContext(record) {
+  const groupPersonKeys = recordChatKeys(record);
+  return {
+    d: {
+      kind: 'chat',
+      data: 'data-record-payment-chat',
+      aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
+    },
+    hideD: false,
+  };
+}
+
 function paymentLayerContext(record, state) {
   return workspaceHeaderContext({
     title: 'Оплата',
     a: paymentOwnerA({ settings: Boolean(state?.hasPayments) }),
-    d: record?.person?.key ? {
-      kind: 'chat',
-      data: 'data-record-payment-chat',
-      aria: 'Чат',
-    } : null,
-    hideD: !record?.person?.key,
+    ...paymentChatContext(record),
   });
 }
 
-function blankPaymentContext() {
+function blankPaymentContext(record, title = 'Оплата') {
   return workspaceHeaderContext({
-    title: 'Оплата',
+    title,
     a: paymentOwnerA(),
-    hideD: true,
+    ...paymentChatContext(record),
   });
 }
 
 function bindPaymentChat(layer, record) {
   layer.querySelector('[data-record-payment-chat]')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('book:record-chat-request', {
-      detail: { personKey: String(record?.person?.key || '') },
+      detail: {
+        personKey: String(record?.person?.key || ''),
+        personKeys: recordChatKeys(record),
+      },
     }));
   });
 }
@@ -252,10 +269,11 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
   const state = paymentStateForRecord(current);
   const total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
-    `${blankPaymentContext()}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
+    `${blankPaymentContext(current)}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
     { className: 'record-payment-allocation-z' },
   ), { stack: true });
   if (!layer) return null;
+  bindPaymentChat(layer, current);
 
   const host = layer.querySelector('[data-record-payment-allocation-host]');
   host.innerHTML = `
@@ -325,10 +343,11 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   const serviceAmount = Math.max(0, Number(payment?.serviceAmount || 0));
   const initialAllocations = paymentAllocations(payment);
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
-    `${workspaceHeaderContext({ title: 'Корректировка оплаты', a: paymentOwnerA(), hideD: true })}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
+    `${blankPaymentContext(record, 'Корректировка оплаты')}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
     { className: 'record-payment-correction-z' },
   ), { stack: true });
   if (!layer) return null;
+  bindPaymentChat(layer, record);
 
   const host = layer.querySelector('[data-record-payment-correction-host]');
   host.innerHTML = `
