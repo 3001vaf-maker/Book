@@ -1,6 +1,7 @@
 import { renderPeople } from './core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from './core/finance/index.js';
 import { inventoryNavigationItems, renderInventorySection } from './core/inventory/index.js';
+import { loyaltyNavigationItems, renderLoyaltySection } from './core/loyalty/index.js';
 import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
@@ -38,6 +39,7 @@ const ROOT_SECTIONS = [
   { id: 'journal', label: 'Журнал', capability: '' },
   { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'service', label: 'Сервис', capability: 'services.access' },
+  { id: 'loyalty', label: 'Лояльность', capability: '' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
@@ -52,6 +54,7 @@ const state = {
   secondary: {
     finance: 'cash',
     inventory: 'stock',
+    loyalty: 'deposit',
     settings: 'online-booking',
   },
 };
@@ -206,7 +209,7 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
-  if (section === 'finance' || section === 'inventory' || section === 'settings') {
+  if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
@@ -252,6 +255,7 @@ function activeRootSection() {
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
   if (section === 'inventory') return inventoryNavigationItems();
+  if (section === 'loyalty') return loyaltyNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
@@ -313,7 +317,6 @@ function sourceText(node, fallback = '') {
 function primarySource(surface) {
   const explicit = surface.querySelector('[data-v2-primary-action]');
   if (explicit) return explicit;
-
 
   const pageAction = surface.querySelector('.page-header-action button');
   if (pageAction) return pageAction;
@@ -470,6 +473,7 @@ function renderActiveWorkspaceSurface(surface) {
   }
   if (section === 'profile') return renderProfile(surface, openNavigation);
   if (section === 'service') return renderService(surface, openNavigation);
+  if (section === 'loyalty') return renderLoyaltySection(surface, ensureSecondary('loyalty'));
   if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
   if (section === 'chat') return renderChat(surface, { personKey: state.chatPersonKey });
   return renderPeople(surface);
@@ -625,7 +629,6 @@ function renderWorkspace() {
     moduleDispose?.();
   };
 
-
   syncViewport();
 }
 
@@ -645,7 +648,6 @@ function renderSuspended() {
   });
   syncViewport();
 }
-
 
 function startRegularPlatformNotices() {
   disposePlatformNotices();
