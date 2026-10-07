@@ -31,6 +31,18 @@ function normalizedChatKeys(values = []) {
     .filter(Boolean))];
 }
 
+function isRecordEditClass(className = '') {
+  return String(className || '').split(/\s+/).includes('record-edit-z');
+}
+
+function closeRecordEditQ() {
+  [...document.querySelectorAll('[data-v2-q="true"]')].reverse().forEach((layer) => {
+    if (!layer.querySelector?.('.record-edit-z')) return;
+    if (typeof layer.v2Close === 'function') layer.v2Close();
+    else layer.remove();
+  });
+}
+
 function recordHeaderContext({
   title = 'Запись',
   settings = false,
@@ -265,6 +277,22 @@ export function mountRecordZ({
   aImagePosition = '',
   aInitials = '',
 } = {}) {
+  if (isRecordEditClass(className) && title !== 'Выбор времени') {
+    return mountRecordQ({
+      title,
+      settings,
+      showA,
+      className,
+      onClose,
+      chatPersonKey,
+      chatPersonKeys,
+      aImage,
+      aImagePosition,
+      aInitials,
+    });
+  }
+  if (isRecordEditClass(className)) closeRecordEditQ();
+
   const context = recordHeaderContext({
     title,
     settings,
@@ -313,9 +341,25 @@ export function mountRecordQ({
   ));
   if (!layer) return null;
   bindRecordChat(layer, context);
+
+  const host = recordZHost(layer);
+  const qHeader = recordQHeaderHost(layer);
+  const promoteCalendarHeader = () => {
+    const calendarHeader = host?.querySelector?.('.calendar__header');
+    if (!calendarHeader || !qHeader || calendarHeader.parentElement === qHeader) return;
+    calendarHeader.style.margin = '0';
+    qHeader.replaceChildren(calendarHeader);
+  };
+  const calendarObserver = title === 'Выбор даты' && host
+    ? new MutationObserver(promoteCalendarHeader)
+    : null;
+  calendarObserver?.observe(host, { childList: true, subtree: true });
+  queueMicrotask(promoteCalendarHeader);
+
   const originalClose = layer.v2Close?.bind(layer);
   layer.v2Close = () => {
     if (!layer.isConnected) return;
+    calendarObserver?.disconnect();
     originalClose?.();
     queueMicrotask(() => {
       window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
@@ -377,4 +421,10 @@ export function closeRecordZStack(className = 'record-flow-z') {
     ? `[data-v2-z-layer].${className}`
     : '[data-v2-z-layer].record-shared-z';
   [...document.querySelectorAll(selector)].reverse().forEach((layer) => layer.v2Close?.());
+  if (className) {
+    [...document.querySelectorAll('[data-v2-q="true"]')].reverse().forEach((layer) => {
+      if (!layer.querySelector?.(`.${className}`)) return;
+      layer.v2Close?.();
+    });
+  }
 }
