@@ -160,7 +160,8 @@ assert.match(recordPaymentSource, /readOnlyReceipt/);
 assert.doesNotMatch(recordPaymentSource, /datetime-local|refundOccurredAt|cancelOccurredAt|paymentOccurredAt/);
 assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryContent|openPaymentModal|openPaidState/);
 
-assert.match(recordPaymentSource, /blankPaymentContext\(\)/);
+assert.match(recordPaymentSource, /blankPaymentContext\(current\)/);
+assert.match(recordPaymentSource, /blankPaymentContext\(record, 'Корректировка оплаты'\)/);
 assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), total, showAction: false, showTotal: false \}\)/);
 assert.match(recordPaymentSource, /serviceAmount:\s*allocationState\.applied/);
 assert.match(recordPaymentSource, /tips:\s*allocationState\.tips/);
