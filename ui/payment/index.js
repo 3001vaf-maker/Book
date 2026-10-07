@@ -1,8 +1,9 @@
 import { button } from '../buttons/index.js';
+import { miniCard } from '../cards/mini-card.js';
 import { select } from '../selectors/index.js';
 import { field } from '../inputs/index.js';
-import { readOnlyReceipt } from '../receipt/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
+import { v2ZBodySections } from '../v2/z-layout.js';
 import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
 
 const numberValue = (value) => {
@@ -28,15 +29,49 @@ const discountOptions = [
   ...Array.from({ length: 100 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}%` })),
 ];
 
-function paymentSummary({ workplace = '', moment = '', identity = '', total = 0 } = {}) {
-  return readOnlyReceipt({
-    groups: [[
-      { label: workplace, value: '' },
-      { label: moment, value: '' },
-      { label: identity, value: '' },
-    ]],
-    totals: [{ label: 'К оплате', value: moneyDisplay(total), strong: true }],
-  });
+function paymentSummary({ workplace = '', date = '', time = '', person = {}, total = 0 } = {}) {
+  const identity = [person?.uei, person?.name]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return `<div class="payment-summary-mini-card-wrap">${miniCard({
+    className: 'payment-summary-mini-card',
+    lines: [
+      { value: workplace || '—', strong: true },
+      { value: date || '—' },
+      { value: time || '—', align: 'right' },
+      { value: identity || '—', strong: true },
+      { value: 'К оплате', strong: true },
+      { value: moneyDisplay(total), align: 'right', strong: true },
+    ],
+  })}</div>`;
+}
+
+function paymentItemHeader(name = '') {
+  const value = String(name || '');
+  return `<div class="payment-item-head">
+    <strong class="payment-item-head__name">${escapeHtml(value)}</strong>
+    <button type="button" class="payment-item-head__remove" data-payment-remove aria-label="Удалить ${escapeHtml(value)}">×</button>
+  </div>`;
+}
+
+function paymentProcedureBlock(procedure, index) {
+  const price = Math.max(0, numberValue(procedure?.cost));
+  const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
+  const money = Math.max(0, numberValue(procedure?.discountMoney));
+  const explicitMode = procedure?.discountMode;
+  const mode = explicitMode === 'percent' || explicitMode === 'money' || explicitMode === 'none'
+    ? explicitMode
+    : percent ? 'percent' : money ? 'money' : 'none';
+  const itemName = procedure?.name || '';
+  return `<div class="payment-item-section" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
+    ${paymentItemHeader(itemName)}
+    <div class="payment-edit-grid">
+      ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
+      ${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}
+      ${field({ label: 'Скидка ₽', value: money ? moneyText(money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-discount-money' })}
+    </div>
+  </div>`;
 }
 
 export function paymentForm({
@@ -48,38 +83,23 @@ export function paymentForm({
   total = 0,
   showActions = true,
 } = {}) {
-  const procedureBlocks = (Array.isArray(procedures) ? procedures : []).map((procedure, index) => {
-    const price = Math.max(0, numberValue(procedure?.cost));
-    const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
-    const money = Math.max(0, numberValue(procedure?.discountMoney));
-    const explicitMode = procedure?.discountMode;
-    const mode = explicitMode === 'percent' || explicitMode === 'money' || explicitMode === 'none'
-      ? explicitMode
-      : percent ? 'percent' : money ? 'money' : 'none';
-    const itemName = procedure?.name || '';
-    return `
-    <section class="form-grid" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
-      ${readOnlyReceipt({
-        items: [{
-          label: itemName,
-          value: moneyDisplay(price),
-          action: { label: '×', data: 'data-payment-remove', aria: `Удалить ${itemName}` },
-        }],
-      })}
-      <div class="payment-edit-grid">
-        ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
-        ${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}
-        ${field({ label: 'Скидка ₽', value: money ? moneyText(money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-discount-money' })}
-      </div>
-    </section>`;
-  }).join('');
+  const procedureBlocks = (Array.isArray(procedures) ? procedures : [])
+    .map((procedure, index) => paymentProcedureBlock(procedure, index));
+  const sections = [
+    {
+      kind: 'content',
+      content: `<div data-payment-summary>${paymentSummary({ workplace, date, time, person, total })}</div>`,
+    },
+    ...procedureBlocks.map((content) => ({ kind: 'content', content })),
+  ];
 
-  const identity = [person?.uei, person?.name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
-  const moment = [date, time].map((value) => String(value || '').trim()).filter(Boolean).join(' - ');
-
-  return `<div class="form-grid" data-payment-ui data-payment-workplace="${escapeHtml(workplace)}" data-payment-moment="${escapeHtml(moment)}" data-payment-identity="${escapeHtml(identity)}">
-    <div data-payment-summary>${paymentSummary({ workplace, moment, identity, total })}</div>
-    <div class="form-grid" data-payment-procedures>${procedureBlocks}</div>
+  return `<div data-payment-ui
+    data-payment-workplace="${escapeHtml(workplace)}"
+    data-payment-date="${escapeHtml(date)}"
+    data-payment-time="${escapeHtml(time)}"
+    data-payment-uei="${escapeHtml(person?.uei || '')}"
+    data-payment-person-name="${escapeHtml(person?.name || '')}">
+    <div data-payment-sections>${v2ZBodySections(sections)}</div>
     ${showActions ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-save', variant: 'secondary' })}${button('Оплатить', { data: 'data-payment-submit' })}</div>` : ''}
   </div>`;
 }
@@ -142,8 +162,12 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
   if (summary) {
     summary.innerHTML = paymentSummary({
       workplace: root.dataset.paymentWorkplace || '',
-      moment: root.dataset.paymentMoment || '',
-      identity: root.dataset.paymentIdentity || '',
+      date: root.dataset.paymentDate || '',
+      time: root.dataset.paymentTime || '',
+      person: {
+        uei: root.dataset.paymentUei || '',
+        name: root.dataset.paymentPersonName || '',
+      },
       total: Math.max(0, numberValue(settlement?.planTotal) - Math.max(0, numberValue(paidTotal))),
     });
   }
