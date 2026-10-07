@@ -13,6 +13,7 @@ import { timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../core/profile/data.js';
+import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../core/profile/card-presentation.js';
 import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
 
 const RECORD_MODES = [
@@ -201,8 +202,14 @@ function renderProceduresStep(modalRoot, {
   excludeId = '',
   className = 'record-flow-z',
   allowDurationCorrection = false,
+  chatPersonKey = '',
+  chatPersonKeys = [],
 } = {}) {
-  modalRoot ||= mountRecordZ({ ...recordOwnerOptions({ settings: true }), title: 'Выбор процедур', className });
+  modalRoot ||= mountRecordZ({
+    ...recordOwnerOptions({ settings: true, chatPersonKey, chatPersonKeys }),
+    title: 'Выбор процедур',
+    className,
+  });
   let items = procedures().filter((procedure) => procedureForWorkplace(procedure, workplaceId));
   const selected = new Map();
   (Array.isArray(initialSelected) ? initialSelected : []).forEach((entry) => {
@@ -604,6 +611,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         from: currentFrom,
         to: currentTo,
         selectedProcedures,
+        chatPersonKey: currentPerson?.key || currentPerson?.id || '',
+        chatPersonKeys: currentPeople.map((person) => person?.key || person?.id || '').filter(Boolean),
         onApply: (next) => {
           currentDate = next.date;
           currentWorkplaceId = next.workplaceId;
@@ -719,6 +728,8 @@ export function openRecordEditFlow({
   to,
   selectedProcedures = [],
   excludeId = '',
+  chatPersonKey = '',
+  chatPersonKeys = [],
   onApply = () => {},
 } = {}) {
   const draft = {
@@ -729,6 +740,7 @@ export function openRecordEditFlow({
     procedures: selectedRecordProcedures(selectedProcedures),
   };
   const className = 'record-edit-z';
+  const ownerOptions = () => recordOwnerOptions({ chatPersonKey, chatPersonKeys });
   const closeFlow = () => closeRecordZStack(className);
   const apply = () => {
     onApply({
@@ -756,6 +768,8 @@ export function openRecordEditFlow({
       excludeId,
       className,
       allowDurationCorrection: true,
+      chatPersonKey,
+      chatPersonKeys,
       onDone: ({ procedures: next, to: nextTo }) => {
         draft.procedures = next;
         draft.to = nextTo;
@@ -766,7 +780,7 @@ export function openRecordEditFlow({
 
   const openTime = () => {
     const duration = Math.max(5, draft.procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0));
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор времени', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор времени', showA: false, className });
     const host = renderRecordZ(layer, `<div class="record-screen record-screen--state-view"><div class="compact-form">${timePicker({
       name: 'recordEditExactTime',
       label: 'Время',
@@ -804,7 +818,7 @@ export function openRecordEditFlow({
   };
 
   const openDate = () => {
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор даты', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор даты', showA: false, className });
     const host = renderRecordZ(layer, '<div class="record-screen record-screen--state-view"><div data-record-edit-calendar></div></div>');
     const calendarRoot = host?.querySelector('[data-record-edit-calendar]');
     const workingDates = getWorkplaceWorkingDates(draft.workplaceId);
@@ -821,12 +835,14 @@ export function openRecordEditFlow({
   };
 
   const openWorkplace = () => {
-    const layer = mountRecordZ({ ...recordOwnerOptions(), title: 'Выбор пространства', showA: false, className });
+    const layer = mountRecordZ({ ...ownerOptions(), title: 'Выбор пространства', showA: false, className });
+    const profile = getProfile();
     const items = getWorkplaces().map((workplace) => ({
       ...workplace,
-      fields: Array.isArray(workplace.fields) ? workplace.fields : [
-        { value: workplace.name || workplace.title || 'Рабочее пространство' },
-      ],
+      appearance: workplaceCardAppearance(workplace),
+      fields: workplaceCardFields(workplace, profile),
+      photo: workplaceCardPhoto(workplace),
+      imagePosition: `${Number(workplace?.photoCropX ?? 50)}% ${Number(workplace?.photoCropY ?? 50)}%`,
     }));
     const host = renderRecordZ(layer, `<div class="record-screen record-screen--state-view">${recordWorkplaceCards(items, { data: 'data-record-edit-workplace' })}</div>`);
     host?.querySelectorAll('[data-record-edit-workplace]').forEach((node) => node.addEventListener('click', () => {
