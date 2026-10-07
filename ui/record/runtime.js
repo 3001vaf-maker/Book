@@ -1,6 +1,7 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
-import { v2ZBodySections } from '../v2/z-layout.js';
+import { v2QFrame, v2ZBodySections } from '../v2/z-layout.js';
+import { modal, mountModal } from '../modals/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
 import { miniCard } from '../cards/mini-card.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
@@ -22,6 +23,64 @@ function escapeRecordText(value = '') {
     '"': '&quot;',
     "'": '&#039;',
   }[char]));
+}
+
+function normalizedChatKeys(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))];
+}
+
+function recordHeaderContext({
+  title = 'Запись',
+  settings = false,
+  showA = true,
+  chatPersonKey = '',
+  chatPersonKeys = [],
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
+} = {}) {
+  const groupPersonKeys = normalizedChatKeys(chatPersonKeys);
+  return {
+    groupPersonKeys,
+    html: workspaceHeaderContext({
+      title,
+      hideD: false,
+      a: {
+        kind: 'avatar',
+        label: 'Запись',
+        image: aImage,
+        imagePosition: aImagePosition,
+        initials: aInitials,
+        ...(showA && settings ? {
+          settingsTag: true,
+          data: 'data-record-owner-settings',
+          aria: 'Настройки записи',
+        } : {
+          disabled: true,
+          aria: 'Запись',
+        }),
+      },
+      d: {
+        kind: 'chat',
+        data: 'data-record-owner-chat',
+        aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
+      },
+    }),
+    chatPersonKey: String(chatPersonKey || ''),
+  };
+}
+
+function bindRecordChat(layer, { chatPersonKey = '', groupPersonKeys = [] } = {}) {
+  layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+      detail: {
+        personKey: String(chatPersonKey || ''),
+        personKeys: normalizedChatKeys(groupPersonKeys),
+      },
+    }));
+  });
 }
 
 function promoteRecordHeaderControls(layerRoot, host) {
@@ -206,51 +265,73 @@ export function mountRecordZ({
   aImagePosition = '',
   aInitials = '',
 } = {}) {
-  const groupPersonKeys = [...new Set((Array.isArray(chatPersonKeys) ? chatPersonKeys : [])
-    .map((value) => String(value || '').trim())
-    .filter(Boolean))];
-  const context = workspaceHeaderContext({
+  const context = recordHeaderContext({
     title,
-    hideD: false,
-    a: {
-      kind: 'avatar',
-      label: 'Запись',
-      image: aImage,
-      imagePosition: aImagePosition,
-      initials: aInitials,
-      ...(showA && settings ? {
-        settingsTag: true,
-        data: 'data-record-owner-settings',
-        aria: 'Настройки записи',
-      } : {
-        disabled: true,
-        aria: 'Запись',
-      }),
-    },
-    d: {
-      kind: 'chat',
-      data: 'data-record-owner-chat',
-      aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
-    },
+    settings,
+    showA,
+    chatPersonKey,
+    chatPersonKeys,
+    aImage,
+    aImagePosition,
+    aInitials,
   });
   const classes = ['record-shared-z', className].filter(Boolean).join(' ');
   const layer = mountV2ZLayer(recordSurface(), v2ZLayer(
-    `${context}<div data-record-owner-host></div>`,
+    `${context.html}<div data-record-owner-host></div>`,
     { className: classes },
   ), { stack, onClose });
-  layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
-      detail: {
-        personKey: String(chatPersonKey || ''),
-        personKeys: groupPersonKeys,
-      },
-    }));
+  bindRecordChat(layer, context);
+  return layer;
+}
+
+export function mountRecordQ({
+  title = 'Запись',
+  settings = false,
+  showA = true,
+  className = '',
+  onClose = null,
+  chatPersonKey = '',
+  chatPersonKeys = [],
+  aImage = '',
+  aImagePosition = '',
+  aInitials = '',
+} = {}) {
+  const context = recordHeaderContext({
+    title,
+    settings,
+    showA,
+    chatPersonKey,
+    chatPersonKeys,
+    aImage,
+    aImagePosition,
+    aInitials,
   });
+  const classes = ['record-shared-q', className].filter(Boolean).join(' ');
+  const layer = mountModal(document.body, modal(
+    `${context.html}${v2QFrame('<div data-record-owner-host></div>')}`,
+    { variant: 'q', surface: 'app', title, className: classes },
+  ));
+  if (!layer) return null;
+  bindRecordChat(layer, context);
+  const originalClose = layer.v2Close?.bind(layer);
+  layer.v2Close = () => {
+    if (!layer.isConnected) return;
+    originalClose?.();
+    queueMicrotask(() => {
+      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+      onClose?.();
+    });
+  };
+  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   return layer;
 }
 
 export function recordZHost(layerRoot) {
   return layerRoot?.querySelector('[data-record-owner-host]') || null;
+}
+
+export function recordQHeaderHost(layerRoot) {
+  return layerRoot?.querySelector('[data-v2-q-header-content]') || null;
 }
 
 export function renderRecordZ(layerRoot, content = '') {
