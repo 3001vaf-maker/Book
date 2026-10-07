@@ -1,4 +1,4 @@
-import { queueOperationalDataset } from '../business-persistence.js';
+import { queueLoyaltyState } from './persistence.js';
 
 export const LOYALTY_PROGRAM_KINDS = Object.freeze(['deposit', 'certificate', 'subscription', 'referral', 'bonus']);
 
@@ -210,7 +210,7 @@ function normalizeState(value = {}) {
 let loyaltyState = emptyState();
 
 function persist() {
-  void queueOperationalDataset('loyalty', loyaltyState);
+  void queueLoyaltyState(loyaltyState).catch(() => {});
   return getLoyaltyState();
 }
 
