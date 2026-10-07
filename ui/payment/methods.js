@@ -50,6 +50,24 @@ function totalReceipt(label, value) {
   return readOnlyReceipt({ totals: [{ label, value: moneyDisplay(value), strong: true }] });
 }
 
+export function paymentAllocationState(allocations = [], total = 0) {
+  const normalized = (Array.isArray(allocations) ? allocations : []).map((item) => ({
+    ...item,
+    walletId: String(item?.walletId || ''),
+    walletName: String(item?.walletName || ''),
+    amount: Math.max(0, numberValue(item?.amount)),
+  })).filter((item) => item.walletId || item.amount > 0);
+  const due = Math.max(0, numberValue(total));
+  const received = normalized.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const applied = Math.min(due, received);
+  const tips = Math.max(0, received - applied);
+  const remaining = Math.max(0, due - applied);
+  const valid = normalized.length > 0
+    && normalized.every((item) => item.walletId && item.amount > 0)
+    && received > 0;
+  return { allocations: normalized, received, tips, applied, remaining, valid };
+}
+
 export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true, showTotal = true } = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
   return `<div class="form-grid" data-payment-allocation-owner>
@@ -83,15 +101,7 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
   }
 
   function state() {
-    const allocations = normalizedAllocations();
-    const received = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const applied = Math.min(Math.max(0, total), received);
-    const tips = Math.max(0, received - applied);
-    const remaining = Math.max(0, total - applied);
-    const valid = allocations.length > 0
-      && allocations.every((item) => item.walletId && item.amount > 0)
-      && received > 0;
-    return { allocations, received, tips, applied, remaining, valid };
+    return paymentAllocationState(normalizedAllocations(), total);
   }
 
   function sync() {
