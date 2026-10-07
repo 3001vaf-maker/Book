@@ -64,7 +64,7 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   let current = { ...breakItem };
   const finish = () => onClose?.();
   const m = mountRecordZ({
-    title: 'Перерыв',
+    title: 'Запись - перерыв',
     settings: true,
     className: 'record-break-z',
     onClose: () => queueMicrotask(finish),
