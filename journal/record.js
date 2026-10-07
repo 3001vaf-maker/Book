@@ -799,7 +799,7 @@ export function openRecordEditFlow({
       }
       draft.from = nextFrom;
       draft.to = nextTo;
-      openProcedures();
+      apply();
     });
   };
 
@@ -815,7 +815,7 @@ export function openRecordEditFlow({
       onDateSelect: (nextDate) => {
         if (!workingDates.includes(nextDate)) return;
         draft.date = nextDate;
-        openTime();
+        apply();
       },
     });
   };
@@ -835,7 +835,7 @@ export function openRecordEditFlow({
         const catalog = procedures().find((item) => String(item?.id || '') === String(entry?.procedure?.id || ''));
         return Boolean(catalog && procedureForWorkplace(catalog, draft.workplaceId));
       });
-      openDate();
+      apply();
     }));
   };
 
