@@ -1,6 +1,20 @@
 import { queueAuxiliaryDataset } from './business-persistence.js';
 
-const SCOPES = new Set(['person', 'workplace', 'wallet', 'loan', 'investment', 'procedure', 'product']);
+const SCOPES = new Set([
+  'person',
+  'workplace',
+  'wallet',
+  'loan',
+  'investment',
+  'procedure',
+  'product',
+  'loyalty-deposit',
+  'loyalty-personal-account',
+  'loyalty-certificate',
+  'loyalty-subscription',
+  'loyalty-referral',
+  'loyalty-bonus',
+]);
 let templatesState = [];
 
 function clone(value) {
