@@ -1,16 +1,10 @@
 import { button, miniCard, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
-import { getWorkplaces } from '../core/workplace-time.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
 
 function formatDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
-
-function workplaceName(workplaceId) {
-  const workplace = getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(workplaceId || ''));
-  return workplace?.name || workplace?.title || 'Рабочее пространство';
 }
 
 function availableBreakStarts(item) {
