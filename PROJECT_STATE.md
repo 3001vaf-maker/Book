@@ -4,6 +4,7 @@
 
 - Рабочая ветка только `staging`. Production только `main`. Другие рабочие ветки запрещены.
 - Новый функционал собирается из существующего Shared UI по `UI_ALPHABET.md`. Локальный клон существующего UI запрещён.
+- Бизнес-классификация F/E, главный рабочий контур, условная видимость инструментов и правило `capability != F` определяются только `BUSINESS_ARCHITECTURE.md`. Новый F/E нельзя добавлять под отдельную профессию в обход этого реестра.
 - F/E/Z, свайпы, CardDeck, modal geometry и viewport geometry имеют одного владельца: Shared UI.
 - Feature-код не создаёт собственный глобальный pointer/touch owner, fixed/full-screen слой, modal geometry или canonical component CSS.
 - A/B/C/D, F/E/Z, Q/X/S, CardDeck, EntityCard, miniCard, v2ListEntry/v2ListEntries, Calendar, TimePicker, Receipt и Document используются только через Shared UI.
