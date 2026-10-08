@@ -1,4 +1,5 @@
 import { apiRequest } from '../../auth.js';
+import { refreshFinanceState } from '../../finance/service.js';
 
 let programs = [];
 
@@ -34,6 +35,7 @@ export async function saveDepositPrograms(next=[]){
     for(const programId of removedProgramIds){
       await payload(await apiRequest(`/loyalty/deposits/program/${encodeURIComponent(programId)}`,{method:'DELETE'}),'Не удалось полностью удалить депозитную программу');
     }
+    await refreshFinanceState();
     return loadDepositPrograms();
   }
   const remote=await payload(await apiRequest('/auxiliary-state/depositPrograms',{
@@ -89,5 +91,6 @@ export async function deleteDeposit(depositId=''){
   const id=text(depositId);
   if(!id)return false;
   await payload(await apiRequest(`/loyalty/deposits/${encodeURIComponent(id)}`,{method:'DELETE'}),'Не удалось полностью удалить депозит');
+  await refreshFinanceState();
   return true;
 }
