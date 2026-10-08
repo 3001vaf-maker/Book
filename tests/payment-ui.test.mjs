@@ -103,7 +103,7 @@ assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
 assert.match(methodsHtml, /data-payment-tips-row hidden/);
-assert.match(methodsHtml, />Сохранить</);
+assert.match(methodsHtml, />Сохранить</>);
 assert.doesNotMatch(methodsHtml, /data-payment-mode|Разделить/);
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
 
@@ -224,7 +224,7 @@ for (const action of [
 
 assert.match(recordPaymentSource, /await\s+correctFinanceOperation/);
 assert.match(recordPaymentSource, /await\s+recordRefundExpense/);
-assert.match(recordPaymentSource, /await\s+cancelFinanceOperation/);
+assert.match(recordPaymentSource, /await\s+cancelPaymentOperation/);
 assert.match(recordPaymentSource, /await\s+hardDeleteFinanceOperation/);
 assert.match(recordPaymentSource, /name: 'recordPaymentDate'/);
 assert.match(recordPaymentSource, /name: 'recordPaymentCorrectionDate'/);
