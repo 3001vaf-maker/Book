@@ -7,6 +7,22 @@ import { SaasAccessService } from '../saas-access/saas-access.service';
 type JsonObject = Record<string, any>;
 type Db = PrismaService | Prisma.TransactionClient;
 
+type CanonicalDepositRow = {
+  depositId: string;
+  programId: string;
+  programName: string;
+  personKey: string;
+  person: unknown;
+  terms: unknown;
+  initialAmount: Prisma.Decimal;
+  principalBalance: Prisma.Decimal;
+  benefitBalance: Prisma.Decimal;
+  balance: Prisma.Decimal;
+  status: string;
+  fundedAt: Date;
+  fundingOperationId: string;
+};
+
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
 }
@@ -132,26 +148,28 @@ function personKey(value: unknown) {
   return text(person.key ?? person.personKey ?? person.id);
 }
 
-function depositMovementEffect(operation: any, depositId: string) {
-  if (!operation || operation.status !== 'completed') return 0;
-  const data = objectValue(operation.data);
-  if (operation.kind === 'deposit-funding' && operation.sourceType === 'deposit' && operation.sourceId === depositId) {
-    return money(data.amount ?? data.total);
-  }
-  if (operation.kind === 'deposit-withdrawal' && operation.sourceType === 'deposit' && operation.sourceId === depositId) {
-    return -money(data.amount ?? data.total);
-  }
-  if (operation.kind === 'payment') {
-    return -money(depositAllocationsValue(data.depositAllocations)
-      .filter((entry) => entry.depositId === depositId)
-      .reduce((sum, entry) => sum + entry.amount, 0));
-  }
-  if (operation.kind === 'refund') {
-    return money(depositAllocationsValue(data.depositAllocations)
-      .filter((entry) => entry.depositId === depositId)
-      .reduce((sum, entry) => sum + entry.amount, 0));
-  }
-  return 0;
+function depositBenefitMode(value: unknown) {
+  const terms = objectValue(value);
+  const type = text(terms.benefitType).toLowerCase();
+  if (type === 'accrual' || type === 'upfront') return 'upfront';
+  if (type === 'discount' || type === 'service') return 'service';
+  return 'none';
+}
+
+function depositBenefitRate(value: unknown) {
+  return percent(objectValue(value).benefitValue);
+}
+
+function depositTermActiveAt(value: unknown, at: Date) {
+  const terms = objectValue(value);
+  const mode = text(terms.termMode).toLowerCase();
+  if (mode !== 'dated' && mode !== 'fixed') return true;
+  const day = at.toISOString().slice(0, 10);
+  const start = text(terms.termStartDate).slice(0, 10);
+  const end = text(terms.termEndDate).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(start) && day < start) return false;
+  return day <= end;
 }
 
 const DEFAULT_FINANCE_ARTICLES = [
@@ -367,70 +385,116 @@ export class FinanceService {
     return program;
   }
 
-  private async depositOperationsWith(db: Db, tenantId: string) {
-    return db.financeOperation.findMany({
-      where: { tenantId, kind: { in: ['deposit-funding', 'deposit-withdrawal', 'payment', 'refund'] } },
-      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
-    });
-  }
-
-  private depositDtoFromOperations(operations: any[], funding: any) {
-    const data = objectValue(funding.data);
-    const depositId = text(data.depositId || funding.sourceId);
-    const balance = money(operations.reduce((sum, row) => sum + depositMovementEffect(row, depositId), 0));
+  private async canonicalDepositWith(db: Db, tenantId: string, depositId: string) {
+    const id = text(depositId);
+    const rows = await db.$queryRaw<CanonicalDepositRow[]>(Prisma.sql`
+      SELECT
+        "depositId", "programId", "programName", "personKey", "person", "terms",
+        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
+        "fundedAt", "fundingOperationId"
+      FROM "LoyaltyDepositInstance"
+      WHERE "tenantId" = ${tenantId} AND "depositId" = ${id}
+      LIMIT 1
+    `);
+    const row = rows[0];
+    if (!row) throw new BadRequestException('Депозит не найден или отменён');
     return {
-      depositId,
-      programId: text(data.programId),
-      programName: text(data.programName),
-      person: clone(objectValue(data.person)),
-      fundedAmount: money(data.amount ?? data.total),
-      balance,
-      terms: clone(objectValue(data.terms)),
-      status: balance > 0.009 ? 'active' : 'closed',
-      fundedAt: funding.occurredAt instanceof Date ? funding.occurredAt.toISOString() : String(funding.occurredAt || ''),
-      fundingOperationId: funding.operationId,
-      history: operations
-        .filter((row) => Math.abs(depositMovementEffect(row, depositId)) > 0.009)
-        .map((row) => ({
-          operationId: row.operationId,
-          kind: row.kind,
-          amount: Math.abs(depositMovementEffect(row, depositId)),
-          direction: depositMovementEffect(row, depositId) >= 0 ? 'IN' : 'OUT',
-          occurredAt: row.occurredAt instanceof Date ? row.occurredAt.toISOString() : String(row.occurredAt || ''),
-          status: row.status,
-          source: { type: row.sourceType, id: row.sourceId },
-        })),
+      depositId: row.depositId,
+      programId: row.programId,
+      programName: row.programName,
+      personKey: row.personKey,
+      person: clone(objectValue(row.person)),
+      terms: clone(objectValue(row.terms)),
+      fundedAmount: money(row.initialAmount),
+      principalBalance: money(row.principalBalance),
+      benefitBalance: money(row.benefitBalance),
+      balance: money(row.balance),
+      status: text(row.status),
+      fundedAt: row.fundedAt instanceof Date ? row.fundedAt.toISOString() : String(row.fundedAt || ''),
+      fundingOperationId: row.fundingOperationId,
     };
   }
 
-  private async depositByIdWith(db: Db, tenantId: string, depositId: string, excludeOperationId = '') {
-    const id = text(depositId);
-    const operations = (await this.depositOperationsWith(db, tenantId)).filter((row) => !excludeOperationId || row.operationId !== excludeOperationId);
-    const funding = operations.find((row) => row.kind === 'deposit-funding' && row.status === 'completed' && row.sourceType === 'deposit' && row.sourceId === id);
-    if (!funding) throw new BadRequestException('Депозит не найден или отменён');
-    return this.depositDtoFromOperations(operations, funding);
+  private async serviceBenefitFromOperationWith(db: Db, tenantId: string, deposit: any, operation: any) {
+    if (!operation || operation.kind !== 'payment' || operation.status !== 'completed') return 0;
+    const terms = objectValue(deposit.terms);
+    const at = operation.occurredAt instanceof Date ? operation.occurredAt : new Date(operation.occurredAt);
+    if (depositBenefitMode(terms) !== 'service' || !depositTermActiveAt(terms, at)) return 0;
+    const data = objectValue(operation.data);
+    if (!deposit.personKey || personKey(data.person) !== deposit.personKey) return 0;
+    const ownerRows = await db.$queryRaw<Array<{ depositId: string }>>(Prisma.sql`
+      SELECT loyalty_deposit_service_owner(${tenantId}, ${deposit.personKey}, ${at}) AS "depositId"
+    `);
+    if (text(ownerRows[0]?.depositId) !== deposit.depositId) return 0;
+    return money(money(data.serviceAmount) * depositBenefitRate(terms) / 100);
   }
 
-  private async validateDepositAllocationsWith(db: Db, tenantId: string, values: JsonObject[], expectedPersonKey: string, excludeOperationId = '') {
+  private async validateDepositAllocationsWith(
+    db: Db,
+    tenantId: string,
+    values: JsonObject[],
+    expectedPersonKey: string,
+    occurredAt: Date,
+    excludeOperationId = '',
+  ) {
     const allocations = depositAllocationsValue(values);
     const seen = new Set<string>();
+    const excluded = excludeOperationId
+      ? await db.financeOperation.findUnique({ where: { tenantId_operationId: { tenantId, operationId: excludeOperationId } } })
+      : null;
+
     for (const allocation of allocations) {
       if (seen.has(allocation.depositId)) throw new BadRequestException('Один депозит нельзя указать дважды');
       seen.add(allocation.depositId);
-      const deposit = await this.depositByIdWith(db, tenantId, allocation.depositId, excludeOperationId);
+      const deposit = await this.canonicalDepositWith(db, tenantId, allocation.depositId);
       if (expectedPersonKey && personKey(deposit.person) !== expectedPersonKey) throw new BadRequestException('Депозит принадлежит другому человеку');
-      if (allocation.amount > deposit.balance + 0.009) throw new BadRequestException(`На депозите «${deposit.programName || 'Депозит'}» недостаточно средств`);
-      allocation.name = allocation.name || `${deposit.programName || 'Депозит'} · остаток ${deposit.balance}`;
+      if (!depositTermActiveAt(deposit.terms, occurredAt)) throw new BadRequestException(`Срок депозита «${deposit.programName || 'Депозит'}» завершён`);
+      if (deposit.status !== 'active' && !(excluded && deposit.status === 'closed')) {
+        throw new BadRequestException(`Депозит «${deposit.programName || 'Депозит'}» недоступен для оплаты`);
+      }
+
+      let available = deposit.balance;
+      if (excluded?.kind === 'payment' && excluded.status === 'completed') {
+        const previousAllocation = depositAllocationsValue(objectValue(excluded.data).depositAllocations)
+          .filter((entry) => entry.depositId === allocation.depositId)
+          .reduce((sum, entry) => sum + entry.amount, 0);
+        const previousBenefit = await this.serviceBenefitFromOperationWith(db, tenantId, deposit, excluded);
+        available = Math.max(0, money(available + previousAllocation - previousBenefit));
+      }
+
+      if (allocation.amount > available + 0.009) throw new BadRequestException(`На депозите «${deposit.programName || 'Депозит'}» недостаточно средств`);
+      allocation.name = allocation.name || `${deposit.programName || 'Депозит'} · остаток ${available}`;
     }
     return allocations;
   }
 
   async listDeposits(tenantId: string, personId = '') {
-    const operations = await this.depositOperationsWith(this.prisma, tenantId);
-    return operations
-      .filter((row) => row.kind === 'deposit-funding' && row.status === 'completed' && row.sourceType === 'deposit')
-      .map((funding) => this.depositDtoFromOperations(operations, funding))
-      .filter((deposit) => !personId || personKey(deposit.person) === text(personId));
+    const key = text(personId);
+    const rows = await this.prisma.$queryRaw<CanonicalDepositRow[]>(Prisma.sql`
+      SELECT
+        "depositId", "programId", "programName", "personKey", "person", "terms",
+        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
+        "fundedAt", "fundingOperationId"
+      FROM "LoyaltyDepositInstance"
+      WHERE "tenantId" = ${tenantId}
+        AND (${key} = '' OR "personKey" = ${key})
+      ORDER BY "fundedAt" DESC
+    `);
+    return rows.map((row) => ({
+      depositId: row.depositId,
+      programId: row.programId,
+      programName: row.programName,
+      person: clone(objectValue(row.person)),
+      fundedAmount: money(row.initialAmount),
+      principalBalance: money(row.principalBalance),
+      benefitBalance: money(row.benefitBalance),
+      refundableAmount: row.status === 'active' ? money(row.principalBalance) : 0,
+      balance: money(row.balance),
+      terms: clone(objectValue(row.terms)),
+      status: row.status,
+      fundedAt: row.fundedAt instanceof Date ? row.fundedAt.toISOString() : String(row.fundedAt || ''),
+      fundingOperationId: row.fundingOperationId,
+    }));
   }
 
   async recordDepositFunding(tenantId: string, body: unknown) {
@@ -478,7 +542,7 @@ export class FinanceService {
         }],
       });
     });
-    return this.depositByIdWith(this.prisma, tenantId, depositId);
+    return this.canonicalDepositWith(this.prisma, tenantId, depositId);
   }
 
   async recordDepositWithdrawal(tenantId: string, depositId: string, body: unknown) {
@@ -494,8 +558,9 @@ export class FinanceService {
     const operationId = randomUUID();
 
     await this.serializable(async (tx) => {
-      const deposit = await this.depositByIdWith(tx, tenantId, id);
-      if (amount > deposit.balance + 0.009) throw new BadRequestException('Сумма возврата превышает остаток депозита');
+      const deposit = await this.canonicalDepositWith(tx, tenantId, id);
+      if (deposit.status !== 'active' || !depositTermActiveAt(deposit.terms, occurredAt)) throw new BadRequestException('Возврат по этому депозиту недоступен');
+      if (amount > deposit.principalBalance + 0.009) throw new BadRequestException('Сумма возврата превышает остаток реальных денег депозита');
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
         kind: 'deposit-withdrawal',
@@ -524,7 +589,7 @@ export class FinanceService {
         }],
       });
     });
-    return this.depositByIdWith(this.prisma, tenantId, id);
+    return this.canonicalDepositWith(this.prisma, tenantId, id);
   }
 
   private async financeEntity(tenantId: string, type: string, id: string) {
@@ -828,7 +893,7 @@ export class FinanceService {
     const operationId = randomUUID();
     const occurredAt = requiredOccurredAt(input.occurredAt);
     await this.serializable(async (tx) => {
-      const depositAllocations = await this.validateDepositAllocationsWith(tx, tenantId, requestedDepositAllocations, personKey(input.person));
+      const depositAllocations = await this.validateDepositAllocationsWith(tx, tenantId, requestedDepositAllocations, personKey(input.person), occurredAt);
       await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
       const paid = Math.max(0, await this.serviceNet(tx, tenantId, source.type, source.id));
       const due = Math.max(0, money(settlement.planTotal - paid));
@@ -1009,7 +1074,7 @@ export class FinanceService {
       if (serviceAmount < 0 || (serviceAmount <= 0 && tips <= 0) || money(serviceAmount + tips) !== money(cashAllocated + depositAllocated)) {
         throw new BadRequestException('Сумма оплаты не совпадает с распределением по источникам');
       }
-      const deposits = await this.validateDepositAllocationsWith(this.prisma, tenantId, requestedDeposits, personKey(currentData.person), current.operationId);
+      const deposits = await this.validateDepositAllocationsWith(this.prisma, tenantId, requestedDeposits, personKey(currentData.person), occurredAt, current.operationId);
       const otherPaid = await this.serviceNet(this.prisma, tenantId, current.sourceType, current.sourceId, current.operationId);
       const due = Math.max(0, money(settlement.planTotal - otherPaid));
       if (serviceAmount > due + 0.009) throw new BadRequestException('Оплата превышает остаток к оплате');
