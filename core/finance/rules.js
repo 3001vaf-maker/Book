@@ -120,12 +120,14 @@ export function normalizeStoredSettlement(value = null) {
 
 export function movementServiceAmount(item = null) {
   if (!item) return 0;
+  const bonus = financialMoney(item?.bonusAmount);
   if (item?.movementType === 'income') {
     const total = financialMoney(item?.total);
     const tips = financialMoney(item?.tips);
-    return financialMoney(item?.serviceAmount ?? (total - tips));
+    const cashService = financialMoney(item?.serviceAmount ?? (total - tips));
+    return financialMoney(cashService + bonus);
   }
-  return financialMoney(item?.serviceAmount ?? item?.total);
+  return financialMoney(financialMoney(item?.serviceAmount ?? item?.total) + bonus);
 }
 
 export function calculateSettlementTotals(settlement = null, movements = []) {
@@ -159,13 +161,17 @@ export function normalizedAllocations(payment = null) {
   }];
 }
 
+function movementSettlementValue(item = null) {
+  return financialMoney(movementServiceAmount(item) + Math.max(0, financialNumber(item?.tips)));
+}
+
 export function paymentNet(payment, movements = []) {
   const refunded = (Array.isArray(movements) ? movements : [])
     .filter((item) => item?.movementType === 'expense'
       && item?.expenseType === 'refund'
       && String(item?.originalPaymentId || '') === String(payment?.id || ''))
-    .reduce((sum, item) => sum + Math.max(0, financialNumber(item?.total)), 0);
-  return Math.max(0, financialNumber(payment?.total) - refunded);
+    .reduce((sum, item) => sum + movementSettlementValue(item), 0);
+  return Math.max(0, movementSettlementValue(payment) - refunded);
 }
 
 export function calculateSettlementPaymentState(settlement = null, movements = []) {
@@ -233,16 +239,21 @@ export function calculateSettlementItemTotals(movements = [], sourceTypeValue = 
 
 export function splitRefund(original = null, refunds = [], requestedAmount = null) {
   if (!original) return null;
-  const alreadyRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + Math.max(0, financialNumber(item?.total)), 0);
+  const alreadyRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + movementSettlementValue(item), 0);
   const alreadyTipsRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + Math.max(0, financialNumber(item?.tips)), 0);
-  const alreadyServiceRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + Math.max(0, financialNumber(item?.serviceAmount)), 0);
-  const remaining = Math.max(0, financialNumber(original.total) - alreadyRefunded);
+  const alreadyBonusRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + Math.max(0, financialNumber(item?.bonusAmount)), 0);
+  const alreadyCashServiceRefunded = (Array.isArray(refunds) ? refunds : []).reduce((sum, item) => sum + Math.max(0, financialNumber(item?.serviceAmount)), 0);
+  const originalValue = movementSettlementValue(original);
+  const remaining = Math.max(0, originalValue - alreadyRefunded);
   const amount = Math.min(remaining, Math.max(0, requestedAmount == null ? remaining : financialNumber(requestedAmount)));
   if (!amount) return null;
   const tipsRemaining = Math.max(0, financialNumber(original.tips) - alreadyTipsRefunded);
-  const serviceRemaining = Math.max(0, financialNumber(original.serviceAmount) - alreadyServiceRefunded);
+  const bonusRemaining = Math.max(0, financialNumber(original.bonusAmount) - alreadyBonusRefunded);
+  const cashServiceRemaining = Math.max(0, financialNumber(original.serviceAmount) - alreadyCashServiceRefunded);
   const tips = Math.min(amount, tipsRemaining);
-  const serviceAmount = Math.min(Math.max(0, amount - tips), serviceRemaining);
-  if (tips + serviceAmount <= 0) return null;
-  return { remaining, total: tips + serviceAmount, tips, serviceAmount };
+  const afterTips = Math.max(0, amount - tips);
+  const bonusAmount = Math.min(afterTips, bonusRemaining);
+  const serviceAmount = Math.min(Math.max(0, afterTips - bonusAmount), cashServiceRemaining);
+  if (tips + bonusAmount + serviceAmount <= 0) return null;
+  return { remaining, total: tips + bonusAmount + serviceAmount, tips, bonusAmount, serviceAmount };
 }
