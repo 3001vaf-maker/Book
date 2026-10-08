@@ -32,6 +32,7 @@ import {
   refreshFinanceState,
   saveSettlementSnapshot,
 } from '../core/finance/index.js';
+import { listPersonDeposits } from '../core/loyalty/deposit/data.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 import { getAllPeople } from '../core/people/data.js';
@@ -76,22 +77,15 @@ async function saveSettlementCorrection(record, settlement) {
     openNotice({ message: 'Расчёт нельзя уменьшить ниже уже оплаченной суммы. Сначала выполните возврат или отмените ошибочную оплату.' });
     return null;
   }
-
   try {
-    await saveSettlementSnapshot({
-      source: { type: 'record', id: current.id },
-      settlement,
-    });
+    await saveSettlementSnapshot({ source: { type: 'record', id: current.id }, settlement });
     const updated = updateRecord(current.id, {
       procedures: sourcesFromSettlement(current?.procedures, settlement, 'procedure'),
       products: sourcesFromSettlement(current?.products, settlement, 'product'),
     });
     if (!updated) throw new Error('Не удалось обновить запись');
     await flushBusinessPersistence();
-    await Promise.all([
-      refreshRecordsFromServer(),
-      refreshFinanceState(),
-    ]);
+    await Promise.all([refreshRecordsFromServer(), refreshFinanceState()]);
     return getRecord(current.id) || updated;
   } catch (error) {
     await refreshRecordsFromServer().catch(() => null);
@@ -147,6 +141,7 @@ function recordPerson(record) {
   const current = personForRecord(record);
   const display = personDisplay(current);
   return {
+    key: String(current?.key || current?.id || ''),
     uei: display.uei || '',
     name: display.name || '',
   };
@@ -174,12 +169,12 @@ function paymentFromRecord(record) {
 
 function paymentAllocations(payment) {
   if (Array.isArray(payment?.allocations) && payment.allocations.length) return payment.allocations.map((item) => ({ ...item }));
-  if (payment?.walletId) return [{
-    walletId: payment.walletId,
-    walletName: payment.walletName || '',
-    amount: Number(payment.total || 0),
-  }];
+  if (payment?.walletId) return [{ walletId: payment.walletId, walletName: payment.walletName || '', amount: Number(payment.total || 0) }];
   return [];
+}
+
+function paymentDepositAllocations(payment) {
+  return Array.isArray(payment?.depositAllocations) ? payment.depositAllocations.map((item) => ({ ...item })) : [];
 }
 
 function paymentOwnerA({ settings = false } = {}) {
@@ -196,14 +191,7 @@ function paymentOwnerA({ settings = false } = {}) {
     image: String(profile?.photo || ''),
     imagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     initials,
-    ...(settings ? {
-      settingsTag: true,
-      data: 'data-record-payment-settings',
-      aria: 'Настройки оплаты',
-    } : {
-      disabled: true,
-      aria: 'Оплата',
-    }),
+    ...(settings ? { settingsTag: true, data: 'data-record-payment-settings', aria: 'Настройки оплаты' } : { disabled: true, aria: 'Оплата' }),
   };
 }
 
@@ -216,38 +204,23 @@ function recordChatKeys(record) {
 function paymentChatContext(record) {
   const groupPersonKeys = recordChatKeys(record);
   return {
-    d: {
-      kind: 'chat',
-      data: 'data-record-payment-chat',
-      aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат',
-    },
+    d: { kind: 'chat', data: 'data-record-payment-chat', aria: groupPersonKeys.length > 1 ? 'Чат группы' : 'Чат' },
     hideD: false,
   };
 }
 
 function paymentLayerContext(record, state) {
-  return workspaceHeaderContext({
-    title: 'Оплата',
-    a: paymentOwnerA({ settings: Boolean(state?.hasPayments) }),
-    ...paymentChatContext(record),
-  });
+  return workspaceHeaderContext({ title: 'Оплата', a: paymentOwnerA({ settings: Boolean(state?.hasPayments) }), ...paymentChatContext(record) });
 }
 
 function blankPaymentContext(record, title = 'Оплата') {
-  return workspaceHeaderContext({
-    title,
-    a: paymentOwnerA(),
-    ...paymentChatContext(record),
-  });
+  return workspaceHeaderContext({ title, a: paymentOwnerA(), ...paymentChatContext(record) });
 }
 
 function bindPaymentChat(layer, record) {
   layer.querySelector('[data-record-payment-chat]')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('book:record-chat-request', {
-      detail: {
-        personKey: String(record?.person?.key || ''),
-        personKeys: recordChatKeys(record),
-      },
+      detail: { personKey: String(record?.person?.key || ''), personKeys: recordChatKeys(record) },
     }));
   });
 }
@@ -264,41 +237,43 @@ function paymentItems(settlement) {
   }));
 }
 
-function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted) {
+async function depositsForRecord(record, payment = null) {
+  const person = personForRecord(record);
+  const key = String(person?.key || person?.id || '');
+  if (!key) return [];
+  const deposits = await listPersonDeposits(key).catch(() => []);
+  const current = paymentDepositAllocations(payment);
+  if (!current.length) return deposits;
+  const used = new Map(current.map((item) => [String(item.depositId || ''), Number(item.amount || 0)]));
+  return deposits.map((item) => ({
+    ...item,
+    balance: Number(item.balance || 0) + Number(used.get(String(item.depositId || '')) || 0),
+  }));
+}
+
+async function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted) {
   const current = getRecord(record?.id) || record;
   const state = paymentStateForRecord(current);
   const total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
+  const deposits = await depositsForRecord(current);
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
     `${blankPaymentContext(current)}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
     { className: 'record-payment-allocation-z' },
   ), { stack: true });
   if (!layer) return null;
   bindPaymentChat(layer, current);
-
   const host = layer.querySelector('[data-record-payment-allocation-host]');
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
     <div class="form-grid">
-      ${datePicker({
-        label: 'Дата оплаты',
-        name: 'recordPaymentDate',
-        value: '',
-        showYear: false,
-        modalVariant: 'bottom',
-        modalClassName: 'modal--form-sheet',
-        modalSurface: 'app',
-        allowClear: true,
-      })}
-      ${paymentMethods({ wallets: getWallets(), total, showAction: false, showTotal: false })}
+      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: true })}
+      ${paymentMethods({ wallets: getWallets(), deposits, total, showAction: false, showTotal: false })}
     </div>`;
   initDatePickers(host);
 
   let allocationState = null;
   const syncPrimary = () => {
-    if (!allocationState?.valid) {
-      setRecordPrimaryAction(layer);
-      return;
-    }
+    if (!allocationState?.valid) { setRecordPrimaryAction(layer); return; }
     setRecordPrimaryAction(layer, {
       label: 'Оплатить',
       onClick: async () => {
@@ -310,6 +285,7 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
             person: recordPerson(current),
             settlement,
             allocations: allocationState.allocations,
+            depositAllocations: allocationState.depositAllocations,
             maxAmount: total,
             serviceAmount: allocationState.applied,
             tips: allocationState.tips,
@@ -329,56 +305,36 @@ function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted
   };
 
   initPaymentMethods(host.querySelector('[data-payment-methods]'), {
-    onChange: (next) => {
-      allocationState = next;
-      syncPrimary();
-    },
+    onChange: (next) => { allocationState = next; syncPrimary(); },
   });
   syncPrimary();
   return layer;
 }
 
-function openPaymentCorrection(parentLayer, record, payment, onSaved) {
+async function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   if (!payment?.id) return null;
   const serviceAmount = Math.max(0, Number(payment?.serviceAmount || 0));
   const initialAllocations = paymentAllocations(payment);
+  const initialDepositAllocations = paymentDepositAllocations(payment);
+  const deposits = await depositsForRecord(record, payment);
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
     `${blankPaymentContext(record, 'Корректировка оплаты')}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
     { className: 'record-payment-correction-z' },
   ), { stack: true });
   if (!layer) return null;
   bindPaymentChat(layer, record);
-
   const host = layer.querySelector('[data-record-payment-correction-host]');
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'Оплата', value: money(payment.total), strong: true }] })}
     <div class="form-grid">
-      ${datePicker({
-        label: 'Дата оплаты',
-        name: 'recordPaymentCorrectionDate',
-        value: paymentDateValue(payment),
-        showYear: false,
-        modalVariant: 'bottom',
-        modalClassName: 'modal--form-sheet',
-        modalSurface: 'app',
-        allowClear: false,
-      })}
-      ${paymentMethods({
-        wallets: getWallets(),
-        total: serviceAmount,
-        showAction: false,
-        showTotal: false,
-        initialAllocations,
-      })}
+      ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentCorrectionDate', value: paymentDateValue(payment), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
+      ${paymentMethods({ wallets: getWallets(), deposits, total: serviceAmount, showAction: false, showTotal: false, initialAllocations, initialDepositAllocations })}
     </div>`;
   initDatePickers(host);
 
   let allocationState = null;
   const syncPrimary = () => {
-    if (!allocationState?.valid) {
-      setRecordPrimaryAction(layer);
-      return;
-    }
+    if (!allocationState?.valid) { setRecordPrimaryAction(layer); return; }
     setRecordPrimaryAction(layer, {
       label: 'Сохранить',
       variant: 'secondary',
@@ -387,6 +343,7 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
         try {
           await correctFinanceOperation(payment.id, {
             allocations: allocationState.allocations,
+            depositAllocations: allocationState.depositAllocations,
             serviceAmount: allocationState.applied,
             tips: allocationState.tips,
             occurredAt: occurredAtForDate(dateValue, record, payment.occurredAt || payment.paidAt || new Date()),
@@ -401,10 +358,7 @@ function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   };
 
   initPaymentMethods(host.querySelector('[data-payment-methods]'), {
-    onChange: (next) => {
-      allocationState = next;
-      syncPrimary();
-    },
+    onChange: (next) => { allocationState = next; syncPrimary(); },
   });
   syncPrimary();
   return layer;
@@ -419,69 +373,40 @@ function openPaymentRefund(record, payment, onSaved) {
     openNotice({ title: 'Возврат', message: 'Эта оплата уже возвращена полностью.' });
     return null;
   }
-
   const wallets = getWallets();
   const allocations = paymentAllocations(payment);
   const defaultWalletId = allocations.length === 1 ? String(allocations[0]?.walletId || '') : '';
   const layer = mountModal(document.body, modal(
     `<div class="compact-form">
-      ${field({
-        label: 'Сумма возврата',
-        name: 'recordPaymentRefundAmount',
-        type: 'number',
-        value: remaining,
-        min: 0,
-        max: remaining,
-        step: '0.01',
-        inputmode: 'decimal',
-      })}
-      ${select({
-        label: 'Кошелёк',
-        name: 'recordPaymentRefundWallet',
-        value: defaultWalletId,
-        options: [
-          { value: '', label: 'Выберите кошелёк' },
-          ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name })),
-        ],
-        aria: 'Кошелёк возврата',
-      })}
-      ${datePicker({
-        label: 'Дата возврата',
-        name: 'recordPaymentRefundDate',
-        value: paymentDateValue(record, new Date()),
-        showYear: false,
-        modalVariant: 'bottom',
-        modalClassName: 'modal--form-sheet',
-        modalSurface: 'app',
-        allowClear: false,
-      })}
+      ${field({ label: 'Сумма возврата', name: 'recordPaymentRefundAmount', type: 'number', value: remaining, min: 0, max: remaining, step: '0.01', inputmode: 'decimal' })}
+      ${select({ label: 'Кошелёк', name: 'recordPaymentRefundWallet', value: defaultWalletId, options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))], aria: 'Кошелёк возврата' })}
+      ${datePicker({ label: 'Дата возврата', name: 'recordPaymentRefundDate', value: paymentDateValue(record, new Date()), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
       ${button('Вернуть', { variant: 'danger', data: 'data-record-payment-refund-confirm' })}
     </div>`,
     { variant: 'x', surface: 'app', title: 'Возврат', className: 'modal--form-sheet' },
   ));
   if (!layer) return null;
   initDatePickers(layer);
-
   const amountInput = layer.querySelector('input[name="recordPaymentRefundAmount"]');
   const walletInput = layer.querySelector('input[name="recordPaymentRefundWallet"]');
   const submit = layer.querySelector('[data-record-payment-refund-confirm]');
+  const hasCash = paymentAllocations(payment).reduce((sum, item) => sum + Number(item.amount || 0), 0) > 0.009;
   const sync = () => {
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
-    if (submit) submit.disabled = !walletInput?.value || amount <= 0;
+    if (submit) submit.disabled = amount <= 0 || (hasCash && !walletInput?.value);
   };
   amountInput?.addEventListener('input', sync);
   walletInput?.addEventListener('change', sync);
-
   submit?.addEventListener('click', async () => {
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
     const wallet = wallets.find((item) => String(item?.id || '') === String(walletInput?.value || ''));
     const dateValue = String(layer.querySelector('input[name="recordPaymentRefundDate"]')?.value || '');
-    if (!amount || !wallet || !dateValue) return;
+    if (!amount || !dateValue || (hasCash && !wallet)) return;
     try {
       const refund = await recordRefundExpense(payment.id, {
         amount,
-        walletId: wallet.id,
-        walletName: wallet.name,
+        walletId: wallet?.id || '',
+        walletName: wallet?.name || '',
         occurredAt: occurredAtForDate(dateValue, record),
       });
       if (!refund) return;
@@ -509,10 +434,7 @@ function openPaymentCancellation(record, payment, onSaved) {
   layer.querySelector('[data-record-payment-cancel-confirm]')?.addEventListener('click', async () => {
     const dateValue = String(layer.querySelector('input[name="recordPaymentCancelDate"]')?.value || '');
     try {
-      await cancelPaymentOperation(payment.id, {
-        reason: 'incorrect-entry',
-        occurredAt: occurredAtForDate(dateValue, record),
-      });
+      await cancelPaymentOperation(payment.id, { reason: 'incorrect-entry', occurredAt: occurredAtForDate(dateValue, record) });
       layer.v2Close?.();
       onSaved?.();
     } catch (error) {
@@ -547,63 +469,26 @@ function openPaymentSettings(layer, record, state, rerender) {
   return openSharedProfileSettingsMenu({
     title: 'Настройки оплаты',
     actions: [
-      {
-        id: 'correct-payment',
-        label: 'Корректировка оплаты',
-        onSelect: () => openPaymentCorrection(layer, record, payment, rerender),
-      },
-      {
-        id: 'refund-payment',
-        label: 'Возврат',
-        variant: 'danger',
-        onSelect: () => openPaymentRefund(record, payment, rerender),
-      },
-      {
-        id: 'cancel-payment',
-        label: 'Отмена оплаты',
-        variant: 'danger',
-        onSelect: () => openPaymentCancellation(record, payment, rerender),
-      },
-      {
-        id: 'delete-payment',
-        label: 'Удаление оплаты',
-        variant: 'critical',
-        onSelect: () => openPaymentDeletion(payment, rerender),
-      },
+      { id: 'correct-payment', label: 'Корректировка оплаты', onSelect: () => openPaymentCorrection(layer, record, payment, rerender) },
+      { id: 'refund-payment', label: 'Возврат', variant: 'danger', onSelect: () => openPaymentRefund(record, payment, rerender) },
+      { id: 'cancel-payment', label: 'Отмена оплаты', variant: 'danger', onSelect: () => openPaymentCancellation(record, payment, rerender) },
+      { id: 'delete-payment', label: 'Удаление оплаты', variant: 'critical', onSelect: () => openPaymentDeletion(payment, rerender) },
     ],
   });
 }
 
 function renderPaymentLayer(layer, recordId) {
   const current = getRecord(recordId);
-  if (!current) {
-    layer.v2Close?.();
-    return;
-  }
+  if (!current) { layer.v2Close?.(); return; }
   const state = paymentStateForRecord(current);
   const payment = paymentFromRecord(current);
   const settlement = payment.settlement;
-
   layer.innerHTML = `${paymentLayerContext(current, state)}
     <div class="record-screen record-screen--state-view">
-      ${paymentForm({
-        workplace: payment.workplace,
-        date: payment.date,
-        time: payment.time,
-        person: payment.person || {},
-        procedures: paymentItems(settlement),
-        total: state.remaining,
-        showActions: false,
-      })}
+      ${paymentForm({ workplace: payment.workplace, date: payment.date, time: payment.time, person: payment.person || {}, procedures: paymentItems(settlement), total: state.remaining, showActions: false })}
     </div>`;
   bindPaymentChat(layer, current);
-
-  let formState = {
-    settlement,
-    total: state.remaining,
-    dirty: false,
-  };
-
+  let formState = { settlement, total: state.remaining, dirty: false };
   const syncPrimary = () => {
     if (formState.dirty) {
       setRecordPrimaryAction(layer, {
@@ -616,12 +501,8 @@ function renderPaymentLayer(layer, recordId) {
       });
       return;
     }
-
     const canPay = state.remaining > 0.009 || state.fullyPaid;
-    if (!canPay) {
-      setRecordPrimaryAction(layer);
-      return;
-    }
+    if (!canPay) { setRecordPrimaryAction(layer); return; }
     setRecordPrimaryAction(layer, {
       label: 'Оплатить',
       onClick: () => openPaymentAllocationLayer(layer, current, formState.settlement, () => {
@@ -629,16 +510,11 @@ function renderPaymentLayer(layer, recordId) {
       }),
     });
   };
-
   initPaymentForm(layer.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     paidTotal: state.paidTotal,
-    onChange: (next) => {
-      formState = next;
-      syncPrimary();
-    },
+    onChange: (next) => { formState = next; syncPrimary(); },
   });
-
   layer.querySelector('[data-record-payment-settings]')?.addEventListener('click', () => {
     openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), () => {
       if (layer.isConnected) renderPaymentLayer(layer, current.id);
@@ -650,9 +526,7 @@ function renderPaymentLayer(layer, recordId) {
 export function openRecordPayment(record, { host = null } = {}) {
   if (!record?.id) return null;
   const current = getRecord(record.id) || record;
-  const layer = mountV2ZLayer(host || document.querySelector('[data-v2-workspace-surface]'), v2ZLayer('', {
-    className: 'record-payment-z',
-  }), { stack: true });
+  const layer = mountV2ZLayer(host || document.querySelector('[data-v2-workspace-surface]'), v2ZLayer('', { className: 'record-payment-z' }), { stack: true });
   if (!layer) return null;
   renderPaymentLayer(layer, current.id);
   return layer;
