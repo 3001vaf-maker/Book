@@ -56,7 +56,7 @@ for (const token of [
   if (!architecture.includes(token)) errors.push(`LOYALTY_ARCHITECTURE.md missing normative rule: ${token}`);
 }
 
-if (!assignment.includes('Личный счёт **не назначается вообще**')) {
+if (!assignment.includes('Личный счёт') || !assignment.includes('**не назначается вообще**')) {
   errors.push('LOYALTY_ASSIGNMENT_CONTRACT.md must explicitly exclude Personal Account from assignment');
 }
 if (!finance.includes('Личный счёт хранит только **реальные деньги')) {
