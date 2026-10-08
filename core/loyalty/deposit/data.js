@@ -30,8 +30,11 @@ export async function saveDepositPrograms(next=[]){
   const values=list(next).map((item)=>clone(item));
   const nextIds=new Set(values.map((item)=>text(item?.id)).filter(Boolean));
   const removedProgramIds=programs.map((item)=>text(item?.id)).filter((id)=>id&&!nextIds.has(id));
-  for(const programId of removedProgramIds){
-    await payload(await apiRequest(`/loyalty/deposits/program/${encodeURIComponent(programId)}`,{method:'DELETE'}),'Не удалось полностью удалить депозитную программу');
+  if(removedProgramIds.length){
+    for(const programId of removedProgramIds){
+      await payload(await apiRequest(`/loyalty/deposits/program/${encodeURIComponent(programId)}`,{method:'DELETE'}),'Не удалось полностью удалить депозитную программу');
+    }
+    return loadDepositPrograms();
   }
   const remote=await payload(await apiRequest('/auxiliary-state/depositPrograms',{
     method:'PUT',
