@@ -1,5 +1,6 @@
 import {
   emptyState,
+  entityCardStack,
   mountV2ZLayer,
   page,
   shortDateTime,
@@ -11,7 +12,9 @@ import {
 import {
   availablePeople,
   bindViewSettings,
+  loyaltyCardFields,
   loyaltyHeader,
+  loyaltyVisualCard,
   money,
   mockPerson,
   notifyLoyaltyContext,
@@ -45,6 +48,17 @@ function balanceFor(person = {}) {
 
 function historyFor(person = {}) {
   return mockHistory.get(personKey(person)) || [];
+}
+
+function accountCardFields(person = {}) {
+  const balance = balanceFor(person);
+  return loyaltyCardFields({
+    title: personLabel(person),
+    subtitle: 'Личный счёт',
+    status: balance > 0 ? 'Есть остаток' : 'Нулевой остаток',
+    metaLeft: 'Денежный остаток',
+    metaRight: money(balance),
+  });
 }
 
 function historyRows(person = {}) {
@@ -82,22 +96,23 @@ async function openAccountLayer(root, person = {}) {
 
 export async function renderPersonalAccount(root) {
   const values = availablePeople(fallbackPeople);
+  const cards = values.length
+    ? entityCardStack(values.map((person) => loyaltyVisualCard('personal-account', accountCardFields(person), {
+        data: `data-personal-account-person="${personKey(person)}"`,
+        aria: `Открыть личный счёт ${personLabel(person)}`,
+      })))
+    : emptyState('Контактов пока нет', 'Личный счёт появляется автоматически вместе с отношением профессионал ↔ человек.');
+
   root.innerHTML = page([
     loyaltyHeader('Личный счёт', { settings: true }),
-    values.length
-      ? v2ListEntries(values.map((person) => v2ListEntry({
-          title: personLabel(person),
-          subtitle: 'Денежный остаток',
-          rightTop: money(balanceFor(person)),
-          interactive: true,
-          initial: personLabel(person).slice(0, 1).toUpperCase(),
-          data: `data-personal-account-person="${personKey(person)}"`,
-          aria: `Открыть личный счёт ${personLabel(person)}`,
-        })))
-      : emptyState('Контактов пока нет', 'Личный счёт появляется автоматически вместе с отношением профессионал ↔ человек.'),
+    cards,
   ]);
 
-  bindViewSettings(root, 'Личный счёт');
+  bindViewSettings(root, 'Личный счёт', {
+    type: 'personal-account',
+    fields: () => accountCardFields(values[0] || fallbackPeople[0]),
+    onSaved: () => renderPersonalAccount(root),
+  });
   root.querySelectorAll('[data-personal-account-person]').forEach((node) => {
     node.addEventListener('click', () => {
       const person = values.find((item) => personKey(item) === String(node.dataset.personalAccountPerson || ''));
