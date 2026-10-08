@@ -17,6 +17,8 @@ const moneyInputText = (value) => {
 };
 
 const moneyDisplay = (value) => `${moneyInputText(value) || '0'} ₽`;
+const bonusDisplay = (value) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
+  .format(Math.max(0, numberValue(value))).replaceAll('\u00a0', ' ');
 
 function walletOptions(wallets = []) {
   return [{ value: '', label: 'Кошелёк' }, ...(Array.isArray(wallets) ? wallets : []).map((wallet) => ({
@@ -50,7 +52,10 @@ function totalReceipt(label, value) {
   return readOnlyReceipt({ totals: [{ label, value: moneyDisplay(value), strong: true }] });
 }
 
-export function paymentAllocationState(allocations = [], total = 0) {
+export function paymentAllocationState(allocations = [], total = 0, {
+  bonusAmount = 0,
+  bonusAvailable = 0,
+} = {}) {
   const normalized = (Array.isArray(allocations) ? allocations : []).map((item) => ({
     ...item,
     walletId: String(item?.walletId || ''),
@@ -58,20 +63,53 @@ export function paymentAllocationState(allocations = [], total = 0) {
     amount: Math.max(0, numberValue(item?.amount)),
   })).filter((item) => item.walletId || item.amount > 0);
   const due = Math.max(0, numberValue(total));
+  const available = Math.max(0, numberValue(bonusAvailable));
+  const bonus = Math.min(due, available, Math.max(0, numberValue(bonusAmount)));
+  const cashDue = Math.max(0, due - bonus);
   const received = normalized.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const applied = Math.min(due, received);
+  const applied = Math.min(cashDue, received);
   const tips = Math.max(0, received - applied);
-  const remaining = Math.max(0, due - applied);
-  const valid = normalized.length > 0
-    && normalized.every((item) => item.walletId && item.amount > 0)
-    && received > 0;
-  return { allocations: normalized, received, tips, applied, remaining, valid };
+  const remaining = Math.max(0, cashDue - applied);
+  const rowsValid = normalized.length === 0
+    || normalized.every((item) => item.walletId && item.amount > 0);
+  const hasValue = bonus > 0 || received > 0;
+  const valid = rowsValid && hasValue;
+  return {
+    allocations: normalized,
+    received,
+    bonusAmount: bonus,
+    bonusAvailable: available,
+    cashDue,
+    tips,
+    applied,
+    serviceApplied: applied + bonus,
+    remaining,
+    valid,
+  };
 }
 
-export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocations = [], showAction = true, showTotal = true } = {}) {
+export function paymentMethodsMarkup({
+  wallets = [],
+  total = 0,
+  initialAllocations = [],
+  bonusAvailable = 0,
+  initialBonusAmount = 0,
+  showAction = true,
+  showTotal = true,
+} = {}) {
   const allocations = Array.isArray(initialAllocations) ? initialAllocations : [];
+  const available = Math.max(0, numberValue(bonusAvailable));
+  const bonus = Math.min(Math.max(0, numberValue(total)), available, Math.max(0, numberValue(initialBonusAmount)));
   return `<div class="form-grid" data-payment-allocation-owner>
     ${showTotal ? `<div data-payment-remaining>${totalReceipt('К оплате', total)}</div>` : ''}
+    ${available > 0 ? field({
+      label: `Бонусы · доступно ${bonusDisplay(available)}`,
+      name: 'paymentBonusAmount',
+      value: bonus ? moneyInputText(bonus) : '',
+      type: 'text',
+      inputmode: 'decimal',
+      data: 'data-payment-bonus-amount',
+    }) : ''}
     <div class="form-grid">
       ${allocationRow(0, wallets, allocations[0] || {})}
       ${allocationRow(1, wallets, allocations[1] || {})}
@@ -81,11 +119,18 @@ export function paymentMethodsMarkup({ wallets = [], total = 0, initialAllocatio
   </div>`;
 }
 
-export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, onPay = () => {}, onChange = () => {} } = {}) {
+export function initPaymentMethodsAllocation(root, {
+  wallets = [],
+  total = 0,
+  bonusAvailable = 0,
+  onPay = () => {},
+  onChange = () => {},
+} = {}) {
   if (!root) return;
   const remainingNode = root.querySelector('[data-payment-remaining]');
   const tipsRow = root.querySelector('[data-payment-tips-row]');
   const submit = root.querySelector('[data-payment-allocation-submit]');
+  const bonusInput = root.querySelector('[data-payment-bonus-amount]');
   const rows = () => [...root.querySelectorAll('[data-payment-allocation-row]')].map((part) => ({
     walletInput: part.querySelector('input[data-payment-allocation-wallet]'),
     amountInput: part.querySelector('[data-payment-allocation-amount]'),
@@ -101,11 +146,18 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
   }
 
   function state() {
-    return paymentAllocationState(normalizedAllocations(), total);
+    return paymentAllocationState(normalizedAllocations(), total, {
+      bonusAmount: bonusInput?.value || 0,
+      bonusAvailable,
+    });
   }
 
   function sync() {
     const current = state();
+    if (bonusInput) {
+      const normalized = current.bonusAmount > 0 ? moneyInputText(current.bonusAmount) : '';
+      if (Math.abs(numberValue(bonusInput.value) - current.bonusAmount) > 0.0001) bonusInput.value = normalized;
+    }
     if (remainingNode) remainingNode.innerHTML = totalReceipt('К оплате', current.remaining);
     if (tipsRow) {
       tipsRow.hidden = current.tips <= 0.009;
@@ -116,6 +168,12 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
     return current;
   }
 
+  bonusInput?.addEventListener('input', sync);
+  bonusInput?.addEventListener('blur', () => {
+    const current = state();
+    bonusInput.value = current.bonusAmount > 0 ? moneyInputText(current.bonusAmount) : '';
+    sync();
+  });
   rows().forEach(({ walletInput, amountInput }) => {
     walletInput?.addEventListener('change', sync);
     amountInput?.addEventListener('input', sync);
@@ -133,6 +191,8 @@ export function initPaymentMethodsAllocation(root, { wallets = [], total = 0, on
       allocations: current.allocations,
       receivedAmount: current.received,
       appliedAmount: current.applied,
+      bonusAmount: current.bonusAmount,
+      serviceApplied: current.serviceApplied,
       tips: current.tips,
     });
   });
