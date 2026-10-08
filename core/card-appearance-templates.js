@@ -39,8 +39,21 @@ function normalized(values = []) {
   return [...byScope.values()];
 }
 
+function updatedAtValue(value = '') {
+  const time = Date.parse(String(value || ''));
+  return Number.isFinite(time) ? time : 0;
+}
+
 export function hydrateCardAppearanceTemplates(values = []) {
-  templatesState = normalized(values);
+  const incoming = normalized(values);
+  const merged = new Map(incoming.map((item) => [item.scope, item]));
+  for (const local of templatesState) {
+    const remote = merged.get(local.scope);
+    if (!remote || updatedAtValue(local.updatedAt) > updatedAtValue(remote.updatedAt)) {
+      merged.set(local.scope, local);
+    }
+  }
+  templatesState = [...merged.values()];
   return getCardAppearanceTemplates();
 }
 
