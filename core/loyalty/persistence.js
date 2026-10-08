@@ -1,4 +1,5 @@
 import { apiRequest } from '../auth.js';
+import { flushBusinessPersistence, queueAuxiliaryDataset } from '../business-persistence.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -11,38 +12,14 @@ async function responseJson(response, fallback) {
 }
 
 export async function loadLoyaltyServerState() {
-  return responseJson(await apiRequest('/loyalty-state'), 'Не удалось загрузить Лояльность');
+  const payload = await responseJson(await apiRequest('/auxiliary-state'), 'Не удалось загрузить Лояльность');
+  return clone(payload?.loyalty && typeof payload.loyalty === 'object' && !Array.isArray(payload.loyalty) ? payload.loyalty : {});
 }
 
-let writeChain = Promise.resolve();
-
 export function queueLoyaltyState(value = {}) {
-  const snapshot = clone(value) || {};
-  writeChain = writeChain
-    .catch(() => null)
-    .then(async () => {
-      const result = await responseJson(await apiRequest('/loyalty-state', {
-        method: 'PUT',
-        body: JSON.stringify({ value: snapshot }),
-      }), 'Не удалось сохранить Лояльность');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('book:server-mutation-completed', {
-          detail: { scopes: ['loyalty'] },
-        }));
-      }
-      return result;
-    })
-    .catch((error) => {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('book:business-persistence-error', {
-          detail: { message: error instanceof Error ? error.message : 'Не удалось сохранить Лояльность' },
-        }));
-      }
-      throw error;
-    });
-  return writeChain;
+  return queueAuxiliaryDataset('loyalty', clone(value) || {});
 }
 
 export async function flushLoyaltyPersistence() {
-  await writeChain;
+  await flushBusinessPersistence();
 }
