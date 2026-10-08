@@ -1,11 +1,12 @@
 import {
+  details,
   emptyState,
   entityCardStack,
+  miniCard,
+  miniCardRail,
   mountV2ZLayer,
   page,
   shortDateTime,
-  v2ListEntries,
-  v2ListEntry,
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
@@ -26,6 +27,7 @@ const fallbackPeople = [
   mockPerson('Анна Иванова', 'mock-person-2'),
 ];
 
+// Личный счёт существует автоматически для каждого контакта; Z1 показывает только ненулевые остатки.
 const mockBalances = new Map([
   ['mock-person-1', 5000],
   ['mock-person-2', 0],
@@ -55,30 +57,31 @@ function accountCardFields(person = {}) {
   return loyaltyCardFields({
     title: personLabel(person),
     subtitle: 'Личный счёт',
-    status: balance > 0 ? 'Есть остаток' : 'Нулевой остаток',
+    status: 'Есть остаток',
     metaLeft: 'Денежный остаток',
     metaRight: money(balance),
   });
 }
 
-function historyRows(person = {}) {
+function historyRail(person = {}) {
   const items = historyFor(person);
-  if (!items.length) return emptyState('Движений пока нет', 'Личный счёт существует и при нулевом денежном остатке.');
-  return v2ListEntries([...items].reverse().map((item) => v2ListEntry({
-    title: item.direction === 'in' ? 'Деньги оставлены на счёте' : 'Использовано при расчёте',
-    subtitle: `${item.source} · ${shortDateTime(item.occurredAt, '—')}`,
-    rightTop: `${item.direction === 'in' ? '+' : '−'}${money(item.amount)}`,
-    rightBottom: `Остаток ${money(item.balanceAfter)}`,
-    interactive: false,
-    initial: '',
+  if (!items.length) return emptyState('Истории пока нет', 'Движения появятся после использования личного счёта.');
+  return miniCardRail([...items].reverse().map((item) => miniCard({
+    title: item.direction === 'in' ? 'Пополнение' : 'Использование',
+    value: `${item.direction === 'in' ? '+' : '−'}${money(item.amount)}`,
+    subtitle: shortDateTime(item.occurredAt, '—'),
+    rows: [
+      { label: 'Источник', value: item.source || '—' },
+      { label: 'Остаток', value: money(item.balanceAfter) },
+    ],
   })));
 }
 
 function accountInfo(person = {}) {
-  return v2ListEntries([
-    v2ListEntry({ title: 'Владелец', subtitle: personLabel(person), interactive: false, initial: '' }),
-    v2ListEntry({ title: 'Денежный остаток', subtitle: money(balanceFor(person)), interactive: false, initial: '' }),
-    v2ListEntry({ title: 'Состояние', subtitle: balanceFor(person) > 0 ? 'Есть деньги человека' : 'Нулевой остаток', interactive: false, initial: '' }),
+  return details([
+    { label: 'Контакт', value: personLabel(person) },
+    { label: 'Денежный остаток', value: money(balanceFor(person)) },
+    { label: 'Состояние', value: 'Есть деньги контакта' },
   ]);
 }
 
@@ -87,21 +90,22 @@ async function openAccountLayer(root, person = {}) {
   if (!layer) return null;
   layer.innerHTML = page([
     loyaltyHeader(personLabel(person)),
-    v2Section('Личный счёт', accountInfo(person)),
-    v2Section('История', historyRows(person)),
+    accountInfo(person),
+    v2Section('История', historyRail(person)),
   ]);
   notifyLoyaltyContext();
   return layer;
 }
 
 export async function renderPersonalAccount(root) {
-  const values = availablePeople(fallbackPeople);
+  const allContacts = availablePeople(fallbackPeople);
+  const values = allContacts.filter((person) => balanceFor(person) > 0.009);
   const cards = values.length
     ? entityCardStack(values.map((person) => loyaltyVisualCard('personal-account', accountCardFields(person), {
         data: `data-personal-account-person="${personKey(person)}"`,
         aria: `Открыть личный счёт ${personLabel(person)}`,
       })))
-    : emptyState('Контактов пока нет', 'Личный счёт появляется автоматически вместе с отношением профессионал ↔ человек.');
+    : emptyState('Ненулевых остатков пока нет', 'Здесь появятся только контакты, у которых есть деньги на личном счёте.');
 
   root.innerHTML = page([
     loyaltyHeader('Личный счёт', { settings: true }),

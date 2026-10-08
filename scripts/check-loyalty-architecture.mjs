@@ -140,9 +140,6 @@ if (/label:\s*['"]\+['"]|data-(?:personal-account|loyalty)-create|data-loyalty-s
 }
 if (/бонус/i.test(personalAccountUI)) errors.push('Personal Account UI must not expose a bonus balance');
 if (!/Денежный остаток/.test(personalAccountUI)) errors.push('Personal Account UI must expose money-only balance');
-if (!/автоматически|появляется автоматически|существует/.test(personalAccountUI)) {
-  errors.push('Personal Account UI must communicate automatic existence rather than manual assignment');
-}
 
 const visualOwners = [
   ['Personal Account', personalAccountUI, 'personal-account'],

@@ -1,6 +1,7 @@
 import {
   button,
   datePicker,
+  details,
   emptyState,
   entityCardStack,
   entityVisualCard,
@@ -8,15 +9,20 @@ import {
   field,
   formValidationMessage,
   initDatePickers,
+  miniCard,
+  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   openEntityCardAppearanceQ,
   openNotice,
   openSharedProfileSettingsMenu,
   page,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
+  smallActionButton,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -50,7 +56,6 @@ const PROGRAM_UEI_TYPE = 'loyalty-deposit-program';
 const DEPOSIT_UEI_TYPE = 'loyalty-deposit';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
-const text = (value) => String(value ?? '').trim();
 const uid = () => globalThis.crypto?.randomUUID?.() || `deposit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function notifyContext() {
@@ -95,12 +100,12 @@ function depositStatusLabel(status = '') {
   return status === 'closed' ? 'Закрыт' : 'Активен';
 }
 
-function personLabel(person = {}) {
+function contactLabel(person = {}) {
   const display = personDisplay(person);
   return display.name || 'Без имени';
 }
 
-function personOption(person = {}) {
+function contactOption(person = {}) {
   const display = personDisplay(person);
   return {
     value: String(person?.key || person?.id || ''),
@@ -164,17 +169,6 @@ function programFields(program = {}) {
   });
 }
 
-function depositFields(deposit = {}) {
-  return depositCardFields({
-    uei: depositUei(deposit),
-    title: deposit?.programName || 'Депозит',
-    subtitle: personLabel(deposit?.person || {}),
-    status: depositStatusLabel(deposit?.status),
-    metaLeft: `Внесено ${money(deposit?.fundedAmount)}`,
-    metaRight: `Остаток ${money(deposit?.balance)}`,
-  });
-}
-
 function card(fields, { data = '', aria = '', interactive = true } = {}) {
   return entityVisualCard({
     appearance: depositCardAppearance(),
@@ -187,38 +181,36 @@ function card(fields, { data = '', aria = '', interactive = true } = {}) {
   });
 }
 
-function programInfo(program = {}, issuedCount = null) {
-  const rows = [
-    ['UEI', programUei(program) || '—'],
-    ['Статус', programStatusLabel(program?.status)],
-    ['Сумма', Number(program?.amount || 0) > 0 ? money(program.amount) : 'Свободная'],
-    ['Срок', program?.termRule || 'Бессрочно'],
-    ['Выгода', program?.benefit || 'Без дополнительной выгоды'],
-    ['Условия', program?.description || '—'],
+function programConditions(program = {}, issuedCount = null) {
+  const lines = [
+    `UEI: ${programUei(program) || '—'}`,
+    `Состояние: ${programStatusLabel(program?.status)}`,
+    `Сумма: ${Number(program?.amount || 0) > 0 ? money(program.amount) : 'Свободная'}`,
+    `Срок: ${program?.termRule || 'Бессрочно'}`,
+    `Выгода: ${program?.benefit || 'Без дополнительной выгоды'}`,
   ];
-  if (issuedCount != null) rows.push(['Оформлено', String(Math.max(0, Number(issuedCount) || 0))]);
-  rows.push(['Создано', shortDateTime(program?.createdAt, '—')]);
-  return v2ListEntries(rows.map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  if (issuedCount != null) lines.push(`Оформлено: ${Math.max(0, Number(issuedCount) || 0)}`);
+  lines.push(`Создано: ${shortDateTime(program?.createdAt, '—')}`, '', program?.description || 'Дополнительные условия не указаны.');
+  return lines.join('\n');
 }
 
 function depositInfo(deposit = {}) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  return v2ListEntries([
-    ['UEI', depositUei(deposit) || '—'],
-    ['Владелец', personLabel(deposit?.person || {})],
-    ['Дата оформления', shortDateTime(deposit?.fundedAt, '—')],
-    ['Внесено', money(deposit?.fundedAmount)],
-    ['Остаток', money(deposit?.balance)],
-    ['Срок', terms?.termRule || 'Бессрочно'],
-    ['Выгода', terms?.benefit || 'Без дополнительной выгоды'],
-    ['Условия', terms?.description || '—'],
-    ['Состояние', depositStatusLabel(deposit?.status)],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  return details([
+    { label: 'UEI', value: depositUei(deposit) || '—' },
+    { label: 'Контакт', value: contactLabel(deposit?.person || {}) },
+    { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
+    { label: 'Внесено', value: money(deposit?.fundedAmount) },
+    { label: 'Остаток', value: money(deposit?.balance) },
+    { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
+    { label: 'Выгода', value: terms?.benefit || 'Без дополнительной выгоды' },
+    { label: 'Состояние', value: depositStatusLabel(deposit?.status) },
+  ]);
 }
 
 function historyMarkup(deposit = {}) {
   const items = Array.isArray(deposit?.history) ? deposit.history : [];
-  if (!items.length) return emptyState('Движений пока нет', 'История депозита появится после операций.');
+  if (!items.length) return emptyState('Истории пока нет', 'Движения депозита появятся здесь.');
   const kindLabel = (kind) => {
     if (kind === 'deposit-funding') return 'Внесение';
     if (kind === 'deposit-withdrawal') return 'Возврат остатка';
@@ -226,12 +218,24 @@ function historyMarkup(deposit = {}) {
     if (kind === 'payment') return 'Использование при оплате';
     return 'Операция';
   };
-  return v2ListEntries([...items].reverse().map((item) => v2ListEntry({
+  return miniCardRail([...items].reverse().map((item) => miniCard({
     title: kindLabel(item?.kind),
+    value: `${item?.direction === 'in' ? '+' : '−'}${money(item?.amount)}`,
     subtitle: shortDateTime(item?.occurredAt, '—'),
-    rightTop: `${item?.direction === 'in' ? '+' : '−'}${money(item?.amount)}`,
-    interactive: false,
+  })));
+}
+
+function issuedList(items = []) {
+  if (!items.length) return emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
+  return v2ListEntries(items.map((deposit) => v2ListEntry({
+    title: contactLabel(deposit?.person || {}),
+    subtitle: depositUei(deposit) || depositStatusLabel(deposit?.status),
+    rightTop: money(deposit?.balance),
+    rightBottom: depositStatusLabel(deposit?.status),
+    interactive: true,
     initial: '',
+    data: `data-deposit-instance="${escapeHtml(deposit.depositId)}"`,
+    aria: `Открыть депозит ${contactLabel(deposit?.person || {})}`,
   })));
 }
 
@@ -281,7 +285,7 @@ function openAppearanceQ(root, onSaved = () => {}) {
     id: '', name: 'Депозит', amount: 30000, termRule: '12 месяцев', benefit: 'Условия программы', status: 'active',
   };
   return openEntityCardAppearanceQ(root, {
-    title: 'Вид карты',
+    title: 'Вид',
     typeLabel: 'Карта',
     typeOptions: [{ value: depositCardScope(), label: 'Депозит' }],
     initialType: depositCardScope(),
@@ -302,6 +306,13 @@ function openAppearanceQ(root, onSaved = () => {}) {
       });
     },
     onSaved,
+  });
+}
+
+function openProgramConditions(program, issuedCount) {
+  return openDocumentViewer({
+    title: program?.name || 'Условия депозита',
+    content: programConditions(program, issuedCount),
   });
 }
 
@@ -367,20 +378,20 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
   const people = getAllPeople();
   const fixedPersonKey = String(person?.key || person?.id || '');
   const selectedPerson = fixedPersonKey ? person : null;
-  const personField = selectedPerson
-    ? field({ label: 'Человек', name: 'personName', value: personLabel(selectedPerson), disabled: true })
+  const contactField = selectedPerson
+    ? field({ label: 'Контакт', name: 'personName', value: contactLabel(selectedPerson), disabled: true })
     : select({
-        label: 'Человек',
+        label: 'Контакт',
         name: 'personKey',
         value: '',
-        options: [{ value: '', label: 'Выберите человека' }, ...people.map(personOption).filter((item) => item.value)],
+        options: [{ value: '', label: 'Выберите контакт' }, ...people.map(contactOption).filter((item) => item.value)],
       });
   const layer = mountModal(root, modal(`${depositHeaderContext({
     title: 'Оформить депозит',
     c: { label: 'Оформить', data: 'data-deposit-fund-save', aria: 'Оформить депозит' },
   })}
     <form class="form-grid" data-deposit-fund-form>
-      ${personField}
+      ${contactField}
       ${ueiField({ name: 'depositUei' })}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: Number(program?.amount || 0) > 0 ? program.amount : '' })}
       ${select({ label: 'Кошелёк приёма денег', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
@@ -403,7 +414,7 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
     const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
     const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
     if (!owner || !wallet || amount <= 0) {
-      if (errorNode) errorNode.textContent = 'Укажите человека, сумму и кошелёк';
+      if (errorNode) errorNode.textContent = 'Укажите контакт, сумму и кошелёк';
       return;
     }
     try {
@@ -480,7 +491,7 @@ function openRootSettings(root, rerender) {
   return openSharedProfileSettingsMenu({
     title: 'Депозит',
     actions: [
-      { id: 'appearance', label: 'Вид карты', onSelect: () => openAppearanceQ(root, rerender) },
+      { id: 'appearance', label: 'Вид', onSelect: () => openAppearanceQ(root, rerender) },
     ],
   });
 }
@@ -516,8 +527,7 @@ async function openDepositLayer(root, depositId, onChanged = () => {}) {
         settingsAria: 'Настройки депозита',
         c: Number(deposit.balance || 0) > 0.009 ? { label: 'Возврат', data: 'data-deposit-withdraw', aria: 'Вернуть остаток депозита' } : null,
       }),
-      `<section>${card(depositFields(deposit), { interactive: false })}</section>`,
-      v2Section('Паспорт', depositInfo(deposit)),
+      depositInfo(deposit),
       v2Section('История', historyMarkup(deposit)),
     ]);
     layer.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
@@ -552,12 +562,6 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
     }
     const allDeposits = await listAllDeposits();
     const issued = allDeposits.filter((item) => String(item?.programId) === String(program.id));
-    const issuedMarkup = issued.length
-      ? entityCardStack(issued.map((deposit) => card(depositFields(deposit), {
-          data: `data-deposit-instance="${escapeHtml(deposit.depositId)}"`,
-          aria: `Открыть депозит ${depositUei(deposit) || deposit.programName || ''}`,
-        })))
-      : emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
     layer.innerHTML = page([
       depositHeaderContext({
         title: program.name || 'Депозит',
@@ -565,10 +569,10 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
         settingsAria: 'Настройки депозитной программы',
         c: program.status === 'active' ? { label: 'Оформить', data: 'data-deposit-program-fund', aria: 'Оформить депозит' } : null,
       }),
-      `<section>${card(programFields(program), { interactive: false })}</section>`,
-      v2Section('Условия', programInfo(program, issued.length)),
-      v2Section('Оформленные депозиты', issuedMarkup),
+      v2Section('Оформленные депозиты', issuedList(issued)),
     ]);
+    setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-deposit-info', aria: 'Условия депозитной программы' })]);
+    layer.querySelector('[data-deposit-info]')?.addEventListener('click', () => openProgramConditions(program, issued.length));
     layer.querySelector('[data-deposit-program-settings]')?.addEventListener('click', () => openProgramSettings(root, program, async () => {
       await render();
       await onChanged?.();
@@ -612,7 +616,7 @@ export async function openDepositForPerson(root, person = null) {
         settingsAria: 'Настройки депозита',
         c: { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
       }),
-      `<section>${cards}</section>`,
+      cards,
     ]);
     layer.querySelector('[data-deposit-settings]')?.addEventListener('click', () => openRootSettings(root, render));
     layer.querySelector('[data-deposit-program-add]')?.addEventListener('click', () => openCreateProgramQ(root, render));
@@ -635,10 +639,10 @@ export async function renderDeposit(root) {
       settingsAria: 'Настройки депозита',
       c: { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
-    `<section>${programs.length ? entityCardStack(programs.map((program) => card(programFields(program), {
+    programs.length ? entityCardStack(programs.map((program) => card(programFields(program), {
       data: `data-deposit-program="${escapeHtml(program.id)}"`,
       aria: `Открыть депозитную программу ${program.name || ''}`,
-    }))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')}</section>`,
+    }))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
   ]);
   const rerender = () => renderDeposit(root);
   root.querySelector('[data-deposit-settings]')?.addEventListener('click', () => openRootSettings(root, rerender));

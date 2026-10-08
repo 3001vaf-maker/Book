@@ -44,7 +44,7 @@ export function entityCard({
 
 export function entityCardStack(cards = [], { className = '' } = {}) {
   const items = Array.isArray(cards) ? cards : [];
-  return `<div class="entity-card-stack${className ? ` ${escapeHtml(className)}` : ''}" data-entity-card-stack>${items.join('')}</div>`;
+  return `<div class="entity-card-stack${className ? ` ${escapeHtml(className)}` : ''}" data-entity-card-stack style="display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:100%;min-width:0;align-content:start">${items.join('')}</div>`;
 }
 
 export function entityCardRail(cards = [], { className = '' } = {}) {

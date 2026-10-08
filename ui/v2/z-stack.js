@@ -19,6 +19,23 @@ export function v2ZLayer(content = '', { className = '' } = {}) {
   return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer style="padding-top:0">${v2ZFrame(content)}</main>`;
 }
 
+function bindStableZFrame(node) {
+  const body = node?.querySelector?.(':scope > [data-v2-z-body]');
+  if (!body) return;
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  if (!descriptor?.get || !descriptor?.set) return;
+
+  Object.defineProperty(node, 'innerHTML', {
+    configurable: true,
+    get() {
+      return descriptor.get.call(body);
+    },
+    set(value) {
+      descriptor.set.call(body, String(value ?? ''));
+    },
+  });
+}
+
 export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
@@ -29,6 +46,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   template.innerHTML = String(html || '').trim();
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
+  bindStableZFrame(node);
   if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => {
     if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
     else layer.remove();

@@ -1,14 +1,20 @@
 import {
+  details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
+  miniCard,
+  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
+  smallActionButton,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -146,56 +152,67 @@ function programCardFields(program = {}) {
   });
 }
 
-function participantCardFields(participant = {}, program = {}) {
-  return loyaltyCardFields({
-    title: participant.personName || 'Без имени',
-    subtitle: program.name || 'Бонусная программа',
-    status: participant.assignmentStatus === 'active' ? 'Активна' : 'Отключена',
-    metaLeft: `Начислено ${Math.max(0, Number(participant.earned || 0))}`,
-    metaRight: `Доступно ${Math.max(0, Number(participant.available || 0))}`,
-  });
-}
-
-function programInfo(program = {}) {
-  return v2ListEntries([
-    ['Срок программы', program.term || 'Бессрочно'],
-    ['Кому действует', assignmentLabel(program.assignment)],
-    ['Условие начисления', conditionLabel(program.condition)],
-    ['Параметр условия', program.conditionValue || '—'],
-    ['Размер начисления', rewardLabel(program)],
-    ['База', program.rewardBase || '—'],
-    ['Срок жизни награды', expiryLabel(program)],
-    ['Повторяемость', recurrenceLabel(program)],
-    ['Момент начисления', timingLabel(program.timing)],
-    ['Условия', program.description || '—'],
-    ['Состояние', program.status === 'active' ? 'Активна' : 'Неактивна'],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+function programConditions(program = {}) {
+  return [
+    `Срок программы: ${program.term || 'Бессрочно'}`,
+    `Кому действует: ${assignmentLabel(program.assignment)}`,
+    `Условие начисления: ${conditionLabel(program.condition)}`,
+    `Параметр условия: ${program.conditionValue || '—'}`,
+    `Размер начисления: ${rewardLabel(program)}`,
+    `База: ${program.rewardBase || '—'}`,
+    `Срок жизни награды: ${expiryLabel(program)}`,
+    `Повторяемость: ${recurrenceLabel(program)}`,
+    `Момент начисления: ${timingLabel(program.timing)}`,
+    `Состояние: ${program.status === 'active' ? 'Активна' : 'Неактивна'}`,
+    '',
+    program.description || 'Дополнительные условия не указаны.',
+  ].join('\n');
 }
 
 function participantInfo(participant = {}, program = {}) {
-  return v2ListEntries([
-    ['Человек', participant.personName || '—'],
-    ['Программа', program.name || '—'],
-    ['Дата назначения', shortDateTime(participant.assignedAt, '—')],
-    ['Состояние назначения', participant.assignmentStatus === 'active' ? 'Активна' : 'Отключена'],
-    ['Квалифицирующих событий', String(Math.max(0, Number(participant.qualifiedEvents || 0)))],
-    ['Начислено', `${Math.max(0, Number(participant.earned || 0))} бонусов`],
-    ['Использовано', `${Math.max(0, Number(participant.spent || 0))} бонусов`],
-    ['Доступно', `${Math.max(0, Number(participant.available || 0))} бонусов`],
-    ['Срок текущей награды', participant.rewardExpiry || expiryLabel(program)],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  return details([
+    { label: 'Контакт', value: participant.personName || '—' },
+    { label: 'Программа', value: program.name || '—' },
+    { label: 'Дата назначения', value: shortDateTime(participant.assignedAt, '—') },
+    { label: 'Состояние', value: participant.assignmentStatus === 'active' ? 'Активна' : 'Отключена' },
+    { label: 'Квалифицирующих событий', value: String(Math.max(0, Number(participant.qualifiedEvents || 0))) },
+    { label: 'Начислено', value: `${Math.max(0, Number(participant.earned || 0))} бонусов` },
+    { label: 'Использовано', value: `${Math.max(0, Number(participant.spent || 0))} бонусов` },
+    { label: 'Доступно', value: `${Math.max(0, Number(participant.available || 0))} бонусов` },
+    { label: 'Срок текущей награды', value: participant.rewardExpiry || expiryLabel(program) },
+  ]);
 }
 
 function historyMarkup(participant = {}) {
   const history = Array.isArray(participant.history) ? participant.history : [];
   if (!history.length) return emptyState('Истории пока нет', 'Начисления, списания и корректировки появятся здесь.');
-  return v2ListEntries([...history].reverse().map((item) => v2ListEntry({
+  return miniCardRail([...history].reverse().map((item) => miniCard({
     title: item.title || 'Операция программы',
-    subtitle: `${item.source || 'Источник'} · ${shortDateTime(item.occurredAt, '—')}`,
-    rightTop: `${Number(item.amount || 0) >= 0 ? '+' : '−'}${Math.abs(Number(item.amount || 0))} бонусов`,
-    interactive: false,
-    initial: '',
+    value: `${Number(item.amount || 0) >= 0 ? '+' : '−'}${Math.abs(Number(item.amount || 0))} бонусов`,
+    subtitle: shortDateTime(item.occurredAt, '—'),
+    rows: [{ label: 'Источник', value: item.source || '—' }],
   })));
+}
+
+function participantList(items = []) {
+  if (!items.length) return emptyState('Участников пока нет', 'Контакты появятся здесь после назначения программы.');
+  return v2ListEntries(items.map((participant) => v2ListEntry({
+    title: participant.personName || 'Без имени',
+    subtitle: participant.assignmentStatus === 'active' ? 'Активна' : 'Отключена',
+    rightTop: `${Math.max(0, Number(participant.available || 0))} бонусов`,
+    rightBottom: `Начислено ${Math.max(0, Number(participant.earned || 0))}`,
+    interactive: true,
+    initial: '',
+    data: `data-bonus-participant="${participant.id}"`,
+    aria: `Открыть результат программы ${participant.personName || ''}`,
+  })));
+}
+
+function openConditions(program = {}) {
+  return openDocumentViewer({
+    title: program.name || 'Условия бонусной программы',
+    content: programConditions(program),
+  });
 }
 
 async function openCreateProgramQ(root, rerender) {
@@ -279,10 +296,6 @@ async function openCreateProgramQ(root, rerender) {
   return layer;
 }
 
-function openConditionsS(root, program) {
-  return mountModal(root, modal(programInfo(program), { variant: 's', surface: 'app', title: program.name || 'Условия программы' }));
-}
-
 async function openParticipantLayer(root, participantId) {
   const participant = participants.find((item) => item.id === participantId);
   if (!participant) return null;
@@ -291,7 +304,7 @@ async function openParticipantLayer(root, participantId) {
   if (!layer) return null;
   layer.innerHTML = page([
     loyaltyHeader(participant.personName || 'Участник программы'),
-    v2Section('Состояние программы', participantInfo(participant, program)),
+    participantInfo(participant, program),
     v2Section('История', historyMarkup(participant)),
   ]);
   notifyLoyaltyContext();
@@ -306,15 +319,10 @@ async function openProgramLayer(root, programId) {
   const items = participants.filter((item) => item.programId === program.id);
   layer.innerHTML = page([
     loyaltyHeader(program.name || 'Бонусная программа'),
-    v2ListEntries([
-      v2ListEntry({ title: 'Условия программы', subtitle: conditionLabel(program.condition), rightTop: '[i]', interactive: true, initial: '', data: 'data-bonus-info', aria: 'Открыть условия программы' }),
-    ]),
-    v2Section('Участники', items.length ? entityCardStack(items.map((participant) => loyaltyVisualCard('bonus', participantCardFields(participant, program), {
-      data: `data-bonus-participant="${participant.id}"`,
-      aria: `Открыть результат программы ${participant.personName || ''}`,
-    }))) : emptyState('Участников пока нет', 'Назначенные люди и результат программы появятся здесь.')),
+    v2Section('Участники', participantList(items)),
   ]);
-  layer.querySelector('[data-bonus-info]')?.addEventListener('click', () => openConditionsS(root, program));
+  setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-bonus-info', aria: 'Условия бонусной программы' })]);
+  layer.querySelector('[data-bonus-info]')?.addEventListener('click', () => openConditions(program));
   layer.querySelectorAll('[data-bonus-participant]').forEach((node) => node.addEventListener('click', () => openParticipantLayer(root, text(node.dataset.bonusParticipant))));
   notifyLoyaltyContext();
   return layer;
