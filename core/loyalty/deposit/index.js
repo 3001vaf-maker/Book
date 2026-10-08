@@ -39,6 +39,7 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../car
 import { createUEI, detachUEI, getUEI, listUEIs, normalizeUEI } from '../../uei.js';
 import { openLoyaltyProgramSettings } from '../shared.js';
 import {
+  deleteDeposit,
   fundDeposit,
   getDepositPrograms,
   listAllDeposits,
@@ -99,7 +100,9 @@ function programStatusLabel(status = '') {
 }
 
 function depositStatusLabel(status = '') {
-  return status === 'closed' ? 'Закрыт' : 'Активен';
+  if (status === 'expired') return 'Срок завершён';
+  if (status === 'closed') return 'Закрыт';
+  return 'Активен';
 }
 
 function contactLabel(person = {}) {
@@ -208,16 +211,25 @@ function programConditions(program = {}, issuedCount = null) {
 
 function depositInfo(deposit = {}) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  return details([
+  const benefitBalance = Math.max(0, Number(deposit?.benefitBalance || 0));
+  const refundableAmount = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
+  const rows = [
     { label: 'UEI', value: depositUei(deposit) || '—' },
     { label: 'Контакт', value: contactLabel(deposit?.person || {}) },
     { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
     { label: 'Внесено', value: money(deposit?.fundedAmount) },
     { label: 'Остаток', value: money(deposit?.balance) },
     { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
-    { label: 'Выгода', value: terms?.benefit || 'Без дополнительной выгоды' },
-    { label: 'Состояние', value: depositStatusLabel(deposit?.status) },
-  ]);
+    { label: 'Условие выгоды', value: terms?.benefit || 'Без дополнительной выгоды' },
+  ];
+  if (String(deposit?.benefitMode || 'none') !== 'none' || benefitBalance > 0.009) {
+    rows.push({ label: 'Выгода в остатке', value: money(benefitBalance) });
+  }
+  if (deposit?.canRefund || refundableAmount > 0.009) {
+    rows.push({ label: 'К возврату', value: money(refundableAmount) });
+  }
+  rows.push({ label: 'Состояние', value: depositStatusLabel(deposit?.status) });
+  return details(rows);
 }
 
 function historyMarkup(deposit = {}) {
@@ -225,6 +237,8 @@ function historyMarkup(deposit = {}) {
   if (!items.length) return emptyState('Истории пока нет', 'Движения депозита появятся здесь.');
   const kindLabel = (kind) => {
     if (kind === 'deposit-funding') return 'Внесение';
+    if (kind === 'deposit-benefit') return 'Выгода';
+    if (kind === 'deposit-benefit-reversal') return 'Отмена выгоды';
     if (kind === 'deposit-withdrawal') return 'Возврат остатка';
     if (kind === 'refund') return 'Возврат оплаты';
     if (kind === 'payment') return 'Использование при оплате';
@@ -262,10 +276,10 @@ async function setProgramStatus(programId, status) {
 async function deleteProgram(programId) {
   const id = String(programId || '');
   const code = getUEI(PROGRAM_UEI_TYPE, id) || '';
+  await saveDepositPrograms(getDepositPrograms().filter((item) => String(item?.id) !== id));
   if (code) {
     try { detachUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, uei: code, explicit: false }); } catch {}
   }
-  await saveDepositPrograms(getDepositPrograms().filter((item) => String(item?.id) !== id));
 }
 
 function openCodeX({ title = 'UEI', entityType, entityId, onCreated = () => {} } = {}) {
@@ -361,8 +375,8 @@ function initDepositProgramConstructor(layer) {
 function depositBenefit(values = {}) {
   const type = String(values.benefitType || 'none');
   const value = Math.max(0, Number(String(values.benefitValue || '0').replace(',', '.')) || 0);
-  if (type === 'discount') return value > 0 ? `Скидка ${value}%` : '';
-  if (type === 'accrual') return value > 0 ? `Начисление ${value}%` : '';
+  if (type === 'discount') return value > 0 ? `На обслуживание ${value}%` : '';
+  if (type === 'accrual') return value > 0 ? `Сразу +${value}%` : '';
   return '';
 }
 
@@ -393,8 +407,8 @@ async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null
       )}</div>
       ${select({ label: 'Выгода', name: 'benefitType', value: sourceProgram?.benefitType || 'none', options: [
         { value: 'none', label: 'Без дополнительной выгоды' },
-        { value: 'discount', label: 'Скидка' },
-        { value: 'accrual', label: 'Начисление' },
+        { value: 'discount', label: 'Выгода на обслуживание' },
+        { value: 'accrual', label: 'Выгода сразу' },
       ] })}
       <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: sourceProgram?.benefitValue || '' })}</div>
       ${textareaField({ label: 'Условия', name: 'description', value: sourceProgram?.description || '' })}
@@ -543,7 +557,12 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
         identifiers: [display.uei, programUei(program)].filter(Boolean),
       });
       layer.v2Close?.();
-      openNotice({ title: 'Депозит оформлен', message: `Принято ${money(amount)}. UEI: ${code}` });
+      const available = Number(deposit?.balance || 0);
+      const benefit = Number(deposit?.benefitBalance || 0);
+      const message = benefit > 0.009
+        ? `Принято ${money(amount)}. Выгода ${money(benefit)}. Доступно ${money(available)}. UEI: ${code}`
+        : `Принято ${money(amount)}. Доступно ${money(available || amount)}. UEI: ${code}`;
+      openNotice({ title: 'Депозит оформлен', message });
       await onSaved?.(deposit);
     } catch (error) {
       if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось оформить депозит';
@@ -555,8 +574,13 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
 
 async function openWithdrawX(root, deposit, onSaved = () => {}) {
   const wallets = getWallets();
+  const refundable = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
+  if (!deposit?.canRefund || refundable <= 0.009) {
+    openNotice({ title: 'Возврат недоступен', message: 'У этого депозита нет возвратного остатка.' });
+    return null;
+  }
   const layer = mountModal(root, modal(`<form class="form-grid" data-deposit-withdraw-form>
-    ${field({ label: 'Сумма возврата', name: 'amount', type: 'number', min: '0.01', max: deposit.balance, step: '0.01', inputmode: 'decimal', value: deposit.balance })}
+    ${field({ label: 'К возврату', name: 'amount', type: 'number', min: '0.01', max: refundable, step: '0.01', inputmode: 'decimal', value: refundable, readonly: true })}
     ${select({ label: 'Кошелёк возврата', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
     ${datePicker({ label: 'Дата возврата', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
     ${textareaField({ label: 'Комментарий', name: 'reason' })}
@@ -571,15 +595,14 @@ async function openWithdrawX(root, deposit, onSaved = () => {}) {
     const values = formObject(form);
     const errorNode = layer.querySelector('[data-deposit-withdraw-error]');
     const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
-    const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
-    if (!wallet || !amount || amount > Number(deposit?.balance || 0) + 0.009) {
-      if (errorNode) errorNode.textContent = 'Проверьте сумму и кошелёк';
+    if (!wallet) {
+      if (errorNode) errorNode.textContent = 'Выберите кошелёк';
       return;
     }
     try {
       await withdrawDeposit({
         depositId: deposit.depositId,
-        amount,
+        amount: refundable,
         walletId: wallet.id,
         walletName: wallet.name,
         reason: values.reason || '',
@@ -639,7 +662,7 @@ async function openDepositLayer(root, depositId, onChanged = () => {}) {
         title: deposit.programName || 'Депозит',
         settingsData: 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
-        c: Number(deposit.balance || 0) > 0.009 ? { label: 'Возврат', data: 'data-deposit-withdraw', aria: 'Вернуть остаток депозита' } : null,
+        c: deposit?.canRefund ? { label: 'Возврат', data: 'data-deposit-withdraw', aria: 'Вернуть остаток депозита' } : null,
       }),
       depositInfo(deposit),
       v2Section('История', historyMarkup(deposit)),
@@ -647,11 +670,27 @@ async function openDepositLayer(root, depositId, onChanged = () => {}) {
     layer.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openSharedProfileSettingsMenu({
         title: deposit.programName || 'Депозит',
-        actions: [{
-          id: 'code',
-          label: 'Код',
-          onSelect: () => openCodeX({ title: 'UEI депозита', entityType: DEPOSIT_UEI_TYPE, entityId: deposit.depositId, onCreated: render }),
-        }],
+        actions: [
+          {
+            id: 'code',
+            label: 'Код',
+            onSelect: () => openCodeX({ title: 'UEI депозита', entityType: DEPOSIT_UEI_TYPE, entityId: deposit.depositId, onCreated: render }),
+          },
+          {
+            id: 'delete',
+            label: 'Удалить',
+            variant: 'danger',
+            onSelect: async () => {
+              const code = getUEI(DEPOSIT_UEI_TYPE, deposit.depositId) || '';
+              await deleteDeposit(deposit.depositId);
+              if (code) {
+                try { detachUEI({ entityType: DEPOSIT_UEI_TYPE, entityId: deposit.depositId, uei: code, explicit: false }); } catch {}
+              }
+              layer.v2Close?.();
+              await onChanged?.();
+            },
+          },
+        ],
       });
     });
     layer.querySelector('[data-deposit-withdraw]')?.addEventListener('click', () => openWithdrawX(root, deposit, async () => {
