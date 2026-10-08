@@ -20,12 +20,19 @@ export function v2ModalPortalGeometry(hostRect = {}, viewport = {}) {
   return { left, top, width, height, bottom: top + height };
 }
 
+function cssPixelValue(name) {
+  const value = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 export function currentVisualViewport() {
   const vv = window.visualViewport;
+  const stableHeight = cssPixelValue('--app-stable-vh');
+  const stableWidth = cssPixelValue('--app-stable-vw');
   return {
     offsetLeft: Number(vv?.offsetLeft ?? 0),
     offsetTop: Number(vv?.offsetTop ?? 0),
-    width: Number(vv?.width ?? window.innerWidth ?? 0),
-    height: Number(vv?.height ?? window.innerHeight ?? 0),
+    width: Number(stableWidth || vv?.width || window.innerWidth || 0),
+    height: Number(stableHeight || vv?.height || window.innerHeight || 0),
   };
 }
