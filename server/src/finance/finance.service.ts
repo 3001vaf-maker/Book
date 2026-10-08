@@ -148,18 +148,6 @@ function personKey(value: unknown) {
   return text(person.key ?? person.personKey ?? person.id);
 }
 
-function depositBenefitMode(value: unknown) {
-  const terms = objectValue(value);
-  const type = text(terms.benefitType).toLowerCase();
-  if (type === 'accrual' || type === 'upfront') return 'upfront';
-  if (type === 'discount' || type === 'service') return 'service';
-  return 'none';
-}
-
-function depositBenefitRate(value: unknown) {
-  return percent(objectValue(value).benefitValue);
-}
-
 function depositTermActiveAt(value: unknown, at: Date) {
   const terms = objectValue(value);
   const mode = text(terms.termMode).toLowerCase();
@@ -415,20 +403,6 @@ export class FinanceService {
     };
   }
 
-  private async serviceBenefitFromOperationWith(db: Db, tenantId: string, deposit: any, operation: any) {
-    if (!operation || operation.kind !== 'payment' || operation.status !== 'completed') return 0;
-    const terms = objectValue(deposit.terms);
-    const at = operation.occurredAt instanceof Date ? operation.occurredAt : new Date(operation.occurredAt);
-    if (depositBenefitMode(terms) !== 'service' || !depositTermActiveAt(terms, at)) return 0;
-    const data = objectValue(operation.data);
-    if (!deposit.personKey || personKey(data.person) !== deposit.personKey) return 0;
-    const ownerRows = await db.$queryRaw<Array<{ depositId: string }>>(Prisma.sql`
-      SELECT loyalty_deposit_service_owner(${tenantId}, ${deposit.personKey}, ${at}) AS "depositId"
-    `);
-    if (text(ownerRows[0]?.depositId) !== deposit.depositId) return 0;
-    return money(money(data.serviceAmount) * depositBenefitRate(terms) / 100);
-  }
-
   private async validateDepositAllocationsWith(
     db: Db,
     tenantId: string,
@@ -458,8 +432,7 @@ export class FinanceService {
         const previousAllocation = depositAllocationsValue(objectValue(excluded.data).depositAllocations)
           .filter((entry) => entry.depositId === allocation.depositId)
           .reduce((sum, entry) => sum + entry.amount, 0);
-        const previousBenefit = await this.serviceBenefitFromOperationWith(db, tenantId, deposit, excluded);
-        available = Math.max(0, money(available + previousAllocation - previousBenefit));
+        available = Math.max(0, money(available + previousAllocation));
       }
 
       if (allocation.amount > available + 0.009) throw new BadRequestException(`На депозите «${deposit.programName || 'Депозит'}» недостаточно средств`);
@@ -723,7 +696,7 @@ export class FinanceService {
     const direction = text(input.direction || parent?.direction);
     const economicType = text(input.economicType || parent?.economicType);
     if (!ARTICLE_DIRECTIONS.has(direction)) throw new BadRequestException('Некорректное направление статьи');
-    if (!ARTICLE_ECONOMIC_TYPES.has(economicType) || economicType === 'GROUP') throw new BadRequestException('Выберите экономический характер статьи');
+    if (!ARTICLE_ECONOMIC_TYPES.has(economicType) || economicType === 'GROUP') throw new BadRequestException('Выберите конечную статью, а не группу');
     if (parent && parent.direction !== direction) throw new BadRequestException('Направление дочерней статьи должно совпадать с родительской');
     const max = await this.prisma.financeArticle.aggregate({ where: { tenantId, parentArticleId }, _max: { position: true } });
     await this.prisma.financeArticle.create({ data: { tenantId, articleId: randomUUID(), parentArticleId, name, direction, economicType, position: (max._max.position || 0) + 10 } });
@@ -778,7 +751,7 @@ export class FinanceService {
     const walletName = text(input.walletName);
     if (!walletId) throw new BadRequestException('Выберите кошелёк');
     const operationArticleId = text(input.articleId);
-    const rawLines = arrayValue(input.lines);
+    const rawLines = input.lines == null ? [] : arrayValue(input.lines);
     const simpleAmount = money(input.amount);
     const preparedLines = rawLines.length
       ? rawLines.map((value, index) => {
