@@ -4,6 +4,7 @@
 // Canonical Settlement snapshots live in Finance. Record receives finance only as a read projection.
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
+import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
 import {
   calculateSettlementTotals,
   calculateSettlementItemTotals,
@@ -74,8 +75,28 @@ export function recordAmountDue(record = null) {
   return resolveRecordSettlement(record).planTotal;
 }
 
+export function recordSettlementPriceCondition(person = null) {
+  const key = String(person?.key || person?.id || '').trim();
+  const personalPercent = clampFinancialPercent(person?.discountPercent ?? 0);
+  const sources = [];
+  if (personalPercent > 0) {
+    sources.push({ type: 'personal', name: 'Личные условия', percent: personalPercent });
+  }
+  for (const source of getPersonDepositPriceConditions(key)) {
+    const value = clampFinancialPercent(source?.percent);
+    if (value > 0) sources.push({ ...source, percent: value });
+  }
+  const conflict = sources.length > 1;
+  return {
+    percent: conflict || !sources.length ? 0 : sources[0].percent,
+    source: conflict || !sources.length ? null : { ...sources[0] },
+    sources: sources.map((source) => ({ ...source })),
+    conflict,
+  };
+}
+
 export function recordSettlementDiscountPercent(person = null) {
-  return clampFinancialPercent(person?.discountPercent ?? 0);
+  return recordSettlementPriceCondition(person).percent;
 }
 
 export function normalizeRecordSettlement(value = null) {
@@ -85,6 +106,8 @@ export function normalizeRecordSettlement(value = null) {
     serviceTotal: Math.max(0, financialNumber(value.serviceTotal)),
     discountPercent: value.discountPercent == null ? null : clampFinancialPercent(value.discountPercent),
     discountTotal: Math.max(0, financialNumber(value.discountTotal)),
+    correctionTotal: Math.max(0, financialNumber(value.correctionTotal)),
+    pricePercentTotal: Math.max(0, financialNumber(value.pricePercentTotal)),
     planTotal: Math.max(0, financialNumber(value.planTotal)),
     factIncome: Math.max(0, financialNumber(value.factIncome)),
     factExpense: Math.max(0, financialNumber(value.factExpense)),
@@ -94,8 +117,9 @@ export function normalizeRecordSettlement(value = null) {
 
 export function hydrateRecordSettlement(record = null) {
   if (!record?.id) return record;
+  const condition = recordSettlementPriceCondition(record?.person);
   const discountPercent = record?.personDiscountPercent == null
-    ? recordSettlementDiscountPercent(record?.person)
+    ? condition.percent
     : clampFinancialPercent(record.personDiscountPercent);
   const { personDiscountPercent: _discountProjection, ...cleanRecord } = record;
   const normalizedRecord = {
@@ -104,5 +128,9 @@ export function hydrateRecordSettlement(record = null) {
     products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
   };
   const projectedSettlement = getRecordSettlement(normalizedRecord, { discountPercent });
-  return { ...normalizedRecord, finance: normalizeRecordSettlement(projectedSettlement) };
+  return {
+    ...normalizedRecord,
+    priceCondition: condition,
+    finance: normalizeRecordSettlement(projectedSettlement),
+  };
 }
