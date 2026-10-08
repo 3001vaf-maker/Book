@@ -41,6 +41,7 @@ const depositService = source('server/src/loyalty/deposit.service.ts');
 const loyaltyController = source('server/src/loyalty/loyalty.controller.ts');
 const loyaltyModule = source('server/src/loyalty/loyalty.module.ts');
 const appModule = source('server/src/app.module.ts');
+const financeController = source('server/src/finance/finance.controller.ts');
 const accountDeposit = source('server/src/online-booking/account-deposit.controller.ts');
 const migration = source('server/prisma/migrations/20261008130500_loyalty_deposit_instance/migration.sql');
 
@@ -135,6 +136,9 @@ if (!/FinanceModule/.test(loyaltyModule) || !/DepositService/.test(loyaltyModule
   errors.push('LoyaltyModule must own DepositService and consume Finance as an integration');
 }
 if (!/LoyaltyModule/.test(appModule)) errors.push('AppModule must register LoyaltyModule');
+if (/@(?:Get|Post)\(['"]deposits(?:\/|['"])/.test(financeController)) {
+  errors.push('FinanceController must not expose Deposit entity routes; the HTTP owner is LoyaltyController');
+}
 if (/FinanceService/.test(accountDeposit) || /finance\.listDeposits/.test(accountDeposit)) {
   errors.push('End-user Deposit API must read from Loyalty owner, not Finance');
 }
