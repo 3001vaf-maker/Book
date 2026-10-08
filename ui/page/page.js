@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
 export function page(blocks = []) {
-  return `<div class="ui-page">${blocks.filter(Boolean).join('')}</div>`;
+  return `<div class="ui-page" style="display:flex;flex-direction:column;gap:20px;min-width:0">${blocks.filter(Boolean).join('')}</div>`;
 }
 
 export function details(items = [], { variant = '' } = {}) {
