@@ -4,6 +4,7 @@
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
+import { resolvePersonPriceCondition } from '../loyalty/price-condition.js';
 import { getAllPeople } from '../people/data.js';
 import {
   calculateSettlementTotals,
@@ -99,22 +100,7 @@ function currentPerson(person = null) {
 export function recordSettlementPriceCondition(person = null) {
   const owner = currentPerson(person);
   const key = String(owner?.key || owner?.id || person?.key || person?.id || '').trim();
-  const personalPercent = clampFinancialPercent(owner?.discountPercent ?? 0);
-  const sources = [];
-  if (personalPercent > 0) {
-    sources.push({ type: 'personal', name: 'Личные условия', percent: personalPercent });
-  }
-  for (const source of getPersonDepositPriceConditions(key)) {
-    const value = clampFinancialPercent(source?.percent);
-    if (value > 0) sources.push({ ...source, percent: value });
-  }
-  const conflict = sources.length > 1;
-  return {
-    percent: conflict || !sources.length ? 0 : sources[0].percent,
-    source: conflict || !sources.length ? null : { ...sources[0] },
-    sources: sources.map((source) => ({ ...source })),
-    conflict,
-  };
+  return resolvePersonPriceCondition(owner, getPersonDepositPriceConditions(key));
 }
 
 export function recordSettlementPricePercent(person = null) {
