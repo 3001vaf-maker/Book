@@ -1,5 +1,5 @@
 import { apiRequest } from '../../auth.js';
-import { refreshFinanceState } from '../../finance/service.js';
+import { refreshFinanceState } from '../../finance/index.js';
 
 let programs = [];
 
