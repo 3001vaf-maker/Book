@@ -27,6 +27,7 @@ const fallbackPeople = [
   mockPerson('Анна Иванова', 'mock-person-2'),
 ];
 
+// Личный счёт существует автоматически для каждого контакта; Z1 показывает только ненулевые остатки.
 const mockBalances = new Map([
   ['mock-person-1', 5000],
   ['mock-person-2', 0],
