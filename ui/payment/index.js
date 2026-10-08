@@ -55,14 +55,7 @@ function paymentItemHeader(name = '') {
   </div>`;
 }
 
-function reconstructedCorrectionMoney(price, totalReduction, pricePercent) {
-  const amount = Math.max(0, Math.min(price, numberValue(totalReduction)));
-  const rate = Math.max(0, Math.min(100, numberValue(pricePercent))) / 100;
-  if (!amount || rate >= 0.999999) return 0;
-  return Math.max(0, Math.min(price, Math.round(((amount - price * rate) / (1 - rate)) * 100) / 100));
-}
-
-function correctionPresentation(procedure = {}, price = 0, pricePercent = 0) {
+function correctionPresentation(procedure = {}, price = 0) {
   const explicitMode = procedure?.correctionMode;
   if (explicitMode === 'percent') {
     const value = Math.max(0, Math.min(100, numberValue(procedure?.correctionPercent)));
@@ -72,17 +65,13 @@ function correctionPresentation(procedure = {}, price = 0, pricePercent = 0) {
     const value = Math.max(0, Math.min(price, numberValue(procedure?.correctionMoney)));
     return { mode: value > 0 ? 'money' : 'none', percent: 0, money: value };
   }
-  if (explicitMode === 'none') return { mode: 'none', percent: 0, money: 0 };
-  const legacyMoney = reconstructedCorrectionMoney(price, procedure?.discountMoney, pricePercent);
-  return legacyMoney > 0
-    ? { mode: 'money', percent: 0, money: legacyMoney }
-    : { mode: 'none', percent: 0, money: 0 };
+  return { mode: 'none', percent: 0, money: 0 };
 }
 
 function paymentProcedureBlock(procedure, index) {
   const price = Math.max(0, numberValue(procedure?.cost));
-  const pricePercent = Math.max(0, Math.min(100, numberValue(procedure?.pricePercent ?? procedure?.discountPercent)));
-  const correction = correctionPresentation(procedure, price, pricePercent);
+  const pricePercent = Math.max(0, Math.min(100, numberValue(procedure?.pricePercent)));
+  const correction = correctionPresentation(procedure, price);
   const itemName = procedure?.name || '';
   return `<div class="payment-item-section" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-correction-mode="${correction.mode}" data-payment-price-percent="${escapeHtml(percentText(pricePercent))}">
     ${paymentItemHeader(itemName)}
@@ -196,8 +185,8 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
-    const pricePercent = Math.max(0, Math.min(100, numberValue(item.pricePercent ?? item.discountPercent)));
-    const correction = correctionPresentation(item, Math.max(0, numberValue(item.price)), pricePercent);
+    const pricePercent = Math.max(0, Math.min(100, numberValue(item.pricePercent)));
+    const correction = correctionPresentation(item, Math.max(0, numberValue(item.price)));
     row.dataset.paymentPricePercent = percentText(pricePercent);
     row.dataset.paymentCorrectionMode = correction.mode;
     const { priceInput, percentInput, moneyInput } = rowValues(row);
