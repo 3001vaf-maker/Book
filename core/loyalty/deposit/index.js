@@ -24,6 +24,7 @@ import {
   shortDateTime,
   smallActionButton,
   textareaField,
+  twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
   v2Section,
@@ -316,6 +317,35 @@ function openProgramConditions(program, issuedCount) {
   });
 }
 
+function initDepositProgramConstructor(layer) {
+  const form = layer?.querySelector?.('[data-deposit-program-form]');
+  if (!form) return;
+  initDatePickers(form);
+  const amountMode = form.querySelector('[name="amountMode"]');
+  const termMode = form.querySelector('[name="termMode"]');
+  const benefitType = form.querySelector('[name="benefitType"]');
+  const sync = () => {
+    const amountPanel = form.querySelector('[data-deposit-amount-fixed]');
+    const termPanel = form.querySelector('[data-deposit-term-dates]');
+    const benefitPanel = form.querySelector('[data-deposit-benefit-value]');
+    if (amountPanel) amountPanel.hidden = amountMode?.value !== 'fixed';
+    if (termPanel) termPanel.hidden = termMode?.value !== 'dated';
+    if (benefitPanel) benefitPanel.hidden = benefitType?.value === 'none';
+  };
+  amountMode?.addEventListener('change', sync);
+  termMode?.addEventListener('change', sync);
+  benefitType?.addEventListener('change', sync);
+  sync();
+}
+
+function depositBenefit(values = {}) {
+  const type = String(values.benefitType || 'none');
+  const value = Math.max(0, Number(String(values.benefitValue || '0').replace(',', '.')) || 0);
+  if (type === 'discount') return value > 0 ? `Скидка ${value}%` : '';
+  if (type === 'accrual') return value > 0 ? `Начисление ${value}%` : '';
+  return '';
+}
+
 async function openCreateProgramQ(root, onSaved = () => {}) {
   const layer = mountModal(root, modal(`${depositHeaderContext({
     title: 'Новая депозитная программа',
@@ -324,14 +354,32 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
     <form class="form-grid" data-deposit-program-form>
       ${field({ label: 'Название', name: 'name', required: true })}
       ${ueiField({ name: 'programUei' })}
-      ${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', placeholder: '0 — свободная сумма' })}
-      ${field({ label: 'Срок / правило срока', name: 'termRule', placeholder: 'Например: 12 месяцев или бессрочно' })}
-      ${field({ label: 'Выгода', name: 'benefit', placeholder: 'Например: скидка 10%' })}
+      ${select({ label: 'Сумма', name: 'amountMode', value: 'fixed', options: [
+        { value: 'fixed', label: 'Фиксированная сумма' },
+        { value: 'free', label: 'Свободная сумма' },
+      ] })}
+      <div data-deposit-amount-fixed>${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' })}</div>
+      ${select({ label: 'Срок', name: 'termMode', value: 'indefinite', options: [
+        { value: 'indefinite', label: 'Бессрочно' },
+        { value: 'dated', label: 'Со сроком' },
+      ] })}
+      <div data-deposit-term-dates hidden>${twoColumnLayout(
+        datePicker({ label: 'С', name: 'termStartDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
+        datePicker({ label: 'До', name: 'termEndDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
+        { ariaLabel: 'Срок депозитной программы' },
+      )}</div>
+      ${select({ label: 'Выгода', name: 'benefitType', value: 'none', options: [
+        { value: 'none', label: 'Без дополнительной выгоды' },
+        { value: 'discount', label: 'Скидка' },
+        { value: 'accrual', label: 'Начисление' },
+      ] })}
+      <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' })}</div>
       ${textareaField({ label: 'Условия', name: 'description' })}
       <div class="form-error" data-deposit-program-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Новая депозитная программа' }));
   if (!layer) return null;
   bindUeiInput(layer, 'programUei');
+  initDepositProgramConstructor(layer);
   const form = layer.querySelector('[data-deposit-program-form]');
   layer.querySelector('[data-deposit-program-save]')?.addEventListener('click', async () => {
     const errorNode = layer.querySelector('[data-deposit-program-error]');
@@ -341,6 +389,28 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
       return;
     }
     const values = formObject(form);
+    const amountMode = values.amountMode || 'fixed';
+    const amount = amountMode === 'free' ? 0 : Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
+    if (amountMode === 'fixed' && amount <= 0) {
+      if (errorNode) errorNode.textContent = 'Укажите сумму программы';
+      return;
+    }
+    const termMode = values.termMode || 'indefinite';
+    const termStartDate = values.termStartDate || '';
+    const termEndDate = values.termEndDate || '';
+    if (termMode === 'dated' && (!termStartDate || !termEndDate)) {
+      if (errorNode) errorNode.textContent = 'Укажите дату начала и окончания';
+      return;
+    }
+    if (termMode === 'dated' && termStartDate > termEndDate) {
+      if (errorNode) errorNode.textContent = 'Дата начала не может быть позже даты окончания';
+      return;
+    }
+    const benefit = depositBenefit(values);
+    if (values.benefitType !== 'none' && !benefit) {
+      if (errorNode) errorNode.textContent = 'Укажите размер выгоды';
+      return;
+    }
     const id = uid();
     let reserved = false;
     try {
@@ -351,9 +421,15 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
       const program = {
         id,
         name: values.name,
-        amount: Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0),
-        termRule: values.termRule || '',
-        benefit: values.benefit || '',
+        amount,
+        amountMode,
+        termMode,
+        termStartDate,
+        termEndDate,
+        termRule: termMode === 'dated' ? `${termStartDate} — ${termEndDate}` : 'Бессрочно',
+        benefitType: values.benefitType || 'none',
+        benefitValue: Math.max(0, Number(String(values.benefitValue || '0').replace(',', '.')) || 0),
+        benefit,
         description: values.description || '',
         status: 'active',
         createdAt: now,
@@ -394,6 +470,7 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
       ${contactField}
       ${ueiField({ name: 'depositUei' })}
       ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: Number(program?.amount || 0) > 0 ? program.amount : '' })}
+      ${field({ label: 'Срок', name: 'termPreview', value: program?.termRule || 'Бессрочно', disabled: true })}
       ${select({ label: 'Кошелёк приёма денег', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
       ${datePicker({ label: 'Дата внесения', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
       <div class="form-error" data-deposit-fund-error></div>

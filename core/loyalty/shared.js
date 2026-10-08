@@ -1,11 +1,17 @@
 import {
+  datePicker,
   entityVisualCard,
+  field,
+  initDatePickers,
   openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
+  select,
+  twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
@@ -91,6 +97,7 @@ export function openLoyaltyAppearanceQ(root, {
         photo,
         photoPosition: editor?.photoPosition || current?.photoPosition || loyaltyCardPhotoPosition(type),
       });
+      await flushBusinessPersistence();
     },
     onSaved,
   });
@@ -107,6 +114,86 @@ export function bindViewSettings(root, title, { type, fields, onSaved = () => {}
       }],
     });
   });
+}
+
+const TERM_UNIT_OPTIONS = [
+  { value: 'days', label: 'Дней' },
+  { value: 'months', label: 'Месяцев' },
+  { value: 'years', label: 'Лет' },
+];
+
+export function loyaltyTermFields({
+  prefix = 'term',
+  label = 'Срок действия',
+  mode = 'indefinite',
+  allowDuration = true,
+  allowRange = true,
+  count = '',
+  unit = 'months',
+  startDate = '',
+  endDate = '',
+  startLabel = 'С',
+  endLabel = 'До',
+} = {}) {
+  const options = [{ value: 'indefinite', label: 'Бессрочно' }];
+  if (allowDuration) options.push({ value: 'duration', label: 'N дней / месяцев / лет' });
+  if (allowRange) options.push({ value: 'range', label: 'С даты по дату' });
+  const resolvedMode = options.some((item) => item.value === mode) ? mode : options[0].value;
+
+  const duration = allowDuration ? `<div data-loyalty-term-panel="duration" hidden>${twoColumnLayout(
+    field({ label: 'Количество', name: `${prefix}Count`, type: 'number', min: '1', step: '1', inputmode: 'numeric', value: count }),
+    select({ label: 'Период', name: `${prefix}Unit`, value: unit, options: TERM_UNIT_OPTIONS }),
+    { ariaLabel: `${label}: период` },
+  )}</div>` : '';
+
+  const range = allowRange ? `<div data-loyalty-term-panel="range" hidden>${twoColumnLayout(
+    datePicker({ label: startLabel, name: `${prefix}StartDate`, value: startDate, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: true }),
+    datePicker({ label: endLabel, name: `${prefix}EndDate`, value: endDate, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: true }),
+    { ariaLabel: `${label}: даты` },
+  )}</div>` : '';
+
+  return `<div data-loyalty-term data-loyalty-term-prefix="${text(prefix)}">
+    ${select({ label, name: `${prefix}Mode`, value: resolvedMode, options, data: 'data-loyalty-term-mode' })}
+    ${duration}
+    ${range}
+  </div>`;
+}
+
+export function initLoyaltyTermFields(root) {
+  if (!root) return;
+  initDatePickers(root);
+  root.querySelectorAll('[data-loyalty-term]').forEach((host) => {
+    const prefix = text(host.dataset.loyaltyTermPrefix || 'term');
+    const mode = host.querySelector(`[name="${CSS.escape(`${prefix}Mode`)}"]`);
+    if (!mode) return;
+    const sync = () => {
+      host.querySelectorAll('[data-loyalty-term-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.loyaltyTermPanel !== mode.value;
+      });
+    };
+    if (mode.dataset.loyaltyTermReady !== 'true') {
+      mode.dataset.loyaltyTermReady = 'true';
+      mode.addEventListener('change', sync);
+    }
+    sync();
+  });
+}
+
+export function loyaltyTermData(values = {}, prefix = 'term') {
+  const mode = text(values[`${prefix}Mode`] || 'indefinite');
+  if (mode === 'duration') {
+    const count = Math.max(1, Number(values[`${prefix}Count`] || 1));
+    const unit = text(values[`${prefix}Unit`] || 'months');
+    const unitLabel = unit === 'days' ? 'дн.' : unit === 'years' ? 'лет' : 'мес.';
+    return { type: 'duration', count, unit, startDate: '', endDate: '', label: `${count} ${unitLabel}` };
+  }
+  if (mode === 'range') {
+    const startDate = text(values[`${prefix}StartDate`]);
+    const endDate = text(values[`${prefix}EndDate`]);
+    const label = startDate && endDate ? `${startDate} — ${endDate}` : startDate ? `С ${startDate}` : endDate ? `До ${endDate}` : 'Срок не задан';
+    return { type: 'range', count: 0, unit: '', startDate, endDate, label };
+  }
+  return { type: 'indefinite', count: 0, unit: '', startDate: '', endDate: '', label: 'Бессрочно' };
 }
 
 export function formObject(form) {

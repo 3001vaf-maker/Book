@@ -1,9 +1,14 @@
 import {
+  checkList,
+  collectCheckList,
+  datePicker,
   details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
+  initCheckList,
+  initDatePickers,
   miniCard,
   miniCardRail,
   modal,
@@ -16,16 +21,21 @@ import {
   shortDateTime,
   smallActionButton,
   textareaField,
+  twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
+import { getProcedures } from '../../service/procedures/data.js';
 import {
   bindViewSettings,
   formObject,
+  initLoyaltyTermFields,
   loyaltyCardFields,
   loyaltyHeader,
+  loyaltyTermData,
+  loyaltyTermFields,
   loyaltyVisualCard,
   notifyLoyaltyContext,
   text,
@@ -38,14 +48,22 @@ let programs = [
     name: 'Кэшбэк 5%',
     description: '5% бонусами с каждой оплаченной операции.',
     term: 'Бессрочно',
+    termType: 'indefinite',
+    termStartDate: '',
+    termEndDate: '',
     assignment: 'all',
     condition: 'each-paid',
     conditionValue: '',
+    conditionServiceIds: [],
     rewardType: 'percent',
     rewardValue: 5,
     rewardBase: 'Сумма оплаченной операции',
+    rewardPositionRules: [],
+    rewardTiers: [],
     rewardExpiryType: 'duration',
-    rewardExpiryValue: '90 дней',
+    rewardExpiryCount: 90,
+    rewardExpiryUnit: 'days',
+    rewardExpiryValue: '90 дн.',
     recurrence: 'each',
     recurrenceValue: '',
     timing: 'paid-and-completed',
@@ -56,14 +74,22 @@ let programs = [
     id: 'bonus-vip-10',
     name: 'VIP 10%',
     description: '10% бонусами по выбранным условиям.',
-    term: '12 месяцев',
+    term: 'Бессрочно',
+    termType: 'indefinite',
+    termStartDate: '',
+    termEndDate: '',
     assignment: 'selected',
     condition: 'minimum-amount',
     conditionValue: '5000',
+    conditionServiceIds: [],
     rewardType: 'percent',
     rewardValue: 10,
     rewardBase: 'Сумма оплаченной операции',
+    rewardPositionRules: [],
+    rewardTiers: [],
     rewardExpiryType: 'indefinite',
+    rewardExpiryCount: 0,
+    rewardExpiryUnit: 'days',
     rewardExpiryValue: '',
     recurrence: 'each',
     recurrenceValue: '',
@@ -109,6 +135,11 @@ function assignmentLabel(value = '') {
   return value === 'selected' ? 'Выбранным контактам' : 'Всем контактам';
 }
 
+function periodLabel(count = 0, unit = 'days') {
+  const amount = Math.max(1, Number(count || 1));
+  return `${amount} ${unit === 'months' ? 'мес.' : unit === 'years' ? 'лет' : 'дн.'}`;
+}
+
 function conditionLabel(value = '') {
   if (value === 'first-paid') return 'Первая оплаченная операция';
   if (value === 'every-n') return 'Каждая N-я операция';
@@ -122,11 +153,16 @@ function conditionLabel(value = '') {
 
 function rewardLabel(program = {}) {
   const value = Math.max(0, Number(program.rewardValue || 0));
-  return program.rewardType === 'fixed' ? `${value} бонусов` : `${value}% бонусами`;
+  if (program.rewardType === 'fixed') return `${value} бонусов`;
+  if (program.rewardType === 'tiered') return 'Ступенчатое начисление';
+  if (program.rewardType === 'per-position') return 'По позициям Сервиса';
+  return `${value}% бонусами`;
 }
 
 function expiryLabel(program = {}) {
-  return program.rewardExpiryType === 'duration' ? (program.rewardExpiryValue || 'N дней / месяцев') : 'Бессрочно';
+  return program.rewardExpiryType === 'duration'
+    ? (program.rewardExpiryValue || periodLabel(program.rewardExpiryCount, program.rewardExpiryUnit))
+    : 'Бессрочно';
 }
 
 function timingLabel(value = '') {
@@ -138,7 +174,7 @@ function timingLabel(value = '') {
 function recurrenceLabel(program = {}) {
   if (program.recurrence === 'once') return 'Один раз';
   if (program.recurrence === 'first-n') return `Первые ${program.recurrenceValue || 'N'} раз`;
-  if (program.recurrence === 'limited-period') return `Не чаще ${program.recurrenceValue || 'N'} за период`;
+  if (program.recurrence === 'limited-period') return `Не чаще ${program.recurrenceValue || 'N за период'}`;
   return 'Каждый раз';
 }
 
@@ -215,14 +251,98 @@ function openConditions(program = {}) {
   });
 }
 
+function services() {
+  return getProcedures()
+    .map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' }))
+    .filter((item) => item.value);
+}
+
+function serviceName(id = '') {
+  return services().find((item) => item.value === String(id || ''))?.label || '';
+}
+
+function tierFields(index) {
+  return `<div data-bonus-tier="${index}">${twoColumnLayout(
+    field({ label: `Ступень ${index} — от суммы`, name: `tier${index}Threshold`, type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
+    field({ label: `Ступень ${index} — %`, name: `tier${index}Value`, type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
+    { ariaLabel: `Ступень ${index}` },
+  )}</div>`;
+}
+
+function positionRewardFields(ids = []) {
+  return ids.map((id) => `<div data-bonus-position-rule="${id}">
+    ${select({ label: serviceName(id) || 'Позиция', name: `position_${id}_type`, value: 'percent', options: [{ value: 'fixed', label: 'Фиксированные бонусы' }, { value: 'percent', label: 'Процент' }] })}
+    ${field({ label: 'Значение', name: `position_${id}_value`, type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
+  </div>`).join('');
+}
+
+function initBonusConstructor(layer) {
+  const form = layer?.querySelector?.('[data-bonus-form]');
+  if (!form) return;
+  initLoyaltyTermFields(form);
+  initDatePickers(form);
+  initCheckList(form);
+  const condition = form.querySelector('[name="condition"]');
+  const rewardType = form.querySelector('[name="rewardType"]');
+  const expiry = form.querySelector('[name="rewardExpiryType"]');
+  const recurrence = form.querySelector('[name="recurrence"]');
+  const tierCount = form.querySelector('[name="tierCount"]');
+  const tierHost = form.querySelector('[data-bonus-tiers]');
+  const positionList = form.querySelector('[data-bonus-reward-position-list]');
+  const positionHost = form.querySelector('[data-bonus-position-rules]');
+
+  const showPanel = (attribute, value) => {
+    form.querySelectorAll(`[${attribute}]`).forEach((panel) => {
+      panel.hidden = panel.getAttribute(attribute) !== value;
+    });
+  };
+  const syncCondition = () => showPanel('data-bonus-condition-panel', condition?.value || 'each-paid');
+  const syncReward = () => showPanel('data-bonus-reward-panel', rewardType?.value || 'percent');
+  const syncExpiry = () => {
+    const node = form.querySelector('[data-bonus-expiry-duration]');
+    if (node) node.hidden = expiry?.value !== 'duration';
+  };
+  const syncRecurrence = () => showPanel('data-bonus-recurrence-panel', recurrence?.value || 'each');
+  const renderTiers = () => {
+    const count = Math.max(1, Math.floor(Number(tierCount?.value || 1)));
+    if (tierCount) tierCount.value = String(count);
+    if (tierHost) tierHost.innerHTML = Array.from({ length: count }, (_, index) => tierFields(index + 1)).join('');
+  };
+  const renderPositionRules = () => {
+    if (!positionHost || !positionList) return;
+    const ids = collectCheckList(positionList);
+    positionHost.innerHTML = positionRewardFields(ids);
+  };
+
+  condition?.addEventListener('change', syncCondition);
+  rewardType?.addEventListener('change', syncReward);
+  expiry?.addEventListener('change', syncExpiry);
+  recurrence?.addEventListener('change', syncRecurrence);
+  tierCount?.addEventListener('input', renderTiers);
+  positionList?.addEventListener('change', renderPositionRules);
+  syncCondition();
+  syncReward();
+  syncExpiry();
+  syncRecurrence();
+  renderTiers();
+  renderPositionRules();
+}
+
 async function openCreateProgramQ(root, rerender) {
+  const serviceItems = services();
+  const conditionServiceList = serviceItems.length
+    ? checkList(serviceItems, { className: 'bonus-condition-service-list' })
+    : emptyState('Позиции Сервиса пока не созданы', 'Сначала добавьте позиции в Сервис.');
+  const rewardServiceList = serviceItems.length
+    ? checkList(serviceItems, { className: 'bonus-reward-service-list' })
+    : emptyState('Позиции Сервиса пока не созданы', 'Сначала добавьте позиции в Сервис.');
   const layer = mountModal(root, modal(`${loyaltyHeader('Новая бонусная программа', {
     c: { label: 'Сохранить', data: 'data-bonus-save', aria: 'Сохранить бонусную программу' },
   })}
     <form class="form-grid" data-bonus-form>
       ${field({ label: 'Название', name: 'name', required: true })}
       ${textareaField({ label: 'Описание / условия', name: 'description' })}
-      ${field({ label: 'Срок программы', name: 'term', placeholder: 'Бессрочно или дата — дата' })}
+      ${loyaltyTermFields({ prefix: 'bonusTerm', label: 'Срок программы', mode: 'indefinite', allowDuration: false, allowRange: true })}
       ${select({ label: 'Кому действует', name: 'assignment', value: 'all', options: [
         { value: 'all', label: 'Всем контактам' },
         { value: 'selected', label: 'Выбранным контактам' },
@@ -237,25 +357,67 @@ async function openCreateProgramQ(root, rerender) {
         { value: 'service-items', label: 'Выбранные позиции Сервиса' },
         { value: 'period', label: 'Событие в заданный период' },
       ] })}
-      ${field({ label: 'N / сумма / позиции / период', name: 'conditionValue', placeholder: 'Параметр условия' })}
+      <div data-bonus-condition-panel="every-n" hidden>${field({ label: 'Каждая N-я операция', name: 'conditionCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '2' })}</div>
+      <div data-bonus-condition-panel="after-n" hidden>${field({ label: 'После N операций', name: 'conditionCountAfter', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '5' })}</div>
+      <div data-bonus-condition-panel="minimum-amount" hidden>${field({ label: 'Минимальная сумма', name: 'conditionAmount', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}</div>
+      <div data-bonus-condition-panel="cumulative-amount" hidden>${field({ label: 'Накопленная сумма', name: 'conditionCumulative', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}</div>
+      <div data-bonus-condition-panel="service-items" hidden>${conditionServiceList}</div>
+      <div data-bonus-condition-panel="period" hidden>${twoColumnLayout(
+        datePicker({ label: 'С', name: 'conditionStartDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
+        datePicker({ label: 'До', name: 'conditionEndDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
+        { ariaLabel: 'Период условия' },
+      )}</div>
       ${select({ label: 'Размер начисления', name: 'rewardType', value: 'percent', options: [
         { value: 'fixed', label: 'Фиксированное количество бонусов' },
         { value: 'percent', label: 'Процент от денежной базы' },
+        { value: 'per-position', label: 'Отдельно по позициям Сервиса' },
+        { value: 'tiered', label: 'Ступенчатое правило' },
       ] })}
-      ${field({ label: 'Значение начисления', name: 'rewardValue', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
-      ${field({ label: 'База процента', name: 'rewardBase', value: 'Сумма оплаченной операции' })}
+      <div data-bonus-reward-panel="fixed" hidden>${field({ label: 'Бонусов', name: 'rewardFixedValue', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}</div>
+      <div data-bonus-reward-panel="percent">${twoColumnLayout(
+        field({ label: 'Процент', name: 'rewardPercentValue', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: '5' }),
+        select({ label: 'База', name: 'rewardBase', value: 'operation', options: [
+          { value: 'operation', label: 'Сумма оплаченной операции' },
+          { value: 'items', label: 'Сумма выбранных позиций' },
+        ] }),
+        { ariaLabel: 'Процентное начисление' },
+      )}</div>
+      <div data-bonus-reward-panel="per-position" hidden>
+        <div data-bonus-reward-position-list>${rewardServiceList}</div>
+        <div data-bonus-position-rules></div>
+      </div>
+      <div data-bonus-reward-panel="tiered" hidden>
+        ${field({ label: 'Количество ступеней', name: 'tierCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '3' })}
+        <div data-bonus-tiers></div>
+      </div>
       ${select({ label: 'Срок жизни награды', name: 'rewardExpiryType', value: 'indefinite', options: [
         { value: 'indefinite', label: 'Бессрочно' },
         { value: 'duration', label: 'N дней / месяцев после начисления' },
       ] })}
-      ${field({ label: 'Срок награды', name: 'rewardExpiryValue', placeholder: 'Например: 90 дней' })}
+      <div data-bonus-expiry-duration hidden>${twoColumnLayout(
+        field({ label: 'Количество', name: 'rewardExpiryCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '90' }),
+        select({ label: 'Период', name: 'rewardExpiryUnit', value: 'days', options: [
+          { value: 'days', label: 'Дней' },
+          { value: 'months', label: 'Месяцев' },
+        ] }),
+        { ariaLabel: 'Срок жизни награды' },
+      )}</div>
       ${select({ label: 'Повторяемость', name: 'recurrence', value: 'each', options: [
         { value: 'once', label: 'Один раз' },
         { value: 'each', label: 'Каждый раз' },
         { value: 'first-n', label: 'Первые N раз' },
         { value: 'limited-period', label: 'Не чаще N раз за день / неделю / месяц' },
       ] })}
-      ${field({ label: 'Параметр повторяемости', name: 'recurrenceValue', placeholder: 'N / период' })}
+      <div data-bonus-recurrence-panel="first-n" hidden>${field({ label: 'Количество начислений', name: 'recurrenceCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '1' })}</div>
+      <div data-bonus-recurrence-panel="limited-period" hidden>${twoColumnLayout(
+        field({ label: 'Не чаще N раз', name: 'recurrenceLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '1' }),
+        select({ label: 'За период', name: 'recurrencePeriod', value: 'day', options: [
+          { value: 'day', label: 'День' },
+          { value: 'week', label: 'Неделю' },
+          { value: 'month', label: 'Месяц' },
+        ] }),
+        { ariaLabel: 'Ограничение повторяемости' },
+      )}</div>
       ${select({ label: 'Момент начисления', name: 'timing', value: 'paid-and-completed', options: [
         { value: 'completion', label: 'После завершения' },
         { value: 'payment', label: 'После оплаты' },
@@ -264,27 +426,117 @@ async function openCreateProgramQ(root, rerender) {
       <div class="form-error" data-bonus-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Новая бонусная программа' }));
   if (!layer) return null;
+  initBonusConstructor(layer);
   const form = layer.querySelector('[data-bonus-form]');
   layer.querySelector('[data-bonus-save]')?.addEventListener('click', async () => {
     const error = layer.querySelector('[data-bonus-error]');
     const validation = formValidationMessage(form);
-    if (validation) { if (error) error.textContent = validation; return; }
+    if (validation) {
+      if (error) error.textContent = validation;
+      return;
+    }
     const values = formObject(form);
+    const term = loyaltyTermData(values, 'bonusTerm');
+    if (term.type === 'range' && (!term.startDate || !term.endDate)) {
+      if (error) error.textContent = 'Укажите дату начала и окончания программы';
+      return;
+    }
+    if (term.type === 'range' && term.startDate > term.endDate) {
+      if (error) error.textContent = 'Дата начала не может быть позже даты окончания';
+      return;
+    }
+
+    const condition = values.condition || 'each-paid';
+    const conditionServiceIds = collectCheckList(form, '[data-bonus-condition-panel="service-items"] .ui-check-list input[type="checkbox"]');
+    let conditionValue = '';
+    if (condition === 'every-n') conditionValue = String(Math.max(1, Number(values.conditionCount || 1)));
+    if (condition === 'after-n') conditionValue = String(Math.max(1, Number(values.conditionCountAfter || 1)));
+    if (condition === 'minimum-amount') conditionValue = String(Math.max(0, Number(values.conditionAmount || 0)));
+    if (condition === 'cumulative-amount') conditionValue = String(Math.max(0, Number(values.conditionCumulative || 0)));
+    if (condition === 'service-items') {
+      if (!conditionServiceIds.length) {
+        if (error) error.textContent = 'Выберите позиции Сервиса';
+        return;
+      }
+      conditionValue = conditionServiceIds.map(serviceName).filter(Boolean).join(' · ');
+    }
+    if (condition === 'period') {
+      if (!values.conditionStartDate || !values.conditionEndDate) {
+        if (error) error.textContent = 'Укажите начало и конец периода';
+        return;
+      }
+      if (values.conditionStartDate > values.conditionEndDate) {
+        if (error) error.textContent = 'Дата начала не может быть позже даты окончания';
+        return;
+      }
+      conditionValue = `${values.conditionStartDate} — ${values.conditionEndDate}`;
+    }
+
+    const rewardType = values.rewardType || 'percent';
+    let rewardValue = 0;
+    let rewardBase = 'Сумма оплаченной операции';
+    let rewardPositionRules = [];
+    let rewardTiers = [];
+    if (rewardType === 'fixed') rewardValue = Math.max(0, Number(values.rewardFixedValue || 0));
+    if (rewardType === 'percent') {
+      rewardValue = Math.max(0, Number(values.rewardPercentValue || 0));
+      rewardBase = values.rewardBase === 'items' ? 'Сумма выбранных позиций' : 'Сумма оплаченной операции';
+    }
+    if (rewardType === 'per-position') {
+      const ids = collectCheckList(form, '[data-bonus-reward-position-list] .ui-check-list input[type="checkbox"]');
+      if (!ids.length) {
+        if (error) error.textContent = 'Выберите позиции Сервиса для начисления';
+        return;
+      }
+      rewardPositionRules = ids.map((id) => ({
+        serviceId: id,
+        serviceName: serviceName(id),
+        type: values[`position_${id}_type`] || 'percent',
+        value: Math.max(0, Number(values[`position_${id}_value`] || 0)),
+      }));
+    }
+    if (rewardType === 'tiered') {
+      const count = Math.max(1, Math.floor(Number(values.tierCount || 1)));
+      rewardTiers = Array.from({ length: count }, (_, index) => ({
+        threshold: Math.max(0, Number(values[`tier${index + 1}Threshold`] || 0)),
+        value: Math.max(0, Number(values[`tier${index + 1}Value`] || 0)),
+      }));
+    }
+
+    const rewardExpiryType = values.rewardExpiryType || 'indefinite';
+    const rewardExpiryCount = rewardExpiryType === 'duration' ? Math.max(1, Number(values.rewardExpiryCount || 1)) : 0;
+    const rewardExpiryUnit = values.rewardExpiryUnit || 'days';
+    const recurrence = values.recurrence || 'each';
+    let recurrenceValue = '';
+    if (recurrence === 'first-n') recurrenceValue = String(Math.max(1, Number(values.recurrenceCount || 1)));
+    if (recurrence === 'limited-period') {
+      const period = values.recurrencePeriod === 'week' ? 'неделю' : values.recurrencePeriod === 'month' ? 'месяц' : 'день';
+      recurrenceValue = `${Math.max(1, Number(values.recurrenceLimit || 1))} за ${period}`;
+    }
+
     programs.push({
       id: uid('bonus-program'),
       name: values.name,
       description: values.description || '',
-      term: values.term || 'Бессрочно',
+      term: term.label,
+      termType: term.type,
+      termStartDate: term.startDate,
+      termEndDate: term.endDate,
       assignment: values.assignment || 'all',
-      condition: values.condition || 'each-paid',
-      conditionValue: values.conditionValue || '',
-      rewardType: values.rewardType || 'percent',
-      rewardValue: Math.max(0, Number(String(values.rewardValue || '0').replace(',', '.')) || 0),
-      rewardBase: values.rewardBase || 'Сумма оплаченной операции',
-      rewardExpiryType: values.rewardExpiryType || 'indefinite',
-      rewardExpiryValue: values.rewardExpiryValue || '',
-      recurrence: values.recurrence || 'each',
-      recurrenceValue: values.recurrenceValue || '',
+      condition,
+      conditionValue,
+      conditionServiceIds,
+      rewardType,
+      rewardValue,
+      rewardBase,
+      rewardPositionRules,
+      rewardTiers,
+      rewardExpiryType,
+      rewardExpiryCount,
+      rewardExpiryUnit,
+      rewardExpiryValue: rewardExpiryType === 'duration' ? periodLabel(rewardExpiryCount, rewardExpiryUnit) : '',
+      recurrence,
+      recurrenceValue,
       timing: values.timing || 'paid-and-completed',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -315,7 +567,10 @@ async function openProgramLayer(root, programId) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'loyalty-bonus-program-z' }), { stack: true });
   if (!layer) return null;
   const program = programs.find((item) => item.id === programId);
-  if (!program) { layer.v2Close?.(); return null; }
+  if (!program) {
+    layer.v2Close?.();
+    return null;
+  }
   const items = participants.filter((item) => item.programId === program.id);
   layer.innerHTML = page([
     loyaltyHeader(program.name || 'Бонусная программа'),
@@ -330,10 +585,12 @@ async function openProgramLayer(root, programId) {
 
 export async function renderBonus(root) {
   const render = async () => {
-    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
-      data: `data-bonus-program="${program.id}"`,
-      aria: `Открыть ${program.name}`,
-    }))) : emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
+    const cards = programs.length
+      ? entityCardStack(programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
+          data: `data-bonus-program="${program.id}"`,
+          aria: `Открыть ${program.name}`,
+        })))
+      : emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
 
     root.innerHTML = page([
       loyaltyHeader('Бонусная программа', {

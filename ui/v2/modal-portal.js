@@ -101,12 +101,28 @@ function lockModalHeader(app, { allowC = false } = {}) {
   };
 }
 
-function closeExistingApplicationModal() {
-  const layers = [...document.querySelectorAll('[data-v2-layer]:not([data-v2-layer-kind="technical"])')];
+function applicationLayers() {
+  return [...document.querySelectorAll('[data-v2-layer]:not([data-v2-layer-kind="technical"])')];
+}
+
+function closeApplicationLayer(layer) {
+  if (!layer) return;
+  if (typeof layer.v2Close === 'function') layer.v2Close();
+  else layer.remove();
+}
+
+function prepareApplicationModal({ qLayer = false } = {}) {
+  const layers = applicationLayers();
+  if (!layers.length) return;
+
+  if (qLayer) {
+    [...layers].reverse().forEach(closeApplicationLayer);
+    return;
+  }
+
   const current = layers.at(-1);
-  if (!current) return;
-  if (typeof current.v2Close === 'function') current.v2Close();
-  else current.remove();
+  if (current?.dataset.v2Q === 'true') return;
+  closeApplicationLayer(current);
 }
 
 export function mountV2Layer(html, { root = null } = {}) {
@@ -118,7 +134,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
 
-  if (!technical) closeExistingApplicationModal();
+  if (!technical) prepareApplicationModal({ qLayer });
 
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
@@ -164,6 +180,8 @@ export function mountV2Layer(html, { root = null } = {}) {
   let closed = false;
 
   const eventIsOwnedByModal = (event) => {
+    const foreignLayer = event.target.closest?.('[data-v2-layer]');
+    if (foreignLayer && foreignLayer !== node) return true;
     const sheet = node.querySelector(':scope > .v2-layer');
     if (sheet?.contains(event.target)) return true;
     if (!qLayer) return false;
