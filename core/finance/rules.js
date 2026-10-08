@@ -34,15 +34,7 @@ function correctionMode(item = {}) {
   return 'none';
 }
 
-function legacyCorrectionMoney(item = {}, price = 0, pricePercent = 0) {
-  const totalReduction = Math.min(financialMoney(price), financialMoney(item?.discountMoney));
-  if (totalReduction <= 0) return 0;
-  const rate = clampFinancialPercent(pricePercent) / 100;
-  if (rate >= 0.999999) return 0;
-  return financialMoney(Math.max(0, Math.min(price, (totalReduction - price * rate) / (1 - rate))));
-}
-
-function correctionForItem(item = {}, price = 0, pricePercent = 0) {
+function correctionForItem(item = {}, price = 0) {
   const explicitMode = correctionMode(item);
   if (explicitMode === 'percent') {
     const correctionPercent = clampFinancialPercent(item?.correctionPercent);
@@ -58,20 +50,6 @@ function correctionForItem(item = {}, price = 0, pricePercent = 0) {
       mode: correctionMoney > 0 ? 'money' : 'none',
       percent: price > 0 ? clampFinancialPercent(correctionMoney / price * 100) : 0,
       money: correctionMoney,
-    };
-  }
-
-  const hasNewCorrection = item?.correctionMode != null || item?.correctionPercent != null || item?.correctionMoney != null;
-  if (hasNewCorrection) return { mode: 'none', percent: 0, money: 0 };
-
-  // Compatibility with historical Settlement snapshots: discountMoney used to contain
-  // the whole reduction. Reconstruct only the manual price correction from that total.
-  const reconstructed = legacyCorrectionMoney(item, price, pricePercent);
-  if (reconstructed > 0) {
-    return {
-      mode: 'money',
-      percent: price > 0 ? clampFinancialPercent(reconstructed / price * 100) : 0,
-      money: reconstructed,
     };
   }
   return { mode: 'none', percent: 0, money: 0 };
@@ -96,7 +74,7 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
     const price = financialMoney(item?.price ?? item?.cost);
     const pricePercent = itemPricePercent(item, defaultPercent);
-    const correction = correctionForItem(item, price, pricePercent);
+    const correction = correctionForItem(item, price);
     const correctedPrice = financialMoney(price - correction.money);
     const pricePercentMoney = financialMoney(Math.min(correctedPrice, correctedPrice * pricePercent / 100));
     const totalReduction = financialMoney(correction.money + pricePercentMoney);
@@ -111,8 +89,6 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
       correctionMoney: correction.money,
       pricePercent,
       pricePercentMoney,
-      // Legacy names stay in the snapshot so old Finance/read-only receipt code remains compatible.
-      // discountPercent is the automatic condition; discountMoney is the total visible reduction.
       discountMode: pricePercent > 0 ? 'percent' : correction.money > 0 ? 'money' : 'none',
       discountPercent: pricePercent,
       discountMoney: totalReduction,
@@ -157,8 +133,7 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
     };
     if (!prior) return { ...base, correctionMode: 'none' };
     const priorPrice = financialMoney(prior?.price ?? source?.cost ?? source?.price);
-    const priorPercent = prior?.pricePercent == null ? defaultPricePercent : clampFinancialPercent(prior.pricePercent);
-    const correction = correctionForItem(prior, priorPrice, priorPercent);
+    const correction = correctionForItem(prior, priorPrice);
     if (correction.mode === 'percent') return { ...base, correctionMode: 'percent', correctionPercent: correction.percent };
     if (correction.money > 0) return { ...base, correctionMode: 'money', correctionMoney: correction.money };
     return { ...base, correctionMode: 'none' };
