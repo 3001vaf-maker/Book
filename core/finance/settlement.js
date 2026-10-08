@@ -18,21 +18,41 @@ import {
   recordSettlementItems,
 } from './rules.js';
 
-export function resolveRecordSettlement(record = null, { discountPercent = 0 } = {}) {
-  if (record?.id) {
-    const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
-    if (owned) return owned;
-  }
-  return calculateSettlement(recordSettlementItems(record), { discountPercent });
+function settlementWithCurrentPricePercent(settlement = null, discountPercent = 0) {
+  if (!settlement) return null;
+  const percent = clampFinancialPercent(discountPercent);
+  const items = (Array.isArray(settlement.items) ? settlement.items : []).map((item) => ({
+    ...item,
+    pricePercent: percent,
+    discountPercent: percent,
+  }));
+  return calculateSettlement(items, { discountPercent: percent });
 }
 
-export function getRecordSettlement(record = null, { discountPercent = 0 } = {}) {
+export function resolveRecordSettlement(record = null, { discountPercent = null } = {}) {
+  const currentPercent = discountPercent == null
+    ? recordSettlementDiscountPercent(record?.person)
+    : clampFinancialPercent(discountPercent);
+  if (record?.id) {
+    const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
+    if (owned) {
+      // Once a real financial fact exists the stored Settlement is historical and immutable.
+      // Before payment, current personal/program conditions may change while an explicit
+      // manual price correction remains saved, so only PRICE_PERCENT is refreshed.
+      const movements = getActiveDDSMovementsForSource('record', record.id);
+      return movements.length ? owned : settlementWithCurrentPricePercent(owned, currentPercent);
+    }
+  }
+  return calculateSettlement(recordSettlementItems(record), { discountPercent: currentPercent });
+}
+
+export function getRecordSettlement(record = null, { discountPercent = null } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   if (!record?.id) return calculateSettlementTotals(settlement, []);
   return calculateSettlementTotals(settlement, getActiveDDSMovementsForSource('record', record.id));
 }
 
-export function getRecordPaymentState(record = null, { discountPercent = 0 } = {}) {
+export function getRecordPaymentState(record = null, { discountPercent = null } = {}) {
   const settlement = resolveRecordSettlement(record, { discountPercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
   const state = calculateSettlementPaymentState(settlement, movements);
