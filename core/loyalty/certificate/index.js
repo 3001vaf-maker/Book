@@ -1,10 +1,13 @@
 import {
+  checkList,
+  collectCheckList,
   datePicker,
   details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
+  initCheckList,
   initDatePickers,
   miniCard,
   miniCardRail,
@@ -23,12 +26,16 @@ import {
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
+import { getProcedures } from '../../service/procedures/data.js';
 import {
   availablePeople,
   bindViewSettings,
   formObject,
+  initLoyaltyTermFields,
   loyaltyCardFields,
   loyaltyHeader,
+  loyaltyTermData,
+  loyaltyTermFields,
   loyaltyVisualCard,
   money,
   mockPerson,
@@ -46,8 +53,8 @@ const fallbackPeople = [
 ];
 
 let programs = [
-  { id: 'certificate-10000', name: 'Подарочный 10 000', type: 'amount', amount: 10000, service: '', term: '12 месяцев', partial: true, status: 'active', description: 'Можно использовать частями.', createdAt: '2026-10-01T10:00:00.000Z' },
-  { id: 'certificate-care', name: 'Уход в подарок', type: 'service', amount: 0, service: 'Уход', term: '6 месяцев', partial: false, status: 'active', description: '', createdAt: '2026-10-02T10:00:00.000Z' },
+  { id: 'certificate-10000', name: 'Подарочный 10 000', type: 'amount', amount: 10000, service: '', serviceIds: [], term: '12 мес.', termType: 'duration', termCount: 12, termUnit: 'months', termStartDate: '', termEndDate: '', partial: true, status: 'active', description: 'Можно использовать частями.', createdAt: '2026-10-01T10:00:00.000Z' },
+  { id: 'certificate-care', name: 'Уход в подарок', type: 'service', amount: 0, service: 'Уход', serviceIds: [], term: '6 мес.', termType: 'duration', termCount: 6, termUnit: 'months', termStartDate: '', termEndDate: '', partial: false, status: 'active', description: '', createdAt: '2026-10-02T10:00:00.000Z' },
 ];
 
 let instances = [
@@ -58,6 +65,19 @@ function typeLabel(type) {
   if (type === 'service') return 'На позицию Сервиса';
   if (type === 'bundle') return 'На набор позиций';
   return 'На сумму';
+}
+
+function serviceOptions() {
+  const items = getProcedures();
+  return [{ value: '', label: items.length ? 'Выберите позицию' : 'Позиции Сервиса пока не созданы' }, ...items.map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value)];
+}
+
+function serviceName(id = '') {
+  return getProcedures().find((item) => String(item.id || '') === String(id || ''))?.name || '';
+}
+
+function serviceChecklist() {
+  return checkList(getProcedures().map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value));
 }
 
 function programRight(program = {}) {
@@ -137,6 +157,33 @@ function openConditions(program = {}) {
   });
 }
 
+function initCertificateTypeFields(layer) {
+  const form = layer?.querySelector?.('[data-certificate-form]');
+  const type = form?.querySelector?.('[name="type"]');
+  if (!form || !type) return;
+  const sync = () => {
+    form.querySelectorAll('[data-certificate-type-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.certificateTypePanel !== type.value;
+    });
+  };
+  type.addEventListener('change', sync);
+  sync();
+  initCheckList(form);
+}
+
+function expiryFromProgram(program = {}, issuedDate = '') {
+  if (program.termType === 'indefinite') return '';
+  if (program.termType === 'range') return program.termEndDate || '';
+  if (program.termType !== 'duration' || !issuedDate) return '';
+  const date = new Date(`${issuedDate}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  const count = Math.max(1, Number(program.termCount || 1));
+  if (program.termUnit === 'days') date.setDate(date.getDate() + count);
+  else if (program.termUnit === 'years') date.setFullYear(date.getFullYear() + count);
+  else date.setMonth(date.getMonth() + count);
+  return date.toISOString().slice(0, 10);
+}
+
 async function openCreateProgramQ(root, rerender) {
   const layer = mountModal(root, modal(`${loyaltyHeader('Новый сертификат', {
     c: { label: 'Сохранить', data: 'data-certificate-save', aria: 'Сохранить вид сертификата' },
@@ -148,27 +195,47 @@ async function openCreateProgramQ(root, rerender) {
         { value: 'service', label: 'На позицию Сервиса' },
         { value: 'bundle', label: 'На набор позиций' },
       ] })}
-      ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
-      ${field({ label: 'Позиция / набор Сервиса', name: 'service', placeholder: 'Выбор из Сервиса подключается без изменения UI' })}
-      ${field({ label: 'Срок', name: 'term', placeholder: 'Например: 12 месяцев или бессрочно' })}
+      <div data-certificate-type-panel="amount">${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' })}</div>
+      <div data-certificate-type-panel="service" hidden>${select({ label: 'Позиция Сервиса', name: 'serviceId', value: '', options: serviceOptions() })}</div>
+      <div data-certificate-type-panel="bundle" hidden>${serviceChecklist()}</div>
+      ${loyaltyTermFields({ prefix: 'certificateTerm', label: 'Срок действия', mode: 'indefinite', allowDuration: true, allowRange: true })}
       ${select({ label: 'Частичное использование', name: 'partial', value: 'yes', options: [{ value: 'yes', label: 'Разрешено' }, { value: 'no', label: 'Нет' }] })}
       ${textareaField({ label: 'Условия', name: 'description' })}
       <div class="form-error" data-certificate-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Новый сертификат' }));
   if (!layer) return null;
+  initLoyaltyTermFields(layer);
+  initCertificateTypeFields(layer);
   const form = layer.querySelector('[data-certificate-form]');
   layer.querySelector('[data-certificate-save]')?.addEventListener('click', async () => {
     const error = layer.querySelector('[data-certificate-error]');
     const validation = formValidationMessage(form);
     if (validation) { if (error) error.textContent = validation; return; }
     const values = formObject(form);
+    const type = values.type || 'amount';
+    const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
+    const singleServiceId = values.serviceId || '';
+    const bundleIds = collectCheckList(form, '[data-certificate-type-panel="bundle"] .ui-check-list input[type="checkbox"]');
+    if (type === 'amount' && amount <= 0) { if (error) error.textContent = 'Укажите сумму'; return; }
+    if (type === 'service' && !singleServiceId) { if (error) error.textContent = 'Выберите позицию Сервиса'; return; }
+    if (type === 'bundle' && !bundleIds.length) { if (error) error.textContent = 'Выберите позиции Сервиса'; return; }
+    const term = loyaltyTermData(values, 'certificateTerm');
+    if (term.type === 'range' && term.startDate && term.endDate && term.startDate > term.endDate) { if (error) error.textContent = 'Дата начала не может быть позже даты окончания'; return; }
+    const serviceIds = type === 'service' ? [singleServiceId] : type === 'bundle' ? bundleIds : [];
+    const serviceNames = serviceIds.map(serviceName).filter(Boolean);
     programs.push({
       id: uid('certificate-program'),
       name: values.name,
-      type: values.type || 'amount',
-      amount: Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0),
-      service: values.service || '',
-      term: values.term || 'Бессрочно',
+      type,
+      amount,
+      service: serviceNames.join(' · '),
+      serviceIds,
+      term: term.label,
+      termType: term.type,
+      termCount: term.count,
+      termUnit: term.unit,
+      termStartDate: term.startDate,
+      termEndDate: term.endDate,
       partial: values.partial !== 'no',
       description: values.description || '',
       status: 'active',
@@ -184,6 +251,7 @@ async function openCreateProgramQ(root, rerender) {
 async function openIssueQ(root, program, rerender) {
   const people = availablePeople(fallbackPeople);
   const options = [{ value: '', label: 'Выберите контакт' }, ...people.map(personOption).filter((item) => item.value)];
+  const today = new Date().toISOString().slice(0, 10);
   const layer = mountModal(root, modal(`${loyaltyHeader('Оформить сертификат', {
     c: { label: 'Оформить', data: 'data-certificate-issue-save', aria: 'Оформить сертификат' },
   })}
@@ -191,8 +259,8 @@ async function openIssueQ(root, program, rerender) {
       ${select({ label: 'Покупатель', name: 'buyerKey', value: '', options })}
       ${select({ label: 'Владелец / получатель', name: 'ownerKey', value: '', options })}
       ${program.type === 'amount' ? field({ label: 'Номинал', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: program.amount || '' }) : field({ label: 'Право', name: 'right', value: programRight(program), disabled: true })}
-      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
-      ${field({ label: 'Срок / дата окончания', name: 'expiresAt', placeholder: program.term || 'Бессрочно' })}
+      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: today, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
+      ${field({ label: 'Срок', name: 'termPreview', value: program.term || 'Бессрочно', disabled: true })}
       <div class="form-error" data-certificate-issue-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Оформить сертификат' }));
   if (!layer) return null;
@@ -217,7 +285,7 @@ async function openIssueQ(root, program, rerender) {
       balance: amount,
       status: 'active',
       issuedAt: new Date(`${values.issuedAt}T12:00:00`).toISOString(),
-      expiresAt: values.expiresAt || program.term || 'Бессрочно',
+      expiresAt: expiryFromProgram(program, values.issuedAt),
       history: [],
     });
     layer.v2Close?.();
@@ -284,7 +352,7 @@ export async function renderCertificate(root) {
     ]);
     bindViewSettings(root, 'Сертификат', {
       type: 'certificate',
-      fields: () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 месяцев', status: 'active' }),
+      fields: () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' }),
       onSaved: render,
     });
     root.querySelector('[data-certificate-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
