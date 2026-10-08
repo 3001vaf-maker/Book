@@ -12,9 +12,10 @@ type AuxiliaryBundle = {
   products: JsonObject[];
   productHistory: JsonObject[];
   cardAppearanceTemplates: JsonObject[];
+  loyalty: JsonObject;
 };
 
-const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates']);
+const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates', 'loyalty']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -38,6 +39,7 @@ function normalize(value: unknown): AuxiliaryBundle {
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),
     cardAppearanceTemplates: (Array.isArray(source.cardAppearanceTemplates) ? source.cardAppearanceTemplates : []).map((item) => clone(objectValue(item))),
+    loyalty: clone(objectValue(source.loyalty)),
   };
 }
 
@@ -173,12 +175,13 @@ export class AuxiliaryStateService {
     const row = await this.ensureState(tenantId);
     const current = normalize(row.data);
     const value = objectValue(body).value;
-    const requested = Array.isArray(value) ? clone(value) : [];
-    const next = key === 'investments'
-      ? this.protectInvestmentAgreements(current.investments, requested)
-      : requested;
+    const requested: JsonObject | JsonObject[] = key === 'loyalty'
+      ? clone(objectValue(value))
+      : (Array.isArray(value) ? value.map((item) => clone(objectValue(item))) : []);
+    let next: JsonObject | JsonObject[] = requested;
     if (key === 'investments') {
-      await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
+      next = this.protectInvestmentAgreements(current.investments, requested as JsonObject[]);
+      await this.assertInvestmentMutationAllowed(tenantId, current.investments, next as JsonObject[]);
     }
     (current as any)[key] = next;
     await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(current) } });
