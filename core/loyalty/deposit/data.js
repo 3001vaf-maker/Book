@@ -9,10 +9,9 @@ async function payload(response,fallback){const value=await response.json().catc
 
 function issuedDepositUei(item={}){
   const personUei=text(item?.person?.uei).toUpperCase();
-  const programUei=text(item?.terms?.programUei||item?.programUei).toUpperCase();
   const depositId=text(item?.depositId||item?.id);
-  const suffix=depositId.replace(/[^A-Za-z0-9]/g,'').slice(0,6).toUpperCase();
-  return [personUei,programUei,suffix].filter(Boolean).join('-');
+  const suffix=depositId.replace(/[^A-Za-z0-9]/g,'').slice(0,8).toUpperCase();
+  return [personUei,suffix].filter(Boolean).join('-');
 }
 
 function normalizeDeposits(value){
