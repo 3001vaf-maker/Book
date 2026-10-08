@@ -10,7 +10,9 @@ import { PrismaService } from '../prisma.service';
 import { TimeModule } from '../time/time.module';
 import { RecordModule } from '../record/record.module';
 import { ProcedureModule } from '../procedure/procedure.module';
+import { FinanceModule } from '../finance/finance.module';
 import { AccountGuard } from './account.guard';
+import { AccountDepositController } from './account-deposit.controller';
 import { AccountSettingsController } from './account-settings.controller';
 import { BookingConsentController } from './booking-consent.controller';
 import { BookingPdnConsentGuard } from './booking-pdn-consent.guard';
@@ -20,8 +22,8 @@ import { OnlineBookingService } from './online-booking.service';
 import { SaasAccessModule } from '../saas-access/saas-access.module';
 
 @Module({
-  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentRegistryModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule, SaasAccessModule],
-  controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController],
+  imports: [AuthModule, BusinessStateModule, CommunicationModule, DocumentRegistryModule, TenantDocumentArchiveModule, NotificationModule, ProfileModule, TimeModule, RecordModule, ProcedureModule, FinanceModule, SaasAccessModule],
+  controllers: [OnlineBookingController, BookingConsentController, AccountSettingsController, AccountDepositController],
   providers: [OnlineBookingService, AccountGuard, BookingPdnConsentGuard, PersonIdentityService, PrismaService],
 })
 export class OnlineBookingModule {}
