@@ -50,10 +50,25 @@ for (const token of [
   'DepositInstance не должен реконструироваться',
   'Личный счёт',
   'не хранит бонусный баланс',
-  'Результат Реферальной программы **не записывается в Личный счёт**',
-  'Результат Бонусной программы **не записывается в Личный счёт**',
+  'Результат Реферальной программы не записывается в Личный счёт',
+  'Результат Бонусной программы не записывается в Личный счёт',
 ]) {
   if (!architecture.includes(token)) errors.push(`LOYALTY_ARCHITECTURE.md missing normative rule: ${token}`);
+}
+
+for (const token of [
+  'Пример общего лимита:',
+  'одна позиция с количеством',
+  'общий лимит на несколько выбранных позиций',
+  'первая оплаченная операция приглашённого',
+  'многоуровневая программа',
+  'максимум от одного приглашённого',
+  'каждую N-ю операцию',
+  'ступенчатые правила',
+  'Срок жизни награды',
+  'покупатель, если он отличается от владельца',
+]) {
+  if (!architecture.includes(token)) errors.push(`LOYALTY_ARCHITECTURE.md lost approved product detail: ${token}`);
 }
 
 if (!assignment.includes('Личный счёт') || !assignment.includes('**не назначается вообще**')) {
@@ -65,8 +80,17 @@ if (!finance.includes('Личный счёт хранит только **реа�
 if (/два независимых номинала|бонусный номинал Личного счёта|срок жизни бонусов принадлежит [`']?Личн/i.test(finance)) {
   errors.push('LOYALTY_FINANCE_CONTRACT.md contains retired Personal Account bonus ownership');
 }
+for (const token of [
+  'ближайшей датой окончания',
+  '1 бонус = 1 единица валюты профиля / бизнеса',
+  'уже созданные начисления не переписываются задним числом',
+  'рабочая / фактическая дата события',
+  'аудитная дата внесения записи',
+]) {
+  if (!finance.toLowerCase().includes(token.toLowerCase())) errors.push(`LOYALTY_FINANCE_CONTRACT.md lost approved financial detail: ${token}`);
+}
 
-for (const token of ['Фаза A — UI', 'Фаза B — доменные сущности', 'Фаза C — persistence / API', 'Фаза D — интеграции', 'Восстановление после смены / обрыва чата', 'commit SHA']) {
+for (const token of ['Фаза A — UI', 'Фаза B — доменные сущности', 'Фаза C — persistence / API', 'Фаза D — интеграции', 'Восстановление после смены / обрыва чата', 'commit SHA', 'Нормативный документ нельзя «упрощать» ценой потери решений']) {
   if (!execution.includes(token)) errors.push(`LOYALTY_EXECUTION_CONTRACT.md missing execution rule: ${token}`);
 }
 
