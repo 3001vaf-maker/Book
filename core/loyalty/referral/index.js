@@ -1,5 +1,6 @@
 import {
   emptyState,
+  entityCardStack,
   field,
   formValidationMessage,
   modal,
@@ -17,7 +18,9 @@ import {
 import {
   bindViewSettings,
   formObject,
+  loyaltyCardFields,
   loyaltyHeader,
+  loyaltyVisualCard,
   notifyLoyaltyContext,
   text,
   uid,
@@ -32,9 +35,7 @@ let programs = [
     qualifyingEvent: 'first-paid',
     eventValue: '',
     levels: 1,
-    levelRewards: [
-      { type: 'percent', value: 5, base: 'Сумма оплаченной операции' },
-    ],
+    levelRewards: [{ type: 'percent', value: 5, base: 'Сумма оплаченной операции' }],
     capType: 'per-invitee',
     capValue: 5000,
     rewardExpiryType: 'duration',
@@ -77,34 +78,14 @@ let programs = [
 
 let relations = [
   {
-    id: 'referral-relation-1',
-    programId: 'referral-friend',
-    inviterName: 'Иван Петров',
-    inviteeName: 'Анна Иванова',
-    inviterCode: 'IVAN-REF',
-    createdAt: '2026-10-02T11:00:00.000Z',
-    level: 1,
-    status: 'completed',
-    qualifyingEvent: 'Первая оплаченная операция',
-    resultBase: 10000,
-    reward: 500,
-    rewardAvailable: 300,
-    rewardExpiresAt: '2027-01-02',
+    id: 'referral-relation-1', programId: 'referral-friend', inviterName: 'Иван Петров', inviteeName: 'Анна Иванова', inviterCode: 'IVAN-REF',
+    createdAt: '2026-10-02T11:00:00.000Z', level: 1, status: 'completed', qualifyingEvent: 'Первая оплаченная операция',
+    resultBase: 10000, reward: 500, rewardAvailable: 300, rewardExpiresAt: '2027-01-02',
   },
   {
-    id: 'referral-relation-2',
-    programId: 'referral-friend',
-    inviterName: 'Анна Иванова',
-    inviteeName: 'Мария Смирнова',
-    inviterCode: 'ANNA-REF',
-    createdAt: '2026-10-05T11:00:00.000Z',
-    level: 1,
-    status: 'waiting',
-    qualifyingEvent: 'Ожидается первая оплаченная операция',
-    resultBase: 0,
-    reward: 0,
-    rewardAvailable: 0,
-    rewardExpiresAt: '',
+    id: 'referral-relation-2', programId: 'referral-friend', inviterName: 'Анна Иванова', inviteeName: 'Мария Смирнова', inviterCode: 'ANNA-REF',
+    createdAt: '2026-10-05T11:00:00.000Z', level: 1, status: 'waiting', qualifyingEvent: 'Ожидается первая оплаченная операция',
+    resultBase: 0, reward: 0, rewardAvailable: 0, rewardExpiresAt: '',
   },
 ];
 
@@ -118,9 +99,9 @@ function eventLabel(value = '') {
   return 'Первая оплаченная операция';
 }
 
-function rewardTypeLabel(value = '') {
-  return value === 'fixed' ? 'Фиксированные бонусы' : 'Процент от базы';
-}
+function rewardTypeLabel(value = '') { return value === 'fixed' ? 'Фиксированные бонусы' : 'Процент от базы'; }
+function assignmentLabel(value = '') { return value === 'selected' ? 'Выбранным контактам' : 'Всем контактам'; }
+function relationStatus(value = '') { if (value === 'completed') return 'Выполнено'; if (value === 'cancelled') return 'Отменено'; return 'Ожидает результата'; }
 
 function capLabel(program = {}) {
   const value = Math.max(0, Number(program.capValue || 0));
@@ -144,10 +125,6 @@ function recurrenceLabel(program = {}) {
   return 'Только первое успешное действие';
 }
 
-function assignmentLabel(value = '') {
-  return value === 'selected' ? 'Выбранным контактам' : 'Всем контактам';
-}
-
 function inviteeBenefitLabel(program = {}) {
   const amount = Math.max(0, Number(program.inviteeBenefitValue || 0));
   if (program.inviteeBenefit === 'fixed-bonus') return `${amount} бонусов внутри программы`;
@@ -156,15 +133,33 @@ function inviteeBenefitLabel(program = {}) {
   return 'Без отдельной выгоды';
 }
 
-function rewardExpiryLabel(program = {}) {
-  return program.rewardExpiryType === 'duration' ? (program.rewardExpiryValue || 'N дней / месяцев') : 'Бессрочно';
-}
+function rewardExpiryLabel(program = {}) { return program.rewardExpiryType === 'duration' ? (program.rewardExpiryValue || 'N дней / месяцев') : 'Бессрочно'; }
 
 function levelSummary(program = {}) {
   return (Array.isArray(program.levelRewards) ? program.levelRewards : [])
     .slice(0, Math.max(1, Number(program.levels || 1)))
     .map((reward, index) => `Уровень ${index + 1}: ${rewardTypeLabel(reward.type)} ${reward.value || 0}${reward.type === 'percent' ? '%' : ''}`)
     .join(' · ');
+}
+
+function programCardFields(program = {}) {
+  return loyaltyCardFields({
+    title: program.name || 'Реферальная программа',
+    subtitle: eventLabel(program.qualifyingEvent),
+    status: program.status === 'active' ? 'Активна' : 'Неактивна',
+    metaLeft: assignmentLabel(program.assignment),
+    metaRight: `${program.levels || 1} ур.`,
+  });
+}
+
+function relationCardFields(relation = {}) {
+  return loyaltyCardFields({
+    title: `${relation.inviterName || '—'} → ${relation.inviteeName || '—'}`,
+    subtitle: relation.qualifyingEvent || 'Реферальная связь',
+    status: relationStatus(relation.status),
+    metaLeft: `Уровень ${relation.level || 1}`,
+    metaRight: relation.reward ? `${relation.reward} бонусов` : 'Без начисления',
+  });
 }
 
 function programInfo(program = {}) {
@@ -182,12 +177,6 @@ function programInfo(program = {}) {
     ['Условия', program.description || '—'],
     ['Состояние', program.status === 'active' ? 'Активна' : 'Неактивна'],
   ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
-}
-
-function relationStatus(value = '') {
-  if (value === 'completed') return 'Выполнено';
-  if (value === 'cancelled') return 'Отменено';
-  return 'Ожидает результата';
 }
 
 function relationInfo(relation = {}, program = {}) {
@@ -246,9 +235,7 @@ async function openCreateProgramQ(root, rerender) {
       ] })}
       ${field({ label: 'N / сумма / срок / выбранные позиции', name: 'eventValue', placeholder: 'Параметр выбранного события' })}
       ${field({ label: 'Количество уровней', name: 'levels', type: 'number', min: '1', max: '3', step: '1', value: '1', inputmode: 'numeric' })}
-      ${levelFields(1)}
-      ${levelFields(2)}
-      ${levelFields(3)}
+      ${levelFields(1)}${levelFields(2)}${levelFields(3)}
       ${select({ label: 'Ограничение награды', name: 'capType', value: 'none', options: [
         { value: 'none', label: 'Без ограничения' },
         { value: 'per-operation', label: 'Максимум за одну операцию' },
@@ -301,26 +288,13 @@ async function openCreateProgramQ(root, rerender) {
       base: baseLabel(values[`level${level}Base`]),
     }));
     programs.push({
-      id: uid('referral-program'),
-      name: values.name,
-      description: values.description || '',
-      term: values.term || 'Бессрочно',
-      qualifyingEvent: values.qualifyingEvent || 'first-paid',
-      eventValue: values.eventValue || '',
-      levels,
-      levelRewards,
-      capType: values.capType || 'none',
-      capValue: Math.max(0, Number(String(values.capValue || '0').replace(',', '.')) || 0),
-      rewardExpiryType: values.rewardExpiryType || 'indefinite',
-      rewardExpiryValue: values.rewardExpiryValue || '',
-      inviteeBenefit: values.inviteeBenefit || 'none',
-      inviteeBenefitValue: Math.max(0, Number(String(values.inviteeBenefitValue || '0').replace(',', '.')) || 0),
-      rewardTiming: values.rewardTiming || 'paid-and-completed',
-      recurrence: values.recurrence || 'first',
-      recurrenceValue: values.recurrenceValue || '',
-      assignment: values.assignment || 'all',
-      status: 'active',
-      createdAt: new Date().toISOString(),
+      id: uid('referral-program'), name: values.name, description: values.description || '', term: values.term || 'Бессрочно',
+      qualifyingEvent: values.qualifyingEvent || 'first-paid', eventValue: values.eventValue || '', levels, levelRewards,
+      capType: values.capType || 'none', capValue: Math.max(0, Number(String(values.capValue || '0').replace(',', '.')) || 0),
+      rewardExpiryType: values.rewardExpiryType || 'indefinite', rewardExpiryValue: values.rewardExpiryValue || '',
+      inviteeBenefit: values.inviteeBenefit || 'none', inviteeBenefitValue: Math.max(0, Number(String(values.inviteeBenefitValue || '0').replace(',', '.')) || 0),
+      rewardTiming: values.rewardTiming || 'paid-and-completed', recurrence: values.recurrence || 'first', recurrenceValue: values.recurrenceValue || '',
+      assignment: values.assignment || 'all', status: 'active', createdAt: new Date().toISOString(),
     });
     layer.v2Close?.();
     await rerender?.();
@@ -363,13 +337,7 @@ async function openProgramLayer(root, programId) {
     v2ListEntries([
       v2ListEntry({ title: 'Условия программы', subtitle: eventLabel(program.qualifyingEvent), rightTop: '[i]', interactive: true, initial: '', data: 'data-referral-info', aria: 'Открыть условия программы' }),
     ]),
-    v2Section('Реферальные связи', items.length ? v2ListEntries(items.map((relation) => v2ListEntry({
-      title: `${relation.inviterName || '—'} → ${relation.inviteeName || '—'}`,
-      subtitle: relation.qualifyingEvent || '—',
-      rightTop: relationStatus(relation.status),
-      rightBottom: relation.reward ? `${relation.reward} бонусов` : '',
-      interactive: true,
-      initial: '',
+    v2Section('Реферальные связи', items.length ? entityCardStack(items.map((relation) => loyaltyVisualCard('referral', relationCardFields(relation), {
       data: `data-referral-relation="${relation.id}"`,
       aria: `Открыть реферальную связь ${relation.inviterName || ''} ${relation.inviteeName || ''}`,
     }))) : emptyState('Связей пока нет', 'Связь появится после использования персонального реферального идентификатора или подтверждённой ручной фиксации через Контакты.')),
@@ -382,23 +350,23 @@ async function openProgramLayer(root, programId) {
 
 export async function renderReferral(root) {
   const render = async () => {
+    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), {
+      data: `data-referral-program="${program.id}"`,
+      aria: `Открыть ${program.name}`,
+    }))) : emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
+
     root.innerHTML = page([
       loyaltyHeader('Реферальная программа', {
         settings: true,
         c: { label: '+', data: 'data-referral-create', aria: 'Создать реферальную программу' },
       }),
-      programs.length ? v2ListEntries(programs.map((program) => v2ListEntry({
-        title: program.name,
-        subtitle: `${eventLabel(program.qualifyingEvent)} · ${assignmentLabel(program.assignment)}`,
-        rightTop: program.status === 'active' ? 'Активна' : 'Неактивна',
-        rightBottom: `${program.levels || 1} ур.`,
-        interactive: true,
-        initial: program.name.slice(0, 1).toUpperCase(),
-        data: `data-referral-program="${program.id}"`,
-        aria: `Открыть ${program.name}`,
-      }))) : emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».')
+      cards,
     ]);
-    bindViewSettings(root, 'Реферальная программа');
+    bindViewSettings(root, 'Реферальная программа', {
+      type: 'referral',
+      fields: () => programCardFields(programs[0] || { name: 'Реферальная программа', qualifyingEvent: 'first-paid', assignment: 'all', levels: 1, status: 'active' }),
+      onSaved: render,
+    });
     root.querySelector('[data-referral-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
     root.querySelectorAll('[data-referral-program]').forEach((node) => node.addEventListener('click', () => openProgramLayer(root, text(node.dataset.referralProgram))));
     notifyLoyaltyContext();
