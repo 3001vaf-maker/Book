@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DepositService } from './deposit.service';
@@ -37,5 +37,21 @@ export class LoyaltyController {
     @Body() body: unknown,
   ) {
     return this.deposits.withdraw(request.auth!.tenantId, depositId, body);
+  }
+
+  @Delete('deposits/program/:programId')
+  deleteProgramDeposits(
+    @Req() request: AuthenticatedRequest,
+    @Param('programId') programId: string,
+  ) {
+    return this.deposits.hardDeleteProgram(request.auth!.tenantId, programId);
+  }
+
+  @Delete('deposits/:depositId')
+  deleteDeposit(
+    @Req() request: AuthenticatedRequest,
+    @Param('depositId') depositId: string,
+  ) {
+    return this.deposits.hardDelete(request.auth!.tenantId, depositId);
   }
 }
