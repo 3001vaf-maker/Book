@@ -123,7 +123,7 @@ export function paymentMethods({
   initialAllocations = [],
   initialDepositAllocations = [],
 } = {}) {
-  const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || deposit?.id || ''), name: String(wallet?.name || '') })) : []));
+  const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
   const depositData = escapeHtml(JSON.stringify(Array.isArray(deposits) ? deposits.map((deposit) => ({
     depositId: String(deposit?.depositId || deposit?.id || ''),
     programName: String(deposit?.programName || deposit?.name || 'Депозит'),
