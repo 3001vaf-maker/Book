@@ -55,21 +55,42 @@ function paymentItemHeader(name = '') {
   </div>`;
 }
 
+function reconstructedCorrectionMoney(price, totalReduction, pricePercent) {
+  const amount = Math.max(0, Math.min(price, numberValue(totalReduction)));
+  const rate = Math.max(0, Math.min(100, numberValue(pricePercent))) / 100;
+  if (!amount || rate >= 0.999999) return 0;
+  return Math.max(0, Math.min(price, Math.round(((amount - price * rate) / (1 - rate)) * 100) / 100));
+}
+
+function correctionPresentation(procedure = {}, price = 0, pricePercent = 0) {
+  const explicitMode = procedure?.correctionMode;
+  if (explicitMode === 'percent') {
+    const value = Math.max(0, Math.min(100, numberValue(procedure?.correctionPercent)));
+    return { mode: value > 0 ? 'percent' : 'none', percent: value, money: 0 };
+  }
+  if (explicitMode === 'money') {
+    const value = Math.max(0, Math.min(price, numberValue(procedure?.correctionMoney)));
+    return { mode: value > 0 ? 'money' : 'none', percent: 0, money: value };
+  }
+  if (explicitMode === 'none') return { mode: 'none', percent: 0, money: 0 };
+  const legacyMoney = reconstructedCorrectionMoney(price, procedure?.discountMoney, pricePercent);
+  return legacyMoney > 0
+    ? { mode: 'money', percent: 0, money: legacyMoney }
+    : { mode: 'none', percent: 0, money: 0 };
+}
+
 function paymentProcedureBlock(procedure, index) {
   const price = Math.max(0, numberValue(procedure?.cost));
-  const percent = Math.max(0, Math.min(100, numberValue(procedure?.discountPercent)));
-  const money = Math.max(0, numberValue(procedure?.discountMoney));
-  const explicitMode = procedure?.discountMode;
-  const mode = explicitMode === 'percent' || explicitMode === 'money' || explicitMode === 'none'
-    ? explicitMode
-    : percent ? 'percent' : money ? 'money' : 'none';
+  const pricePercent = Math.max(0, Math.min(100, numberValue(procedure?.pricePercent ?? procedure?.discountPercent)));
+  const correction = correctionPresentation(procedure, price, pricePercent);
   const itemName = procedure?.name || '';
-  return `<div class="payment-item-section" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-discount-mode="${mode}">
+  return `<div class="payment-item-section" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-correction-mode="${correction.mode}" data-payment-price-percent="${escapeHtml(percentText(pricePercent))}">
     ${paymentItemHeader(itemName)}
     <div class="payment-edit-grid">
       ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
-      ${select({ label: 'Скидка %', value: percent ? percentText(percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-discount-percent', aria: 'Скидка в процентах' })}
-      ${field({ label: 'Скидка ₽', value: money ? moneyText(money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-discount-money' })}
+      ${pricePercent > 0 ? field({ label: 'Условие', value: `${percentText(pricePercent)}%`, disabled: true, data: 'data-payment-price-condition' }) : ''}
+      ${select({ label: 'Ручная коррекция %', value: correction.mode === 'percent' ? percentText(correction.percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-correction-percent', aria: 'Ручная коррекция цены в процентах' })}
+      ${field({ label: 'Ручная коррекция ₽', value: correction.mode === 'money' ? moneyText(correction.money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-correction-money' })}
     </div>
   </div>`;
 }
@@ -132,8 +153,8 @@ export function paymentMethods({
 
 function rowValues(row) {
   const priceInput = row.querySelector('[data-payment-price]');
-  const percentInput = row.querySelector('input[data-payment-discount-percent]');
-  const moneyInput = row.querySelector('[data-payment-discount-money]');
+  const percentInput = row.querySelector('input[data-payment-correction-percent]');
+  const moneyInput = row.querySelector('[data-payment-correction-money]');
   return {
     priceInput,
     percentInput,
@@ -141,6 +162,7 @@ function rowValues(row) {
     price: Math.max(0, numberValue(priceInput?.value)),
     percent: Math.max(0, numberValue(percentInput?.value)),
     money: Math.max(0, numberValue(moneyInput?.value)),
+    pricePercent: Math.max(0, Math.min(100, numberValue(row.dataset.paymentPricePercent))),
   };
 }
 
@@ -155,15 +177,16 @@ function setPercentDisplay(input, value) {
 function settlementInputs(root) {
   return [...root.querySelectorAll('[data-payment-procedure]')].map((row) => {
     const values = rowValues(row);
-    const mode = row.dataset.paymentDiscountMode || 'none';
+    const mode = row.dataset.paymentCorrectionMode || 'none';
     return {
       sourceType: row.dataset.paymentSourceType || 'procedure',
       sourceId: row.dataset.paymentSourceId || '',
       name: row.dataset.paymentName || '',
       price: values.price,
-      discountMode: mode,
-      discountPercent: mode === 'percent' ? values.percent : '',
-      discountMoney: mode === 'money' ? values.money : '',
+      pricePercent: values.pricePercent,
+      correctionMode: mode,
+      correctionPercent: mode === 'percent' ? values.percent : '',
+      correctionMoney: mode === 'money' ? values.money : '',
     };
   });
 }
@@ -173,11 +196,16 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
   [...root.querySelectorAll('[data-payment-procedure]')].forEach((row, index) => {
     const item = items[index];
     if (!item) return;
-    row.dataset.paymentDiscountMode = item.discountMode || 'none';
+    const pricePercent = Math.max(0, Math.min(100, numberValue(item.pricePercent ?? item.discountPercent)));
+    const correction = correctionPresentation(item, Math.max(0, numberValue(item.price)), pricePercent);
+    row.dataset.paymentPricePercent = percentText(pricePercent);
+    row.dataset.paymentCorrectionMode = correction.mode;
     const { priceInput, percentInput, moneyInput } = rowValues(row);
     if (priceInput && priceInput !== preserve) priceInput.value = moneyText(item.price);
-    if (percentInput !== preserve) setPercentDisplay(percentInput, item.discountPercent || 0);
-    if (moneyInput && moneyInput !== preserve) moneyInput.value = item.discountMoney ? moneyText(item.discountMoney) : '';
+    if (percentInput !== preserve) setPercentDisplay(percentInput, correction.mode === 'percent' ? correction.percent : 0);
+    if (moneyInput && moneyInput !== preserve) moneyInput.value = correction.mode === 'money' ? moneyText(correction.money) : '';
+    const conditionInput = row.querySelector('[data-payment-price-condition]');
+    if (conditionInput) conditionInput.value = pricePercent > 0 ? `${percentText(pricePercent)}%` : '';
   });
   const summary = root.querySelector('[data-payment-summary]');
   if (summary) {
@@ -230,11 +258,13 @@ export function initPaymentForm(root, {
     const { priceInput, percentInput, moneyInput } = rowValues(row);
     priceInput?.addEventListener('input', () => currentState(priceInput));
     percentInput?.addEventListener('change', () => {
-      row.dataset.paymentDiscountMode = percentInput.value ? 'percent' : 'none';
+      row.dataset.paymentCorrectionMode = percentInput.value ? 'percent' : 'none';
+      if (percentInput.value && moneyInput) moneyInput.value = '';
       currentState(percentInput);
     });
     moneyInput?.addEventListener('input', () => {
-      row.dataset.paymentDiscountMode = moneyInput.value ? 'money' : 'none';
+      row.dataset.paymentCorrectionMode = moneyInput.value ? 'money' : 'none';
+      if (moneyInput.value && percentInput) setPercentDisplay(percentInput, 0);
       currentState(moneyInput);
     });
   });
