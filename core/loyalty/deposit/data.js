@@ -7,22 +7,8 @@ function list(value){return Array.isArray(value)?value:[];}
 function text(value){return String(value??'').trim();}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
-function issuedDepositUei(item={}){
-  const personUei=text(item?.person?.uei).toUpperCase();
-  const depositId=text(item?.depositId||item?.id);
-  const suffix=depositId.replace(/[^A-Za-z0-9]/g,'').slice(0,8).toUpperCase();
-  return [personUei,suffix].filter(Boolean).join('-');
-}
-
 function normalizeDeposits(value){
-  const seen=new Set();
-  return list(value).map((item)=>{
-    const normalized={...clone(item),depositUei:issuedDepositUei(item)};
-    if(!normalized.depositUei)return normalized;
-    if(seen.has(normalized.depositUei))throw new Error('UEI депозита уже используется другим депозитом');
-    seen.add(normalized.depositUei);
-    return normalized;
-  });
+  return list(value).map((item)=>clone(item));
 }
 
 export function getDepositPrograms(){return programs.map((item)=>clone(item));}
