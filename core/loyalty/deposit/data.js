@@ -1,12 +1,24 @@
 import { apiRequest } from '../../auth.js';
-import { refreshFinanceState } from '../../finance/index.js';
 
 let programs = [];
+let deposits = [];
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
 function list(value){return Array.isArray(value)?value:[];}
 function text(value){return String(value??'').trim();}
+function numberValue(value){const number=Number(String(value??'').replace(',','.'));return Number.isFinite(number)?number:0;}
+function percent(value){return Math.max(0,Math.min(100,numberValue(value)));}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
+
+async function refreshFinance(){
+  const { refreshFinanceState } = await import('../../finance/index.js');
+  return refreshFinanceState();
+}
+
+function personKeyOf(value={}){
+  const person=value?.person&&typeof value.person==='object'?value.person:{};
+  return text(person.key||person.personKey||person.id);
+}
 
 function normalizeDeposits(value){
   return list(value).map((item)=>{
@@ -15,16 +27,62 @@ function normalizeDeposits(value){
       ...entry,
       direction:text(entry?.direction).toLowerCase(),
     }));
+    deposit.discountPercent=percent(deposit.discountPercent);
     return deposit;
   });
 }
 
+function replacePersonDeposits(personKey='',values=[]){
+  const key=text(personKey);
+  const incoming=normalizeDeposits(values);
+  deposits=[...deposits.filter((item)=>personKeyOf(item)!==key),...incoming];
+  return incoming.map((item)=>clone(item));
+}
+
+function upsertDeposit(value=null){
+  const normalized=normalizeDeposits(value?[value]:[])[0]||null;
+  if(!normalized?.depositId)return normalized;
+  const id=text(normalized.depositId);
+  const index=deposits.findIndex((item)=>text(item?.depositId)===id);
+  if(index>=0)deposits[index]=normalized;
+  else deposits.push(normalized);
+  return clone(normalized);
+}
+
 export function getDepositPrograms(){return programs.map((item)=>clone(item));}
+export function getDepositInstances(){return deposits.map((item)=>clone(item));}
+
+export function hydrateDepositInstances(values=[]){
+  deposits=normalizeDeposits(values);
+  return getDepositInstances();
+}
+
+export function getPersonDepositPriceConditions(personKey=''){
+  const key=text(personKey);
+  if(!key)return [];
+  return deposits
+    .filter((deposit)=>personKeyOf(deposit)===key
+      && text(deposit?.status)==='active'
+      && percent(deposit?.discountPercent)>0)
+    .map((deposit)=>({
+      type:'program',
+      programType:'deposit',
+      depositId:text(deposit.depositId),
+      programId:text(deposit.programId),
+      name:text(deposit.programName)||'Депозит',
+      percent:percent(deposit.discountPercent),
+    }));
+}
 
 export async function loadDepositPrograms(){
   const remote=await payload(await apiRequest('/auxiliary-state'),'Не удалось загрузить депозитные программы');
   programs=list(remote.depositPrograms).map((item)=>clone(item));
   return getDepositPrograms();
+}
+
+export async function loadAllDeposits(){
+  deposits=normalizeDeposits(await payload(await apiRequest('/loyalty/deposits'),'Не удалось загрузить депозиты'));
+  return getDepositInstances();
 }
 
 export async function saveDepositPrograms(next=[]){
@@ -35,7 +93,7 @@ export async function saveDepositPrograms(next=[]){
     for(const programId of removedProgramIds){
       await payload(await apiRequest(`/loyalty/deposits/program/${encodeURIComponent(programId)}`,{method:'DELETE'}),'Не удалось полностью удалить депозитную программу');
     }
-    await refreshFinanceState();
+    await Promise.all([refreshFinance(),loadAllDeposits()]);
     return loadDepositPrograms();
   }
   const remote=await payload(await apiRequest('/auxiliary-state/depositPrograms',{
@@ -49,15 +107,36 @@ export async function saveDepositPrograms(next=[]){
 export async function listPersonDeposits(personKey=''){
   const key=text(personKey);
   if(!key)return [];
-  return normalizeDeposits(await payload(await apiRequest(`/loyalty/deposits/person/${encodeURIComponent(key)}`),'Не удалось загрузить депозиты'));
+  const values=await payload(await apiRequest(`/loyalty/deposits/person/${encodeURIComponent(key)}`),'Не удалось загрузить депозиты');
+  return replacePersonDeposits(key,values);
 }
 
 export async function listAllDeposits(){
-  return normalizeDeposits(await payload(await apiRequest('/loyalty/deposits'),'Не удалось загрузить депозиты'));
+  return loadAllDeposits();
+}
+
+async function assertPricePercentAvailable(programId='',person=null){
+  const program=programs.find((item)=>text(item?.id)===text(programId))||null;
+  if(text(program?.benefitType)!=='discount'||percent(program?.benefitValue)<=0)return;
+  const key=text(person?.key||person?.id);
+  if(!key)return;
+  const { getAllPeople } = await import('../../people/data.js');
+  const owner=getAllPeople().find((item)=>text(item?.key||item?.id)===key)||person||{};
+  const personalPercent=percent(owner?.discountPercent);
+  if(personalPercent>0){
+    throw new Error(`У контакта уже действует личная скидка ${personalPercent}%. Сначала уберите личную скидку в профиле, затем оформите программу.`);
+  }
+  await listPersonDeposits(key);
+  const active=getPersonDepositPriceConditions(key);
+  if(active.length){
+    const condition=active[0];
+    throw new Error(`У контакта уже действует скидка ${condition.percent}% по программе «${condition.name}». Одновременно может действовать только одна процентная скидка.`);
+  }
 }
 
 export async function fundDeposit({programId='',person=null,amount=0,walletId='',walletName='',occurredAt=null}={}){
   if(!programId||!person?.key||!walletId||!occurredAt)return null;
+  await assertPricePercentAvailable(programId,person);
   const result=await payload(await apiRequest('/loyalty/deposits/fund',{
     method:'POST',
     body:JSON.stringify({
@@ -69,7 +148,7 @@ export async function fundDeposit({programId='',person=null,amount=0,walletId=''
       occurredAt:occurredAt instanceof Date?occurredAt.toISOString():occurredAt,
     }),
   }),'Не удалось оформить депозит');
-  return normalizeDeposits([result])[0]||null;
+  return upsertDeposit(result);
 }
 
 export async function withdrawDeposit({depositId='',amount=0,walletId='',walletName='',reason='',occurredAt=null}={}){
@@ -84,13 +163,14 @@ export async function withdrawDeposit({depositId='',amount=0,walletId='',walletN
       occurredAt:occurredAt instanceof Date?occurredAt.toISOString():occurredAt,
     }),
   }),'Не удалось вернуть остаток депозита');
-  return normalizeDeposits([result])[0]||null;
+  return upsertDeposit(result);
 }
 
 export async function deleteDeposit(depositId=''){
   const id=text(depositId);
   if(!id)return false;
   await payload(await apiRequest(`/loyalty/deposits/${encodeURIComponent(id)}`,{method:'DELETE'}),'Не удалось полностью удалить депозит');
-  await refreshFinanceState();
+  deposits=deposits.filter((item)=>text(item?.depositId)!==id);
+  await refreshFinance();
   return true;
 }
