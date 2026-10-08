@@ -5,6 +5,7 @@
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
+import { getAllPeople } from '../people/data.js';
 import {
   calculateSettlementTotals,
   calculateSettlementItemTotals,
@@ -75,9 +76,16 @@ export function recordAmountDue(record = null) {
   return resolveRecordSettlement(record).planTotal;
 }
 
-export function recordSettlementPriceCondition(person = null) {
+function currentPerson(person = null) {
   const key = String(person?.key || person?.id || '').trim();
-  const personalPercent = clampFinancialPercent(person?.discountPercent ?? 0);
+  if (!key) return person || {};
+  return getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === key) || person || {};
+}
+
+export function recordSettlementPriceCondition(person = null) {
+  const owner = currentPerson(person);
+  const key = String(owner?.key || owner?.id || person?.key || person?.id || '').trim();
+  const personalPercent = clampFinancialPercent(owner?.discountPercent ?? 0);
   const sources = [];
   if (personalPercent > 0) {
     sources.push({ type: 'personal', name: 'Личные условия', percent: personalPercent });
@@ -118,16 +126,13 @@ export function normalizeRecordSettlement(value = null) {
 export function hydrateRecordSettlement(record = null) {
   if (!record?.id) return record;
   const condition = recordSettlementPriceCondition(record?.person);
-  const discountPercent = record?.personDiscountPercent == null
-    ? condition.percent
-    : clampFinancialPercent(record.personDiscountPercent);
   const { personDiscountPercent: _discountProjection, ...cleanRecord } = record;
   const normalizedRecord = {
     ...cleanRecord,
     procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
     products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
   };
-  const projectedSettlement = getRecordSettlement(normalizedRecord, { discountPercent });
+  const projectedSettlement = getRecordSettlement(normalizedRecord, { discountPercent: condition.percent });
   return {
     ...normalizedRecord,
     priceCondition: condition,
