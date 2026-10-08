@@ -26,11 +26,60 @@ function sourceKey(item = null) {
   return `${sourceType(item)}:${sourceId(item)}`;
 }
 
-function discountMode(item = {}, defaultPercent = 0) {
-  if (item?.discountMode === 'percent' || item?.discountMode === 'money' || item?.discountMode === 'none') return item.discountMode;
-  if (item?.discountPercent !== '' && item?.discountPercent != null && clampFinancialPercent(item.discountPercent) > 0) return 'percent';
-  if (item?.discountMoney !== '' && item?.discountMoney != null && financialNumber(item.discountMoney) > 0) return 'money';
-  return defaultPercent > 0 ? 'percent' : 'none';
+function correctionMode(item = {}) {
+  const explicit = String(item?.correctionMode || '');
+  if (explicit === 'percent' || explicit === 'money' || explicit === 'none') return explicit;
+  if (item?.correctionPercent !== '' && item?.correctionPercent != null && clampFinancialPercent(item.correctionPercent) > 0) return 'percent';
+  if (item?.correctionMoney !== '' && item?.correctionMoney != null && financialNumber(item.correctionMoney) > 0) return 'money';
+  return 'none';
+}
+
+function legacyCorrectionMoney(item = {}, price = 0, pricePercent = 0) {
+  const totalReduction = Math.min(financialMoney(price), financialMoney(item?.discountMoney));
+  if (totalReduction <= 0) return 0;
+  const rate = clampFinancialPercent(pricePercent) / 100;
+  if (rate >= 0.999999) return 0;
+  return financialMoney(Math.max(0, Math.min(price, (totalReduction - price * rate) / (1 - rate))));
+}
+
+function correctionForItem(item = {}, price = 0, pricePercent = 0) {
+  const explicitMode = correctionMode(item);
+  if (explicitMode === 'percent') {
+    const correctionPercent = clampFinancialPercent(item?.correctionPercent);
+    return {
+      mode: 'percent',
+      percent: correctionPercent,
+      money: financialMoney(Math.min(price, price * correctionPercent / 100)),
+    };
+  }
+  if (explicitMode === 'money') {
+    const correctionMoney = financialMoney(Math.min(price, item?.correctionMoney));
+    return {
+      mode: correctionMoney > 0 ? 'money' : 'none',
+      percent: price > 0 ? clampFinancialPercent(correctionMoney / price * 100) : 0,
+      money: correctionMoney,
+    };
+  }
+
+  const hasNewCorrection = item?.correctionMode != null || item?.correctionPercent != null || item?.correctionMoney != null;
+  if (hasNewCorrection) return { mode: 'none', percent: 0, money: 0 };
+
+  // Compatibility with historical Settlement snapshots: discountMoney used to contain
+  // the whole reduction. Reconstruct only the manual price correction from that total.
+  const reconstructed = legacyCorrectionMoney(item, price, pricePercent);
+  if (reconstructed > 0) {
+    return {
+      mode: 'money',
+      percent: price > 0 ? clampFinancialPercent(reconstructed / price * 100) : 0,
+      money: reconstructed,
+    };
+  }
+  return { mode: 'none', percent: 0, money: 0 };
+}
+
+function itemPricePercent(item = {}, defaultPercent = 0) {
+  if (item?.pricePercent !== '' && item?.pricePercent != null) return clampFinancialPercent(item.pricePercent);
+  return clampFinancialPercent(defaultPercent);
 }
 
 export function recordSettlementItems(record = null) {
@@ -46,36 +95,44 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
   const defaultPercent = clampFinancialPercent(discountPercent);
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
     const price = financialMoney(item?.price ?? item?.cost);
-    const mode = discountMode(item, defaultPercent);
-    const selectedPercent = mode === 'percent'
-      ? clampFinancialPercent(item?.discountPercent === '' || item?.discountPercent == null ? defaultPercent : item.discountPercent)
-      : 0;
-    const discountMoney = financialMoney(Math.min(price,
-      mode === 'money' ? financialMoney(item?.discountMoney) : price * selectedPercent / 100));
-    const resolvedPercent = price > 0
-      ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent)
-      : 0;
+    const pricePercent = itemPricePercent(item, defaultPercent);
+    const correction = correctionForItem(item, price, pricePercent);
+    const correctedPrice = financialMoney(price - correction.money);
+    const pricePercentMoney = financialMoney(Math.min(correctedPrice, correctedPrice * pricePercent / 100));
+    const totalReduction = financialMoney(correction.money + pricePercentMoney);
     return {
       sourceType: sourceType(item),
       sourceId: sourceId(item),
       name: String(item?.name || ''),
       price,
-      discountMode: mode,
-      discountPercent: clampFinancialPercent(resolvedPercent),
-      discountMoney,
-      planAmount: financialMoney(price - discountMoney),
+      correctedPrice,
+      correctionMode: correction.mode,
+      correctionPercent: clampFinancialPercent(correction.percent),
+      correctionMoney: correction.money,
+      pricePercent,
+      pricePercentMoney,
+      // Legacy names stay in the snapshot so old Finance/read-only receipt code remains compatible.
+      // discountPercent is the automatic condition; discountMoney is the total visible reduction.
+      discountMode: pricePercent > 0 ? 'percent' : correction.money > 0 ? 'money' : 'none',
+      discountPercent: pricePercent,
+      discountMoney: totalReduction,
+      planAmount: financialMoney(correctedPrice - pricePercentMoney),
     };
   });
 
   const serviceTotal = financialMoney(prepared.reduce((sum, item) => sum + item.price, 0));
-  const discountTotal = financialMoney(prepared.reduce((sum, item) => sum + item.discountMoney, 0));
+  const correctionTotal = financialMoney(prepared.reduce((sum, item) => sum + item.correctionMoney, 0));
+  const pricePercentTotal = financialMoney(prepared.reduce((sum, item) => sum + item.pricePercentMoney, 0));
+  const discountTotal = financialMoney(correctionTotal + pricePercentTotal);
   const planTotal = financialMoney(prepared.reduce((sum, item) => sum + item.planAmount, 0));
-  const percents = [...new Set(prepared.map((item) => Math.round(item.discountPercent * 10000) / 10000))];
+  const percents = [...new Set(prepared.map((item) => Math.round(item.pricePercent * 10000) / 10000))];
 
   return {
     items: prepared,
     serviceTotal,
     discountPercent: percents.length === 1 ? percents[0] : null,
+    correctionTotal,
+    pricePercentTotal,
     discountTotal,
     planTotal,
   };
@@ -84,7 +141,7 @@ export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
 export function repriceSettlement(sources = [], currentSettlement = null) {
   const priorItems = Array.isArray(currentSettlement?.items) ? currentSettlement.items : [];
   const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
-  const defaultDiscount = currentSettlement?.discountPercent == null ? 0 : clampFinancialPercent(currentSettlement.discountPercent);
+  const defaultPricePercent = currentSettlement?.discountPercent == null ? 0 : clampFinancialPercent(currentSettlement.discountPercent);
   const items = (Array.isArray(sources) ? sources : []).map((source, index) => {
     const type = sourceType(source);
     const id = sourceId(source);
@@ -96,15 +153,17 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
       sourceId: id,
       name: String(source?.name || ''),
       price: financialMoney(source?.cost ?? source?.price),
+      pricePercent: prior?.pricePercent == null ? defaultPricePercent : clampFinancialPercent(prior.pricePercent),
     };
-    if (!prior) return { ...base, discountMode: defaultDiscount > 0 ? 'percent' : 'none', discountPercent: defaultDiscount };
-    if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
-    if (prior.discountMode === 'percent' || financialNumber(prior.discountPercent) > 0) {
-      return { ...base, discountMode: 'percent', discountPercent: prior.discountPercent };
-    }
-    return { ...base, discountMode: 'none' };
+    if (!prior) return { ...base, correctionMode: 'none' };
+    const priorPrice = financialMoney(prior?.price ?? source?.cost ?? source?.price);
+    const priorPercent = prior?.pricePercent == null ? defaultPricePercent : clampFinancialPercent(prior.pricePercent);
+    const correction = correctionForItem(prior, priorPrice, priorPercent);
+    if (correction.mode === 'percent') return { ...base, correctionMode: 'percent', correctionPercent: correction.percent };
+    if (correction.money > 0) return { ...base, correctionMode: 'money', correctionMoney: correction.money };
+    return { ...base, correctionMode: 'none' };
   });
-  return calculateSettlement(items, { discountPercent: defaultDiscount });
+  return calculateSettlement(items, { discountPercent: defaultPricePercent });
 }
 
 export function isStoredSettlement(value = null) {
