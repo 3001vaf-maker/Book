@@ -37,6 +37,7 @@ import { getAllPeople } from '../../people/data.js';
 import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import { createUEI, detachUEI, getUEI, listUEIs, normalizeUEI } from '../../uei.js';
+import { openLoyaltyProgramSettings } from '../shared.js';
 import {
   fundDeposit,
   getDepositPrograms,
@@ -93,7 +94,7 @@ function formObject(form) {
 
 function programStatusLabel(status = '') {
   if (status === 'paused') return 'Приостановлена';
-  if (status === 'closed') return 'Закрыта';
+  if (status === 'closed' || status === 'ended') return 'Завершена';
   return 'Активна';
 }
 
@@ -134,6 +135,16 @@ function ensureUeiAvailable(value) {
   return normalized;
 }
 
+function optionalProgramUei(value, current = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = normalizeUEI(raw);
+  if (!normalized || normalized === '0000') return '';
+  if (normalized === current) return normalized;
+  if (listUEIs().some((item) => String(item?.uei || '') === normalized)) throw new Error('Этот UEI уже используется');
+  return normalized;
+}
+
 function bindUeiInput(root, name = 'uei') {
   const input = root?.querySelector?.(`[name="${CSS.escape(name)}"]`);
   input?.addEventListener('input', () => {
@@ -145,14 +156,14 @@ function bindUeiInput(root, name = 'uei') {
   });
 }
 
-function ueiField({ name = 'uei', value = '', readonly = false } = {}) {
+function ueiField({ name = 'uei', value = '', readonly = false, required = true } = {}) {
   return field({
     label: 'UEI',
     name,
     value,
     maxlength: 4,
     autocomplete: 'off',
-    required: !readonly,
+    required: required && !readonly,
     readonly,
     data: 'data-deposit-uei-field',
   });
@@ -246,6 +257,15 @@ async function setProgramStatus(programId, status) {
     ? { ...item, status, updatedAt: now }
     : item);
   await saveDepositPrograms(next);
+}
+
+async function deleteProgram(programId) {
+  const id = String(programId || '');
+  const code = getUEI(PROGRAM_UEI_TYPE, id) || '';
+  if (code) {
+    try { detachUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, uei: code, explicit: false }); } catch {}
+  }
+  await saveDepositPrograms(getDepositPrograms().filter((item) => String(item?.id) !== id));
 }
 
 function openCodeX({ title = 'UEI', entityType, entityId, onCreated = () => {} } = {}) {
@@ -346,37 +366,40 @@ function depositBenefit(values = {}) {
   return '';
 }
 
-async function openCreateProgramQ(root, onSaved = () => {}) {
+async function openCreateProgramQ(root, onSaved = () => {}, editingProgram = null) {
+  const editing = Boolean(editingProgram?.id);
+  const title = editing ? 'Корректировать депозит' : 'Новая депозитная программа';
+  const currentCode = editing ? programUei(editingProgram) : '';
   const layer = mountModal(root, modal(`${depositHeaderContext({
-    title: 'Новая депозитная программа',
+    title,
     c: { label: 'Сохранить', data: 'data-deposit-program-save', aria: 'Сохранить депозитную программу' },
   })}
     <form class="form-grid" data-deposit-program-form>
-      ${field({ label: 'Название', name: 'name', required: true })}
-      ${ueiField({ name: 'programUei' })}
-      ${select({ label: 'Сумма', name: 'amountMode', value: 'fixed', options: [
+      ${field({ label: 'Название', name: 'name', value: editingProgram?.name || '', required: true })}
+      ${ueiField({ name: 'programUei', value: currentCode, required: false })}
+      ${select({ label: 'Сумма', name: 'amountMode', value: editingProgram?.amountMode || (Number(editingProgram?.amount || 0) > 0 ? 'fixed' : 'free'), options: [
         { value: 'fixed', label: 'Фиксированная сумма' },
         { value: 'free', label: 'Свободная сумма' },
       ] })}
-      <div data-deposit-amount-fixed>${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' })}</div>
-      ${select({ label: 'Срок', name: 'termMode', value: 'indefinite', options: [
+      <div data-deposit-amount-fixed>${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: editingProgram?.amount || '' })}</div>
+      ${select({ label: 'Срок', name: 'termMode', value: editingProgram?.termMode || 'indefinite', options: [
         { value: 'indefinite', label: 'Бессрочно' },
-        { value: 'dated', label: 'Со сроком' },
+        { value: 'dated', label: 'Период' },
       ] })}
       <div data-deposit-term-dates hidden>${twoColumnLayout(
-        datePicker({ label: 'С', name: 'termStartDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
-        datePicker({ label: 'До', name: 'termEndDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false }),
-        { ariaLabel: 'Срок депозитной программы' },
+        datePicker({ label: 'С', name: 'termStartDate', value: editingProgram?.termStartDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
+        datePicker({ label: 'До', name: 'termEndDate', value: editingProgram?.termEndDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
+        { ariaLabel: 'Период депозитной программы' },
       )}</div>
-      ${select({ label: 'Выгода', name: 'benefitType', value: 'none', options: [
+      ${select({ label: 'Выгода', name: 'benefitType', value: editingProgram?.benefitType || 'none', options: [
         { value: 'none', label: 'Без дополнительной выгоды' },
         { value: 'discount', label: 'Скидка' },
         { value: 'accrual', label: 'Начисление' },
       ] })}
-      <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' })}</div>
-      ${textareaField({ label: 'Условия', name: 'description' })}
+      <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: editingProgram?.benefitValue || '' })}</div>
+      ${textareaField({ label: 'Условия', name: 'description', value: editingProgram?.description || '' })}
       <div class="form-error" data-deposit-program-error></div>
-    </form>`, { variant: 'q', surface: 'app', title: 'Новая депозитная программа' }));
+    </form>`, { variant: 'q', surface: 'app', title }));
   if (!layer) return null;
   bindUeiInput(layer, 'programUei');
   initDepositProgramConstructor(layer);
@@ -399,7 +422,7 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
     const termStartDate = values.termStartDate || '';
     const termEndDate = values.termEndDate || '';
     if (termMode === 'dated' && (!termStartDate || !termEndDate)) {
-      if (errorNode) errorNode.textContent = 'Укажите дату начала и окончания';
+      if (errorNode) errorNode.textContent = 'Укажите начало и конец периода';
       return;
     }
     if (termMode === 'dated' && termStartDate > termEndDate) {
@@ -411,14 +434,12 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
       if (errorNode) errorNode.textContent = 'Укажите размер выгоды';
       return;
     }
-    const id = uid();
-    let reserved = false;
+    const id = editing ? editingProgram.id : uid();
     try {
-      const code = ensureUeiAvailable(values.programUei);
-      createUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, value: code });
-      reserved = true;
+      const code = optionalProgramUei(values.programUei, currentCode);
       const now = new Date().toISOString();
       const program = {
+        ...(editingProgram || {}),
         id,
         name: values.name,
         amount,
@@ -431,17 +452,23 @@ async function openCreateProgramQ(root, onSaved = () => {}) {
         benefitValue: Math.max(0, Number(String(values.benefitValue || '0').replace(',', '.')) || 0),
         benefit,
         description: values.description || '',
-        status: 'active',
-        createdAt: now,
+        status: editingProgram?.status || 'active',
+        createdAt: editingProgram?.createdAt || now,
         updatedAt: now,
       };
-      await saveDepositPrograms([...getDepositPrograms(), program]);
+      const next = editing
+        ? getDepositPrograms().map((item) => String(item?.id) === String(id) ? program : item)
+        : [...getDepositPrograms(), program];
+      await saveDepositPrograms(next);
+      if (code !== currentCode) {
+        if (currentCode) {
+          try { detachUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, uei: currentCode, explicit: false }); } catch {}
+        }
+        if (code) createUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, value: code });
+      }
       layer.v2Close?.();
       await onSaved?.();
     } catch (error) {
-      if (reserved) {
-        try { detachUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, uei: getUEI(PROGRAM_UEI_TYPE, id), explicit: false }); } catch {}
-      }
       if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить программу';
     }
   });
@@ -472,7 +499,7 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
       ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: Number(program?.amount || 0) > 0 ? program.amount : '' })}
       ${field({ label: 'Срок', name: 'termPreview', value: program?.termRule || 'Бессрочно', disabled: true })}
       ${select({ label: 'Кошелёк приёма денег', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
-      ${datePicker({ label: 'Дата внесения', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
+      ${datePicker({ label: 'Дата внесения', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
       <div class="form-error" data-deposit-fund-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Оформить депозит' }));
   if (!layer) return null;
@@ -528,7 +555,7 @@ async function openWithdrawX(root, deposit, onSaved = () => {}) {
   const layer = mountModal(root, modal(`<form class="form-grid" data-deposit-withdraw-form>
     ${field({ label: 'Сумма возврата', name: 'amount', type: 'number', min: '0.01', max: deposit.balance, step: '0.01', inputmode: 'decimal', value: deposit.balance })}
     ${select({ label: 'Кошелёк возврата', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
-    ${datePicker({ label: 'Дата возврата', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
+    ${datePicker({ label: 'Дата возврата', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
     ${textareaField({ label: 'Комментарий', name: 'reason' })}
     ${button('Вернуть', { type: 'submit', variant: 'danger' })}
     <div class="form-error" data-deposit-withdraw-error></div>
@@ -574,17 +601,23 @@ function openRootSettings(root, rerender) {
 }
 
 function openProgramSettings(root, program, rerender) {
-  const actions = [
-    {
-      id: 'code',
-      label: 'Код',
-      onSelect: () => openCodeX({ title: 'UEI программы', entityType: PROGRAM_UEI_TYPE, entityId: program.id, onCreated: rerender }),
+  return openLoyaltyProgramSettings({
+    title: program.name || 'Депозит',
+    status: program.status,
+    onCorrect: () => openCreateProgramQ(root, rerender, program),
+    onToggle: async () => {
+      await setProgramStatus(program.id, program.status === 'paused' ? 'active' : 'paused');
+      await rerender();
     },
-  ];
-  if (program.status === 'active') actions.push({ id: 'pause', label: 'Приостановить', onSelect: async () => { await setProgramStatus(program.id, 'paused'); await rerender(); } });
-  if (program.status === 'paused') actions.push({ id: 'resume', label: 'Возобновить', onSelect: async () => { await setProgramStatus(program.id, 'active'); await rerender(); } });
-  if (program.status !== 'closed') actions.push({ id: 'close', label: 'Закрыть программу', variant: 'danger', onSelect: async () => { await setProgramStatus(program.id, 'closed'); await rerender(); } });
-  return openSharedProfileSettingsMenu({ title: program.name || 'Депозит', actions });
+    onFinish: async () => {
+      await setProgramStatus(program.id, 'closed');
+      await rerender();
+    },
+    onDelete: async () => {
+      await deleteProgram(program.id);
+      await rerender();
+    },
+  });
 }
 
 async function openDepositLayer(root, depositId, onChanged = () => {}) {
@@ -635,6 +668,7 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
     const program = getDepositPrograms().find((item) => String(item?.id) === String(programId));
     if (!program) {
       layer.v2Close?.();
+      await onChanged?.();
       return;
     }
     const allDeposits = await listAllDeposits();
