@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 
@@ -17,7 +16,6 @@ type AuxiliaryBundle = {
 };
 
 const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates', 'depositPrograms']);
-const DEPOSIT_UEI_ALPHABET = 'CDFGHJKLMNPQRTVWXY346789';
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -29,18 +27,6 @@ function clone<T>(value: T): T {
 
 function text(value: unknown) {
   return String(value ?? '').trim();
-}
-
-function depositProgramUei(used: Set<string>) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const bytes = randomBytes(4);
-    const value = [...bytes].map((byte) => DEPOSIT_UEI_ALPHABET[byte % DEPOSIT_UEI_ALPHABET.length]).join('');
-    if (!used.has(value)) {
-      used.add(value);
-      return value;
-    }
-  }
-  throw new ConflictException('Не удалось выдать уникальный UEI депозитной программы');
 }
 
 function normalize(value: unknown): AuxiliaryBundle {
@@ -61,10 +47,6 @@ function stable(value: any): any {
   if (Array.isArray(value)) return value.map(stable);
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
-}
-
-function canonical(value: AuxiliaryBundle) {
-  return JSON.stringify(stable(normalize(value)));
 }
 
 function json(value: unknown): Prisma.InputJsonValue {
@@ -170,13 +152,7 @@ export class AuxiliaryStateService {
         })
         .filter(([id]) => Boolean(id)),
     );
-    const usedUei = new Set<string>();
-    for (const value of before) {
-      const uei = text(objectValue(value).programUei).toUpperCase();
-      if (uei) usedUei.add(uei);
-    }
     const seenId = new Set<string>();
-    const seenUei = new Set<string>();
     return after.map((value) => {
       const entity = clone(objectValue(value));
       const id = text(entity.id);
@@ -184,24 +160,9 @@ export class AuxiliaryStateService {
       if (seenId.has(id)) throw new BadRequestException('Депозитная программа продублирована');
       seenId.add(id);
       const previous = beforeById.get(id);
-      if (previous) {
-        const previousUei = text(previous.programUei).toUpperCase();
-        entity.programUei = previousUei || depositProgramUei(usedUei);
-        if (JSON.stringify(stable(protectedDepositSnapshot(previous))) !== JSON.stringify(stable(protectedDepositSnapshot(entity)))) {
-          throw new ConflictException('Условия созданной депозитной программы нельзя изменять. Создайте новую программу.');
-        }
-      } else {
-        const requestedUei = text(entity.programUei).toUpperCase();
-        if (requestedUei && !/^[CDFGHJKLMNPQRTVWXY346789]{4}$/.test(requestedUei)) {
-          throw new BadRequestException('Некорректный UEI депозитной программы');
-        }
-        if (requestedUei && usedUei.has(requestedUei)) throw new ConflictException('UEI депозитной программы уже используется');
-        entity.programUei = requestedUei || depositProgramUei(usedUei);
-        usedUei.add(entity.programUei);
+      if (previous && JSON.stringify(stable(protectedDepositSnapshot(previous))) !== JSON.stringify(stable(protectedDepositSnapshot(entity)))) {
+        throw new ConflictException('Условия созданной депозитной программы нельзя изменять. Создайте новую программу.');
       }
-      const programUei = text(entity.programUei).toUpperCase();
-      if (seenUei.has(programUei)) throw new ConflictException('UEI депозитной программы продублирован');
-      seenUei.add(programUei);
       return entity;
     });
   }
