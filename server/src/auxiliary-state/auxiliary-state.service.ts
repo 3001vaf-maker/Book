@@ -153,7 +153,7 @@ export class AuxiliaryStateService {
         .filter(([id]) => Boolean(id)),
     );
     const seenId = new Set<string>();
-    return after.map((value) => {
+    const next = after.map((value) => {
       const entity = clone(objectValue(value));
       const id = text(entity.id);
       if (!id) throw new BadRequestException('У депозитной программы отсутствует id');
@@ -165,6 +165,11 @@ export class AuxiliaryStateService {
       }
       return entity;
     });
+    const removed = [...beforeById.keys()].filter((id) => !seenId.has(id));
+    if (removed.length) {
+      throw new ConflictException('Депозитную программу нельзя удалять с историей. Закройте или архивируйте программу.');
+    }
+    return next;
   }
 
   private async assertInvestmentMutationAllowed(tenantId: string, before: unknown[], after: unknown[]) {
