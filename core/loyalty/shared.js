@@ -119,6 +119,7 @@ export function bindViewSettings(root, title, { type, fields, onSaved = () => {}
 export function openLoyaltyProgramSettings({
   title = 'Программа',
   status = 'active',
+  correctLabel = 'Корректировать',
   onCorrect = () => {},
   onToggle = () => {},
   onFinish = () => {},
@@ -126,7 +127,7 @@ export function openLoyaltyProgramSettings({
 } = {}) {
   const ended = status === 'ended' || status === 'closed';
   const actions = [
-    { id: 'correct', label: 'Корректировать', onSelect: onCorrect },
+    { id: 'correct', label: correctLabel, onSelect: onCorrect },
   ];
   if (!ended) {
     actions.push({

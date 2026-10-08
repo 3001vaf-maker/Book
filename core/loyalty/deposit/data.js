@@ -8,7 +8,14 @@ function text(value){return String(value??'').trim();}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
 function normalizeDeposits(value){
-  return list(value).map((item)=>clone(item));
+  return list(value).map((item)=>{
+    const deposit=clone(item);
+    deposit.history=list(deposit.history).map((entry)=>({
+      ...entry,
+      direction:text(entry?.direction).toLowerCase(),
+    }));
+    return deposit;
+  });
 }
 
 export function getDepositPrograms(){return programs.map((item)=>clone(item));}
