@@ -82,6 +82,15 @@ function monthDayLabel(value) {
   return date ? MONTH_DAY_FORMATTER.format(date) : '';
 }
 
+function normalizeModalVariant(value = '') {
+  const variant = String(value || '').trim();
+  if (variant === 'bottom') return 'x';
+  if (variant === 'top') return 's';
+  if (variant === 'standard') return 'q';
+  if (variant === 'x' || variant === 's' || variant === 'q' || variant === 'technical') return variant;
+  return 'q';
+}
+
 function calendarHeader({ label, prevAriaLabel, nextAriaLabel, prevAttribute, nextAttribute }) {
   return `<header class="calendar__header"><button type="button" class="calendar__month-button" ${prevAttribute} aria-label="${prevAriaLabel}">←</button><div class="calendar__month" aria-live="polite">${label}</div><button type="button" class="calendar__month-button" ${nextAttribute} aria-label="${nextAriaLabel}">→</button></header>`;
 }
@@ -272,7 +281,7 @@ function openDatePicker(host) {
     : Math.max(minYear, Math.min(maxYear, now.getFullYear()));
   const placeholder = host.dataset.datePickerPlaceholder || 'Выберите дату';
   const showYear = host.dataset.datePickerShowYear !== 'false';
-  const modalVariant = host.dataset.datePickerModalVariant || 'standard';
+  const modalVariant = normalizeModalVariant(host.dataset.datePickerModalVariant || 'standard');
   const modalClassName = host.dataset.datePickerModalClass || '';
   const modalSurface = host.dataset.datePickerModalSurface || '';
   const allowClear = host.dataset.datePickerAllowClear !== 'false';
