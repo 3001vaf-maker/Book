@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { FinanceService } from '../finance/finance.service';
+import { calculateCanonicalSettlement, repriceCanonicalSettlement } from '../finance/settlement-rules';
+import { resolvePersonPricePercent } from '../loyalty/price-condition';
 import { ProcedureService } from '../procedure/procedure.service';
 import { TimeService } from '../time/time.service';
 
@@ -78,7 +80,6 @@ function normalizeGroup(value: unknown, fallbackPerson: unknown, allowedCapacity
   return { capacity, participants };
 }
 
-
 @Injectable()
 export class RecordService {
   constructor(
@@ -104,6 +105,17 @@ export class RecordService {
       from: text(record?.from),
       to: text(record?.to),
     };
+  }
+
+  private settlementSources(procedures: JsonObject[], products: JsonObject[]) {
+    return [
+      ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: text(item?.id) })),
+      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
+    ];
+  }
+
+  private async pricePercent(tenantId: string, person: JsonObject) {
+    return (await resolvePersonPricePercent(this.prisma, tenantId, person)).percent;
   }
 
   private async validateAvailability(
@@ -214,10 +226,8 @@ export class RecordService {
     let person = clone(objectValue(input.person));
     const group = normalizeGroup(input.group, person, groupCapacityFromProcedures(procedureSnapshots));
     if (group?.participants?.length) person = clone(group.participants[0]);
-    const settlement = this.finance.calculateSettlement([
-      ...procedureSnapshots.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-    ], person?.discountPercent);
+    const pricePercent = await this.pricePercent(tenantId, person);
+    const settlement = calculateCanonicalSettlement(this.settlementSources(procedureSnapshots, products), pricePercent);
 
     const now = new Date().toISOString();
     const createdAt = text(input.createdAt) || now;
@@ -347,10 +357,14 @@ export class RecordService {
       if (!personKeys.has(text(person?.key)) && !personIds.has(text(person?.id))) continue;
       const events = byRecord.get(text(record.id)) || [];
       const lifecycle = this.projectLifecycle(record, events);
-      const fallbackSettlement = this.finance.calculateSettlement([
-        ...arrayValue(record.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
-        ...arrayValue(record.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
-      ], person?.discountPercent);
+      const pricePercent = await this.pricePercent(tenantId, person);
+      const fallbackSettlement = calculateCanonicalSettlement(
+        this.settlementSources(
+          arrayValue(record.procedures).map((item) => objectValue(item)),
+          arrayValue(record.products).map((item) => objectValue(item)),
+        ),
+        pricePercent,
+      );
       const settlement = await this.finance.settlementForSource(
         tenantId,
         'record',
@@ -442,10 +456,16 @@ export class RecordService {
     const allowedGroupCapacity = rawProceduresChanged ? groupCapacityFromProcedures(procedures) : currentGroupCapacity;
     const group = normalizeGroup(groupSource, person, allowedGroupCapacity);
     if (group?.participants?.length) person = clone(group.participants[0]);
-    const currentFallbackSettlement = this.finance.calculateSettlement([
-      ...arrayValue(current.procedures).map((item) => ({ ...objectValue(item), sourceType: 'procedure', sourceId: text(item?.id) })),
-      ...arrayValue(current.products).map((item) => ({ ...objectValue(item), sourceType: 'product', sourceId: text(item?.id) })),
-    ], objectValue(current.person)?.discountPercent);
+
+    const currentPerson = objectValue(current.person);
+    const currentPricePercent = await this.pricePercent(tenantId, currentPerson);
+    const currentFallbackSettlement = calculateCanonicalSettlement(
+      this.settlementSources(
+        arrayValue(current.procedures).map((item) => objectValue(item)),
+        arrayValue(current.products).map((item) => objectValue(item)),
+      ),
+      currentPricePercent,
+    );
     const currentSettlement = await this.finance.settlementForSource(
       tenantId,
       'record',
@@ -453,14 +473,12 @@ export class RecordService {
       currentFallbackSettlement,
     ) || currentFallbackSettlement;
 
-    const nextSettlementSources = [
-      ...procedures.map((item) => ({ ...item, sourceType: 'procedure', sourceId: item.id })),
-      ...products.map((item) => ({ ...item, sourceType: 'product', sourceId: text(item?.id) })),
-    ];
+    const nextSettlementSources = this.settlementSources(procedures, products);
+    const nextPricePercent = await this.pricePercent(tenantId, person);
     const settlement = personChanged
-      ? this.finance.calculateSettlement(nextSettlementSources, person?.discountPercent)
+      ? calculateCanonicalSettlement(nextSettlementSources, nextPricePercent)
       : (refreshProcedures || productsChanged)
-        ? this.finance.repriceSettlement(nextSettlementSources, currentSettlement, person?.discountPercent)
+        ? repriceCanonicalSettlement(nextSettlementSources, currentSettlement, nextPricePercent)
         : null;
 
     const { finance: _financeProjection, ...currentRecord } = current;
