@@ -363,6 +363,18 @@ export class DepositService {
         FOR UPDATE
       `);
       for (const row of rows) await this.hardDeleteWith(tx, tenantId, row.depositId);
+
+      const auxiliary = await tx.businessAuxiliaryState.findUnique({ where: { tenantId } });
+      if (auxiliary) {
+        const data = objectValue(auxiliary.data);
+        const nextPrograms = arrayValue(data.depositPrograms)
+          .filter((program) => text(objectValue(program).id) !== id)
+          .map((program) => clone(objectValue(program)));
+        await tx.businessAuxiliaryState.update({
+          where: { tenantId },
+          data: { data: { ...clone(data), depositPrograms: nextPrograms } as Prisma.InputJsonValue },
+        });
+      }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return { deleted: true, programId: id };
   }
