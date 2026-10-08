@@ -46,6 +46,7 @@ import { getPersonHistory } from './history.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleSortMode, setPeopleSortMode } from './view-state.js';
 import { canUseRealPersonalData } from '../access.js';
+import { openDepositForPerson } from '../loyalty/deposit/index.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
 const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
@@ -623,6 +624,7 @@ function openPersonSettings(root, key, { onIdentityChange = null } = {}) {
     title: name(person),
     actions: [
       { id: 'code', label: 'Код', onSelect: () => openPersonUeiQuick(root, person.key, (nextKey) => onIdentityChange?.(nextKey || person.key)) },
+      { id: 'deposit', label: 'Депозит', onSelect: () => openDepositForPerson(root, person) },
       { id: 'documents', label: 'Документы / согласия', onSelect: () => openPersonDocuments(root, person) },
       { id: 'history', label: 'История', onSelect: () => openPersonHistoryQ(root, person) },
     ],
