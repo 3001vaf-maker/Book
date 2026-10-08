@@ -17,33 +17,6 @@ export class FinanceController {
     return this.finance.snapshot(request.auth!.tenantId);
   }
 
-  @Get('deposits')
-  deposits(@Req() request: AuthenticatedRequest) {
-    return this.finance.listDeposits(request.auth!.tenantId);
-  }
-
-  @Get('deposits/person/:personKey')
-  personDeposits(
-    @Req() request: AuthenticatedRequest,
-    @Param('personKey') personKey: string,
-  ) {
-    return this.finance.listDeposits(request.auth!.tenantId, personKey);
-  }
-
-  @Post('deposits/fund')
-  fundDeposit(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.finance.recordDepositFunding(request.auth!.tenantId, body);
-  }
-
-  @Post('deposits/:depositId/withdraw')
-  withdrawDeposit(
-    @Req() request: AuthenticatedRequest,
-    @Param('depositId') depositId: string,
-    @Body() body: unknown,
-  ) {
-    return this.finance.recordDepositWithdrawal(request.auth!.tenantId, depositId, body);
-  }
-
   @Put('settlements/:sourceType/:sourceId')
   saveSettlement(
     @Req() request: AuthenticatedRequest,

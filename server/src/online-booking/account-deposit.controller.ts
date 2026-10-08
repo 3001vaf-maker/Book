@@ -1,7 +1,7 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { BusinessStateService } from '../business-state/business-state.service';
-import { FinanceService } from '../finance/finance.service';
+import { DepositService } from '../loyalty/deposit.service';
 import { PrismaService } from '../prisma.service';
 import { AccountGuard } from './account.guard';
 
@@ -15,7 +15,7 @@ export class AccountDepositController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
-    private readonly finance: FinanceService,
+    private readonly deposits: DepositService,
   ) {}
 
   @Get()
@@ -34,7 +34,7 @@ export class AccountDepositController {
         : {};
       const personId = String(person.key ?? person.id ?? '').trim();
       if (!personId) return [];
-      const deposits = await this.finance.listDeposits(tenantId, personId);
+      const deposits = await this.deposits.list(tenantId, personId);
       return deposits.map((deposit: Record<string, unknown>) => ({ tenantId, ...deposit }));
     }));
 
