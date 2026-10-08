@@ -8,6 +8,7 @@ import {
 } from '../../ui/ui.js';
 import { getProfile } from '../profile/data.js';
 import { renderDeposit } from './deposit/index.js';
+import { renderPersonalAccount } from './personal-account/index.js';
 
 const LOYALTY_NAVIGATION = [
   { id: 'deposit', label: 'Депозит' },
@@ -60,16 +61,6 @@ function bindStageActions(root, title) {
       surface: 'app',
     });
   });
-}
-
-function renderPersonalAccount(root) {
-  root.innerHTML = page([
-    header('Личный счёт'),
-    previewRows([
-      { title: 'Иван Петров', subtitle: 'Денежный остаток', rightTop: '5 000 ₽' },
-      { title: 'Анна Иванова', subtitle: 'Денежный остаток', rightTop: '0 ₽' },
-    ]),
-  ]);
 }
 
 function renderCertificate(root) {
