@@ -2,6 +2,8 @@ import { normalizePhoneForStorage, phonesMatch } from '../phone/index.js';
 import { getMembers, getUEI } from '../uei.js';
 import { queuePersonDelete, queuePersonUpsert } from '../business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
+import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
+import { describePriceConditionConflict, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
 
 let peopleState = [];
 
@@ -146,11 +148,28 @@ export function getPeopleCount() {
   return getPeople().length;
 }
 
+function assertPersonalPricePercentAvailable(person = null, previous = null) {
+  const percent = normalizeDiscount(person || {});
+  if (percent <= 0) return;
+  const previousPercent = normalizeDiscount(previous || {});
+  if (previous && previousPercent === percent) return;
+  const programSources = getPersonDepositPriceConditions(person?.key);
+  const condition = resolvePersonPriceCondition(person, programSources);
+  if (condition.conflict) {
+    throw new Error(`Процентная скидка задваивается: ${describePriceConditionConflict(condition)}. Уберите скидку программы или оставьте личную скидку 0%.`);
+  }
+}
+
 export function savePeople(people = []) {
   const normalized = (Array.isArray(people) ? people : []).map(normalizePerson).filter((person) => person.key);
   const previous = peopleState;
   const previousByKey = new Map(previous.map((person, position) => [person.key, { person, position }]));
   const nextByKey = new Map(normalized.map((person, position) => [person.key, { person, position }]));
+
+  for (const [key, next] of nextByKey) {
+    assertPersonalPricePercentAvailable(next.person, previousByKey.get(key)?.person || null);
+  }
+
   peopleState = clone(normalized);
 
   for (const [key] of previousByKey) {
