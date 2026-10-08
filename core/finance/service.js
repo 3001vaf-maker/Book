@@ -1,5 +1,6 @@
 import { apiRequest } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
+import { refreshLoyaltyState } from '../loyalty/runtime.js';
 import { hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
 import { getDDSExpenses, getDDSIncome } from './read.js';
@@ -25,6 +26,10 @@ function sourceMatch(item, source) {
     && String(item?.source?.id || '') === String(source?.id || '');
 }
 
+async function refreshLoyaltyAfterFinance() {
+  await refreshLoyaltyState().catch(() => null);
+}
+
 export async function canPermanentlyDeleteFinanceData() {
   const response = await apiRequest('/saas-admin/me');
   return response.ok;
@@ -37,6 +42,7 @@ export async function hardDeleteFinanceWallet(walletId) {
     method: 'DELETE',
   });
   const state = await applyServerState(response, 'Не удалось полностью удалить кассу');
+  await refreshLoyaltyAfterFinance();
   notifyFinanceChanged({ action: 'wallet-hard-delete', walletId: id });
   return state;
 }
@@ -145,6 +151,7 @@ export async function recordPaymentIncome({
   allocations = [],
   maxAmount = null,
   serviceAmount = null,
+  bonusAmount = 0,
   tips = 0,
   occurredAt = null,
 } = {}) {
@@ -159,8 +166,10 @@ export async function recordPaymentIncome({
   const allocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
   const tipsTotal = Math.max(0, financialNumber(tips));
   const applied = Math.max(0, financialNumber(serviceAmount == null ? allocated - tipsTotal : serviceAmount));
-  if (!preparedAllocations.length || allocated <= 0 || applied < 0 || (applied <= 0 && tipsTotal <= 0)) return null;
-  if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
+  const bonus = Math.max(0, financialNumber(bonusAmount));
+  const serviceApplied = applied + bonus;
+  if (applied < 0 || (serviceApplied <= 0 && tipsTotal <= 0)) return null;
+  if (maxAmount != null && serviceApplied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(allocated - applied - tipsTotal) > 0.009) return null;
 
   const before = new Set(getDDSIncome().map((item) => String(item?.id || '')));
@@ -170,14 +179,17 @@ export async function recordPaymentIncome({
       source,
       workplace,
       person,
+      personKey: String(person?.key || ''),
       settlement,
       allocations: preparedAllocations,
       serviceAmount: applied,
+      bonusAmount: bonus,
       tips: tipsTotal,
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
   await applyServerState(response, 'Не удалось провести оплату');
+  await refreshLoyaltyAfterFinance();
   const income = getDDSIncome();
   const payment = income.find((item) => !before.has(String(item?.id || '')) && sourceMatch(item, source))
     || [...income].reverse().find((item) => sourceMatch(item, source));
@@ -187,6 +199,7 @@ export async function recordPaymentIncome({
     paymentId: payment.id,
     total: payment.total,
     serviceAmount: payment.serviceAmount,
+    bonusAmount: payment.bonusAmount,
     tips: payment.tips,
     source: payment.source,
   });
@@ -204,6 +217,7 @@ export async function correctFinanceOperation(operationId, payload = {}) {
     }),
   });
   const state = await applyServerState(response, 'Не удалось скорректировать операцию');
+  await refreshLoyaltyAfterFinance();
   const operation = state.operations.find((item) => String(item?.operationId || '') === id) || null;
   notifyFinanceChanged({ action: 'operation-corrected', operationId: id, source: operation?.source || null });
   return operation;
@@ -216,6 +230,7 @@ export async function hardDeleteFinanceOperation(operationId) {
     method: 'DELETE',
   });
   const state = await applyServerState(response, 'Не удалось полностью удалить операцию');
+  await refreshLoyaltyAfterFinance();
   notifyFinanceChanged({ action: 'operation-hard-delete', operationId: id });
   return state;
 }
@@ -231,6 +246,7 @@ export async function cancelFinanceOperation(operationId, { reason = 'incorrect-
     }),
   });
   const state = await applyServerState(response, 'Не удалось отменить операцию');
+  await refreshLoyaltyAfterFinance();
   const operation = state.operations.find((item) => String(item?.operationId || '') === id) || null;
   if (!operation) return null;
   notifyFinanceChanged({ action: 'operation-cancelled', operationId: id, source: operation.source || null });
@@ -248,22 +264,24 @@ export async function cancelPaymentOperation(paymentId, options = {}) {
 
 export async function recordRefundExpense(
   paymentId,
-  { reason = '', amount = null, walletId = '', walletName = '', occurredAt = null } = {},
+  { reason = '', amount = null, bonusAmount = 0, walletId = '', walletName = '', occurredAt = null } = {},
 ) {
   const id = String(paymentId || '');
-  if (!id || !walletId || !occurredAt) return null;
+  if (!id || !occurredAt) return null;
   const before = new Set(getDDSExpenses().map((item) => String(item?.id || '')));
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}/refund`, {
     method: 'POST',
     body: JSON.stringify({
       reason,
       amount,
+      bonusAmount,
       walletId,
       walletName,
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
   await applyServerState(response, 'Не удалось выполнить возврат');
+  await refreshLoyaltyAfterFinance();
   const expenses = getDDSExpenses();
   const refund = expenses.find((item) => !before.has(String(item?.id || ''))
     && String(item?.originalPaymentId || '') === id)
@@ -275,6 +293,7 @@ export async function recordRefundExpense(
     originalPaymentId: id,
     total: refund.total,
     serviceAmount: refund.serviceAmount,
+    bonusAmount: refund.bonusAmount,
     tips: refund.tips,
     source: refund.source || null,
   });
