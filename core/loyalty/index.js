@@ -1,14 +1,17 @@
 import {
   emptyState,
-  page,
-  v2ListEntries,
-  v2ListEntry,
-  workspaceHeaderContext,
+  entityCardStack,
   openNotice,
+  page,
 } from '../../ui/ui.js';
-import { getProfile } from '../profile/data.js';
 import { renderDeposit } from './deposit/index.js';
 import { renderPersonalAccount } from './personal-account/index.js';
+import {
+  bindViewSettings,
+  loyaltyCardFields,
+  loyaltyHeader,
+  loyaltyVisualCard,
+} from './shared.js';
 
 const LOYALTY_NAVIGATION = [
   { id: 'deposit', label: 'Депозит' },
@@ -19,91 +22,92 @@ const LOYALTY_NAVIGATION = [
   { id: 'bonus', label: 'Бонусная программа' },
 ];
 
-function profileASlot({ settings = false, data = '', aria = 'Настройки' } = {}) {
-  const profile = getProfile();
-  const name = [profile?.name, profile?.surname].filter(Boolean).join(' ').trim() || 'Профиль';
-  const crop = (value) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Math.round(Number(value)))) : 50;
-  return {
-    kind: 'avatar',
-    image: String(profile?.photo || ''),
-    imagePosition: `${crop(profile?.photoCropX)}% ${crop(profile?.photoCropY)}%`,
-    initials: name.slice(0, 1).toUpperCase() || '?',
-    settingsTag: settings,
-    data,
-    aria,
-    disabled: !settings,
-  };
-}
-
-function header(title, { settings = false, c = null } = {}) {
-  return workspaceHeaderContext({
-    title,
-    a: profileASlot({ settings, data: settings ? 'data-loyalty-settings' : '', aria: `Настройки ${title}` }),
-    c,
-  });
-}
-
-function previewRows(rows) {
-  return v2ListEntries(rows.map(({ title, subtitle, rightTop = '' }) => v2ListEntry({
-    title,
-    subtitle,
-    rightTop,
-    interactive: false,
-    initial: '',
-  })));
+function previewCards(type, items = []) {
+  return entityCardStack(items.map((item) => loyaltyVisualCard(type, loyaltyCardFields({
+    uei: item.uei || '',
+    title: item.title || '',
+    subtitle: item.subtitle || '',
+    status: item.status || '',
+    metaLeft: item.metaLeft || '',
+    metaRight: item.metaRight || '',
+  }), { interactive: false })));
 }
 
 function bindStageActions(root, title) {
   root.querySelector('[data-loyalty-stage-action]')?.addEventListener('click', () => {
     openNotice({
       title,
-      message: 'Интерфейс готов. Бизнес-логика подключается следующим слоем.',
+      message: 'Это только визуальный mock. Q-конструктор этого раздела ещё не подключён.',
       surface: 'app',
     });
   });
 }
 
 function renderCertificate(root) {
+  const items = [
+    { title: 'Подарочный 10 000', subtitle: 'Сертификат', status: 'Активен', metaLeft: 'Денежный', metaRight: '10 000 ₽' },
+    { title: 'Уход 5 000', subtitle: 'Сертификат', status: 'Активен', metaLeft: 'Денежный', metaRight: '5 000 ₽' },
+  ];
   root.innerHTML = page([
-    header('Сертификат', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать сертификат' } }),
-    previewRows([
-      { title: 'Подарочный 10 000', subtitle: 'Активен', rightTop: '10 000 ₽' },
-      { title: 'Уход 5 000', subtitle: 'Активен', rightTop: '5 000 ₽' },
-    ]),
+    loyaltyHeader('Сертификат', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать сертификат' } }),
+    previewCards('certificate', items),
   ]);
+  bindViewSettings(root, 'Сертификат', {
+    type: 'certificate',
+    fields: () => loyaltyCardFields(items[0]),
+    onSaved: () => renderCertificate(root),
+  });
   bindStageActions(root, 'Сертификат');
 }
 
 function renderSubscription(root) {
+  const items = [
+    { title: 'Стрижка × 10', subtitle: 'Абонемент', status: 'Активен', metaLeft: '10 посещений', metaRight: 'Осталось 10' },
+    { title: 'Уход × 5', subtitle: 'Абонемент', status: 'Активен', metaLeft: '5 посещений', metaRight: 'Осталось 5' },
+  ];
   root.innerHTML = page([
-    header('Абонемент', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать абонемент' } }),
-    previewRows([
-      { title: 'Стрижка × 10', subtitle: '10 посещений', rightTop: 'Активен' },
-      { title: 'Уход × 5', subtitle: '5 посещений', rightTop: 'Активен' },
-    ]),
+    loyaltyHeader('Абонемент', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать абонемент' } }),
+    previewCards('subscription', items),
   ]);
+  bindViewSettings(root, 'Абонемент', {
+    type: 'subscription',
+    fields: () => loyaltyCardFields(items[0]),
+    onSaved: () => renderSubscription(root),
+  });
   bindStageActions(root, 'Абонемент');
 }
 
 function renderReferral(root) {
+  const items = [
+    { title: 'Приведи друга', subtitle: 'Реферальная программа', status: 'Активна', metaLeft: 'Всем контактам', metaRight: '1 уровень' },
+    { title: 'VIP рекомендации', subtitle: 'Реферальная программа', status: 'Активна', metaLeft: 'Выбранным контактам', metaRight: '2 уровня' },
+  ];
   root.innerHTML = page([
-    header('Реферальная программа', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать реферальную программу' } }),
-    previewRows([
-      { title: 'Приведи друга', subtitle: 'Всем контактам', rightTop: 'Активна' },
-      { title: 'VIP рекомендации', subtitle: 'Выбранным контактам', rightTop: 'Активна' },
-    ]),
+    loyaltyHeader('Реферальная программа', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать реферальную программу' } }),
+    previewCards('referral', items),
   ]);
+  bindViewSettings(root, 'Реферальная программа', {
+    type: 'referral',
+    fields: () => loyaltyCardFields(items[0]),
+    onSaved: () => renderReferral(root),
+  });
   bindStageActions(root, 'Реферальная программа');
 }
 
 function renderBonus(root) {
+  const items = [
+    { title: '5% с оплаты', subtitle: 'Бонусная программа', status: 'Активна', metaLeft: 'Всем контактам', metaRight: '5%' },
+    { title: 'VIP 10%', subtitle: 'Бонусная программа', status: 'Активна', metaLeft: 'Выбранным контактам', metaRight: '10%' },
+  ];
   root.innerHTML = page([
-    header('Бонусная программа', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать бонусную программу' } }),
-    previewRows([
-      { title: '5% с оплаты', subtitle: 'Всем контактам', rightTop: 'Активна' },
-      { title: 'VIP 10%', subtitle: 'Выбранным контактам', rightTop: 'Активна' },
-    ]),
+    loyaltyHeader('Бонусная программа', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Создать бонусную программу' } }),
+    previewCards('bonus', items),
   ]);
+  bindViewSettings(root, 'Бонусная программа', {
+    type: 'bonus',
+    fields: () => loyaltyCardFields(items[0]),
+    onSaved: () => renderBonus(root),
+  });
   bindStageActions(root, 'Бонусная программа');
 }
 
@@ -119,7 +123,7 @@ export async function renderLoyaltySection(root, section = 'deposit') {
   if (section === 'referral') return renderReferral(root);
   if (section === 'bonus') return renderBonus(root);
   root.innerHTML = page([
-    header('Лояльность'),
+    loyaltyHeader('Лояльность'),
     emptyState('Раздел не найден', 'Выберите инструмент Лояльности в меню.'),
   ]);
 }
