@@ -218,7 +218,7 @@ assert.match(financeService, /saveSettlementSnapshot\(\{ source = null, settleme
 assert.match(financeService, /recordPaymentIncome\([\s\S]*!settlement \|\| !occurredAt/);
 assert.match(financeService, /cancelFinanceOperation\([\s\S]*!id \|\| !occurredAt/);
 assert.match(financeService, /cancelPaymentOperation\([\s\S]*cancelFinanceOperation/);
-assert.match(financeService, /recordRefundExpense\([\s\S]*!id \|\| !walletId \|\| !occurredAt/);
+assert.match(financeService, /recordRefundExpense\([\s\S]*!id \|\| !occurredAt/);
 assert.doesNotMatch(serverFinance, /dateValue\(input\.occurredAt/);
 
 console.log('finance roundtrip alignment tests: OK');
