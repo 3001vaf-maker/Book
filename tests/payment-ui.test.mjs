@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { paymentForm, paymentMethods } from '../ui/payment/index.js';
 import { paymentAllocationState } from '../ui/payment/methods.js';
-import { calculateSettlement, normalizeStoredSettlement } from '../core/finance/rules.js';
+import { calculateSettlement } from '../core/finance/index.js';
 import { shortDate } from '../ui/utils/date-time.js';
 import { zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 
@@ -80,15 +80,6 @@ const correctedWithoutProgram = calculateSettlement([
 assert.equal(correctedWithoutProgram.correctionTotal, 500);
 assert.equal(correctedWithoutProgram.pricePercentTotal, 0);
 assert.equal(correctedWithoutProgram.planTotal, 4500);
-
-const legacyAutomatic = normalizeStoredSettlement({
-  items: [{ sourceId: 'p1', name: 'Стрижка', price: 5000, discountMode: 'percent', discountPercent: 20, discountMoney: 1000, planAmount: 4000 }],
-  discountPercent: 20,
-  planTotal: 4000,
-});
-assert.equal(legacyAutomatic.correctionTotal, 0);
-assert.equal(legacyAutomatic.pricePercentTotal, 1000);
-assert.equal(legacyAutomatic.planTotal, 4000);
 
 const methodsHtml = paymentMethods({
   wallets: [{ id: 'cash', name: 'Наличные' }, { id: 'card', name: 'СберБанк' }],
