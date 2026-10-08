@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from 
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FinanceService } from '../finance/finance.service';
+import { SettlementLifecycleService } from './settlement-lifecycle.service';
 import { SettlementService } from './settlement.service';
 
 type AuthenticatedRequest = Request & {
@@ -13,6 +14,7 @@ type AuthenticatedRequest = Request & {
 export class SettlementController {
   constructor(
     private readonly settlement: SettlementService,
+    private readonly lifecycle: SettlementLifecycleService,
     private readonly finance: FinanceService,
   ) {}
 
@@ -57,7 +59,7 @@ export class SettlementController {
     const tenantId = request.auth!.tenantId;
     const kind = await this.settlement.operationKind(tenantId, operationId);
     if (kind === 'payment') return this.settlement.cancelPaymentTree(tenantId, operationId, body);
-    if (kind === 'refund') return this.settlement.cancelRefund(tenantId, operationId, body);
+    if (kind === 'refund') return this.lifecycle.cancelRefund(tenantId, operationId, body);
     return this.finance.cancelOperation(tenantId, operationId, body);
   }
 
@@ -68,9 +70,8 @@ export class SettlementController {
   ) {
     const tenantId = request.auth!.tenantId;
     const kind = await this.settlement.operationKind(tenantId, operationId);
-    if (kind === 'payment' || kind === 'refund' || kind === 'cancel') {
-      return this.settlement.hardDeleteSettlementOperation(tenantId, operationId);
-    }
+    if (kind === 'payment') return this.settlement.hardDeletePaymentTree(tenantId, operationId);
+    if (kind === 'refund') return this.lifecycle.hardDeleteRefund(tenantId, operationId);
     return this.finance.hardDeleteOperation(tenantId, operationId);
   }
 }
