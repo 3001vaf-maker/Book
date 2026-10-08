@@ -8,6 +8,20 @@ function list(value){return Array.isArray(value)?value:[];}
 function text(value){return String(value??'').trim();}
 function numberValue(value){const number=Number(String(value??'').replace(',','.'));return Number.isFinite(number)?number:0;}
 function percent(value){return Math.max(0,Math.min(100,numberValue(value)));}
+function localDateKey(value=new Date()){
+  const date=value instanceof Date?value:new Date(value);
+  if(!Number.isFinite(date.getTime()))return '';
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+function termsActive(terms={},at=new Date()){
+  if(text(terms?.termMode).toLowerCase()!=='dated')return true;
+  const day=localDateKey(at);
+  const start=text(terms?.termStartDate).slice(0,10);
+  const end=text(terms?.termEndDate).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!/^\d{4}-\d{2}-\d{2}$/.test(end))return false;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(start)&&day<start)return false;
+  return day<=end;
+}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
 async function refreshFinance(){
@@ -63,6 +77,7 @@ export function getPersonDepositPriceConditions(personKey=''){
   return deposits
     .filter((deposit)=>personKeyOf(deposit)===key
       && text(deposit?.status)==='active'
+      && termsActive(deposit?.terms)
       && percent(deposit?.discountPercent)>0)
     .map((deposit)=>({
       type:'program',
