@@ -35,6 +35,10 @@ const finance = source('LOYALTY_FINANCE_CONTRACT.md');
 const execution = source('LOYALTY_EXECUTION_CONTRACT.md');
 const loyaltyRoot = source('core/loyalty/index.js');
 const personalAccountUI = source('core/loyalty/personal-account/index.js');
+const certificateUI = source('core/loyalty/certificate/index.js');
+const subscriptionUI = source('core/loyalty/subscription/index.js');
+const referralUI = source('core/loyalty/referral/index.js');
+const bonusUI = source('core/loyalty/bonus/index.js');
 const depositData = source('core/loyalty/deposit/data.js');
 const depositUI = source('core/loyalty/deposit/index.js');
 const core = source('core.js');
@@ -115,8 +119,19 @@ if (!/id:\s*['"]loyalty['"][^\n]*label:\s*['"]Лояльность['"]/.test(cor
   errors.push('core.js must expose top-level F Loyalty');
 }
 if (!/renderLoyaltySection/.test(core)) errors.push('core.js must route Loyalty through its owner renderer');
-if (!/from ['"]\.\/personal-account\/index\.js['"]/.test(loyaltyRoot)) {
-  errors.push('core/loyalty/index.js must route Personal Account through its dedicated owner module');
+
+const ownerModules = [
+  ['personal-account', personalAccountUI],
+  ['certificate', certificateUI],
+  ['subscription', subscriptionUI],
+  ['referral', referralUI],
+  ['bonus', bonusUI],
+];
+for (const [name] of ownerModules) {
+  if (!loyaltyRoot.includes(`./${name}/index.js`)) errors.push(`core/loyalty/index.js must route ${name} through its dedicated owner module`);
+}
+if (/data-loyalty-stage-action|previewCards|Интерфейс готов|визуальный mock/i.test(loyaltyRoot)) {
+  errors.push('core/loyalty/index.js must not contain placeholder E implementations');
 }
 
 if (!/export async function renderPersonalAccount/.test(personalAccountUI)) errors.push('Personal Account UI owner is missing');
@@ -129,6 +144,22 @@ if (!/автоматически|появляется автоматически
   errors.push('Personal Account UI must communicate automatic existence rather than manual assignment');
 }
 
+const visualOwners = [
+  ['Personal Account', personalAccountUI, 'personal-account'],
+  ['Certificate', certificateUI, 'certificate'],
+  ['Subscription', subscriptionUI, 'subscription'],
+  ['Referral', referralUI, 'referral'],
+  ['Bonus', bonusUI, 'bonus'],
+];
+for (const [label, sourceText, type] of visualOwners) {
+  if (!sourceText.includes('entityCardStack')) errors.push(`${label} Z1 must use the shared visual-card stack`);
+  if (!sourceText.includes('loyaltyVisualCard')) errors.push(`${label} must render shared entityVisualCard-based cards`);
+  if (!sourceText.includes(`type: '${type}'`)) errors.push(`${label} A → View must edit its own card type`);
+}
+for (const token of ['entityCardStack', 'entityVisualCard', 'openEntityCardAppearanceQ']) {
+  if (!depositUI.includes(token)) errors.push(`Deposit must reuse shared ${token}`);
+}
+
 if (/\/finance\/deposits/.test(depositData)) {
   errors.push('Deposit browser data must not use /finance/deposits as its canonical API');
 }
@@ -138,10 +169,9 @@ for (const route of ['/loyalty/deposits', '/loyalty/deposits/person/']) {
 
 const loyaltyCss = walk(join(root, 'core/loyalty')).map(rel).filter((path) => path.endsWith('.css'));
 if (loyaltyCss.length) errors.push(`Loyalty must not own local CSS: ${loyaltyCss.join(', ')}`);
-if (/<select\b/.test(depositUI)) errors.push('Deposit UI must use shared selector instead of native select');
-if (/\b(?:alert|confirm|prompt)\s*\(/.test(depositUI)) errors.push('Deposit UI must not use browser dialogs');
-for (const token of ['workspaceHeaderContext', 'v2ListEntry', 'v2ListEntries']) {
-  if (!depositUI.includes(token)) errors.push(`Deposit UI must reuse shared ${token}`);
+for (const [label, sourceText] of [['Deposit', depositUI], ['Certificate', certificateUI], ['Subscription', subscriptionUI], ['Referral', referralUI], ['Bonus', bonusUI]]) {
+  if (/<select\b/.test(sourceText)) errors.push(`${label} UI must use shared selector instead of native select`);
+  if (/\b(?:alert|confirm|prompt)\s*\(/.test(sourceText)) errors.push(`${label} UI must not use browser dialogs`);
 }
 
 for (const token of ['CREATE TABLE "LoyaltyDepositInstance"', '"balance" DECIMAL(14,2)', 'loyalty_deposit_recalculate', 'LoyaltyDepositFinanceSync', 'Backfill every Deposit']) {
