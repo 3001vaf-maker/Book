@@ -1,6 +1,7 @@
 import {
   datePicker,
   emptyState,
+  entityCardStack,
   field,
   formValidationMessage,
   initDatePickers,
@@ -20,7 +21,9 @@ import {
   availablePeople,
   bindViewSettings,
   formObject,
+  loyaltyCardFields,
   loyaltyHeader,
+  loyaltyVisualCard,
   money,
   mockPerson,
   notifyLoyaltyContext,
@@ -60,6 +63,27 @@ function instanceRight(instance = {}) {
   const program = programs.find((item) => item.id === instance.programId);
   if (program?.type === 'amount') return `${money(instance.balance)} осталось`;
   return instance.status === 'used' ? 'Использован' : 'Активен';
+}
+
+function programCardFields(program = {}) {
+  return loyaltyCardFields({
+    title: program.name || 'Сертификат',
+    subtitle: typeLabel(program.type),
+    status: program.status === 'active' ? 'Активен' : 'Закрыт',
+    metaLeft: program.term || 'Бессрочно',
+    metaRight: programRight(program),
+  });
+}
+
+function instanceCardFields(instance = {}) {
+  const program = programs.find((item) => item.id === instance.programId) || {};
+  return loyaltyCardFields({
+    title: instance.ownerName || 'Без имени',
+    subtitle: program.name || 'Сертификат',
+    status: instance.status === 'used' ? 'Использован' : 'Активен',
+    metaLeft: instance.buyerName && instance.buyerName !== instance.ownerName ? `Покупатель: ${instance.buyerName}` : 'Владелец = покупатель',
+    metaRight: instanceRight(instance),
+  });
 }
 
 function programInfo(program = {}) {
@@ -217,12 +241,7 @@ async function openProgramLayer(root, programId, onChanged) {
         c: { label: 'Оформить', data: 'data-certificate-issue', aria: 'Оформить сертификат' },
       }),
       v2Section('Условия', programInfo(program)),
-      v2Section('Оформленные', issued.length ? v2ListEntries(issued.map((item) => v2ListEntry({
-        title: item.ownerName || 'Без имени',
-        subtitle: item.buyerName && item.buyerName !== item.ownerName ? `Покупатель: ${item.buyerName}` : 'Покупатель и владелец совпадают',
-        rightTop: instanceRight(item),
-        interactive: true,
-        initial: (item.ownerName || '?').slice(0, 1).toUpperCase(),
+      v2Section('Оформленные', issued.length ? entityCardStack(issued.map((item) => loyaltyVisualCard('certificate', instanceCardFields(item), {
         data: `data-certificate-instance="${item.id}"`,
         aria: `Открыть сертификат ${item.ownerName || ''}`,
       }))) : emptyState('Экземпляров пока нет', 'Оформите сертификат конкретному владельцу.')),
@@ -240,23 +259,23 @@ async function openProgramLayer(root, programId, onChanged) {
 
 export async function renderCertificate(root) {
   const render = async () => {
+    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {
+      data: `data-certificate-program="${program.id}"`,
+      aria: `Открыть ${program.name}`,
+    }))) : emptyState('Сертификатов пока нет', 'Создайте первый вид сертификата кнопкой «+».');
+
     root.innerHTML = page([
       loyaltyHeader('Сертификат', {
         settings: true,
         c: { label: '+', data: 'data-certificate-create', aria: 'Создать вид сертификата' },
       }),
-      programs.length ? v2ListEntries(programs.map((program) => v2ListEntry({
-        title: program.name,
-        subtitle: `${typeLabel(program.type)} · ${program.term || 'Бессрочно'}`,
-        rightTop: programRight(program),
-        rightBottom: program.status === 'active' ? 'Активен' : 'Закрыт',
-        interactive: true,
-        initial: program.name.slice(0, 1).toUpperCase(),
-        data: `data-certificate-program="${program.id}"`,
-        aria: `Открыть ${program.name}`,
-      }))) : emptyState('Сертификатов пока нет', 'Создайте первый вид сертификата кнопкой «+».')
+      cards,
     ]);
-    bindViewSettings(root, 'Сертификат');
+    bindViewSettings(root, 'Сертификат', {
+      type: 'certificate',
+      fields: () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 месяцев', status: 'active' }),
+      onSaved: render,
+    });
     root.querySelector('[data-certificate-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
     root.querySelectorAll('[data-certificate-program]').forEach((node) => node.addEventListener('click', () => openProgramLayer(root, text(node.dataset.certificateProgram), render)));
     notifyLoyaltyContext();
