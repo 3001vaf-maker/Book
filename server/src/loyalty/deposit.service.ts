@@ -48,15 +48,10 @@ function money(value: unknown) {
   return Math.round(Math.max(0, numberValue(value)) * 100) / 100;
 }
 
-function personKey(value: unknown) {
-  const person = objectValue(value);
-  return text(person.key ?? person.personKey ?? person.id);
-}
-
 function benefitMode(terms: JsonObject) {
   const type = text(terms.benefitType).toLowerCase();
-  if (type === 'accrual' || type === 'upfront') return 'upfront';
-  if (type === 'discount' || type === 'service') return 'service';
+  if (type === 'discount') return 'discount';
+  if (type === 'accrual') return 'accrual';
   return 'none';
 }
 
@@ -64,19 +59,11 @@ function benefitRate(terms: JsonObject) {
   return Math.max(0, Math.min(100, numberValue(terms.benefitValue)));
 }
 
-function termEndDate(terms: JsonObject) {
-  const mode = text(terms.termMode).toLowerCase();
-  if (mode !== 'dated' && mode !== 'fixed') return '';
-  const value = text(terms.termEndDate).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
-}
-
 function termActiveAt(terms: JsonObject, value: Date) {
-  const mode = text(terms.termMode).toLowerCase();
-  if (mode !== 'dated' && mode !== 'fixed') return true;
+  if (text(terms.termMode).toLowerCase() !== 'dated') return true;
   const start = text(terms.termStartDate).slice(0, 10);
-  const end = termEndDate(terms);
-  if (!end) return false;
+  const end = text(terms.termEndDate).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
   const day = value.toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(start) && day < start) return false;
   return day <= end;
@@ -118,7 +105,7 @@ export class DepositService {
       WHERE "tenantId" = ${tenantId}
         AND (${depositId} = '' OR "depositId" = ${depositId})
         AND "status" = 'active'
-        AND LOWER(COALESCE("terms"->>'termMode', 'indefinite')) IN ('dated', 'fixed')
+        AND LOWER(COALESCE("terms"->>'termMode', 'indefinite')) = 'dated'
         AND COALESCE("terms"->>'termEndDate', '') ~ '^\d{4}-\d{2}-\d{2}$'
         AND ("terms"->>'termEndDate')::date < CURRENT_DATE
     `);
@@ -160,7 +147,6 @@ export class DepositService {
     const terms = objectValue(row.terms);
     const mode = benefitMode(terms);
     const rate = benefitRate(terms);
-    const ownerKey = row.personKey || personKey(row.person);
     const items: JsonObject[] = [];
 
     for (const operation of operations) {
@@ -176,7 +162,7 @@ export class DepositService {
           occurredAt: occurredAt.toISOString(), status: operation.status,
           source: { type: operation.sourceType, id: operation.sourceId },
         });
-        if (mode === 'upfront' && rate > 0) {
+        if (mode === 'accrual' && rate > 0) {
           const gain = money(amount * rate / 100);
           if (gain > 0) items.push({
             operationId: `${operation.operationId}:benefit`,
@@ -207,15 +193,6 @@ export class DepositService {
           occurredAt: occurredAt.toISOString(), status: operation.status,
           source: { type: operation.sourceType, id: operation.sourceId },
         });
-        if (mode === 'service' && rate > 0 && ownerKey && personKey(data.person) === ownerKey && termActiveAt(terms, occurredAt)) {
-          const gain = money(money(data.serviceAmount) * rate / 100);
-          if (gain > 0) items.push({
-            operationId: `${operation.operationId}:benefit`,
-            kind: 'deposit-benefit', amount: gain, direction: 'IN',
-            occurredAt: occurredAt.toISOString(), status: operation.status,
-            source: { type: operation.sourceType, id: operation.sourceId },
-          });
-        }
         continue;
       }
 
@@ -227,15 +204,6 @@ export class DepositService {
           occurredAt: occurredAt.toISOString(), status: operation.status,
           source: { type: operation.sourceType, id: operation.sourceId },
         });
-        if (mode === 'service' && rate > 0 && ownerKey && personKey(data.person) === ownerKey) {
-          const reversed = money(money(data.serviceAmount) * rate / 100);
-          if (reversed > 0) items.push({
-            operationId: `${operation.operationId}:benefit`,
-            kind: 'deposit-benefit-reversal', amount: reversed, direction: 'OUT',
-            occurredAt: occurredAt.toISOString(), status: operation.status,
-            source: { type: operation.sourceType, id: operation.sourceId },
-          });
-        }
       }
     }
 
@@ -247,6 +215,7 @@ export class DepositService {
     const benefitBalance = money(row.benefitBalance);
     const balance = money(row.balance);
     const terms = objectValue(row.terms);
+    const mode = benefitMode(terms);
     return {
       depositId: row.depositId,
       programId: row.programId,
@@ -258,7 +227,8 @@ export class DepositService {
       refundableAmount: row.status === 'active' ? principalBalance : 0,
       balance,
       terms,
-      benefitMode: benefitMode(terms),
+      benefitMode: mode,
+      discountPercent: mode === 'discount' && row.status === 'active' && termActiveAt(terms, new Date()) ? benefitRate(terms) : 0,
       status: row.status,
       canRefund: row.status === 'active' && principalBalance > 0.009 && termActiveAt(terms, new Date()),
       fundedAt: row.fundedAt.toISOString(),
@@ -343,18 +313,16 @@ export class DepositService {
       if (removed <= 0.009) continue;
 
       const nextAllocations = allocations.filter((allocation) => text(allocation.depositId ?? allocation.sourceId ?? allocation.id) !== id);
-      const currentService = money(data.serviceAmount);
-      const nextService = Math.max(0, money(currentService - removed));
+      const nextService = Math.max(0, money(money(data.serviceAmount) - removed));
       const tips = money(data.tips);
-      const nextTotal = money(nextService + tips);
       const nextData = {
         ...clone(data),
         depositAllocations: nextAllocations,
         serviceAmount: nextService,
-        total: nextTotal,
+        total: money(nextService + tips),
       };
 
-      if (nextTotal <= 0.009 && money(data.cashTotal) <= 0.009) {
+      if (money(nextData.total) <= 0.009 && money(data.cashTotal) <= 0.009) {
         await tx.financeOperation.delete({ where: { id: operation.id } });
       } else {
         await tx.financeOperation.update({ where: { id: operation.id }, data: { data: nextData as Prisma.InputJsonValue } });
