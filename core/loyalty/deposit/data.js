@@ -32,16 +32,16 @@ export async function saveDepositPrograms(next=[]){
 export async function listPersonDeposits(personKey=''){
   const key=text(personKey);
   if(!key)return [];
-  return normalizeDeposits(await payload(await apiRequest(`/finance/deposits/person/${encodeURIComponent(key)}`),'Не удалось загрузить депозиты'));
+  return normalizeDeposits(await payload(await apiRequest(`/loyalty/deposits/person/${encodeURIComponent(key)}`),'Не удалось загрузить депозиты'));
 }
 
 export async function listAllDeposits(){
-  return normalizeDeposits(await payload(await apiRequest('/finance/deposits'),'Не удалось загрузить депозиты'));
+  return normalizeDeposits(await payload(await apiRequest('/loyalty/deposits'),'Не удалось загрузить депозиты'));
 }
 
 export async function fundDeposit({programId='',person=null,amount=0,walletId='',walletName='',occurredAt=null}={}){
   if(!programId||!person?.key||!walletId||!occurredAt)return null;
-  const result=await payload(await apiRequest('/finance/deposits/fund',{
+  const result=await payload(await apiRequest('/loyalty/deposits/fund',{
     method:'POST',
     body:JSON.stringify({
       programId,
@@ -57,7 +57,7 @@ export async function fundDeposit({programId='',person=null,amount=0,walletId=''
 
 export async function withdrawDeposit({depositId='',amount=0,walletId='',walletName='',reason='',occurredAt=null}={}){
   if(!depositId||!walletId||!occurredAt)return null;
-  const result=await payload(await apiRequest(`/finance/deposits/${encodeURIComponent(depositId)}/withdraw`,{
+  const result=await payload(await apiRequest(`/loyalty/deposits/${encodeURIComponent(depositId)}/withdraw`,{
     method:'POST',
     body:JSON.stringify({
       amount,
