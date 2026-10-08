@@ -1,10 +1,13 @@
 import {
+  checkList,
+  collectCheckList,
   datePicker,
   details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
+  initCheckList,
   initDatePickers,
   miniCard,
   miniCardRail,
@@ -18,6 +21,7 @@ import {
   shortDateTime,
   smallActionButton,
   textareaField,
+  twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
   v2Section,
@@ -49,14 +53,14 @@ const fallbackPeople = [
 let programs = [
   {
     id: 'subscription-10', name: '10 посещений', description: 'Десять использований выбранной позиции.', price: 30000,
-    compositionMode: 'common-limit', procedureIds: [], procedureNames: ['Стрижка'], commonLimit: 10, quantity1: 10, quantity2: 0,
-    termType: 'duration', termValue: '12 месяцев', startRule: 'issue', frequencyPeriod: 'none', frequencyLimit: 0,
+    compositionMode: 'common-limit', procedureIds: [], procedureNames: ['Стрижка'], commonLimit: 10, quantityByProcedure: {},
+    termType: 'duration', termCount: 12, termUnit: 'months', termEndDate: '', termValue: '12 мес.', startRule: 'issue', startDate: '', frequencyPeriod: 'none', frequencyLimit: 0,
     multiplePerEvent: false, status: 'active', createdAt: '2026-10-01T10:00:00.000Z',
   },
   {
     id: 'subscription-unlimited', name: 'Годовой безлимит', description: 'Безлимит по выбранным позициям.', price: 90000,
-    compositionMode: 'unlimited', procedureIds: [], procedureNames: ['Уход', 'Стрижка'], commonLimit: 0, quantity1: 0, quantity2: 0,
-    termType: 'duration', termValue: '12 месяцев', startRule: 'first-use', frequencyPeriod: 'week', frequencyLimit: 2,
+    compositionMode: 'unlimited', procedureIds: [], procedureNames: ['Уход', 'Стрижка'], commonLimit: 0, quantityByProcedure: {},
+    termType: 'duration', termCount: 12, termUnit: 'months', termEndDate: '', termValue: '12 мес.', startRule: 'first-use', startDate: '', frequencyPeriod: 'week', frequencyLimit: 2,
     multiplePerEvent: true, status: 'active', createdAt: '2026-10-02T10:00:00.000Z',
   },
 ];
@@ -90,12 +94,20 @@ function frequencyLabel(program = {}) {
   return `Не более ${count} в неделю`;
 }
 
+function termLabel({ termType = 'indefinite', termCount = 0, termUnit = 'months', termEndDate = '' } = {}) {
+  if (termType === 'indefinite') return 'Бессрочно';
+  if (termType === 'date') return termEndDate ? `До ${termEndDate}` : 'До даты';
+  const count = Math.max(1, Number(termCount || 1));
+  const unit = termUnit === 'days' ? 'дн.' : termUnit === 'years' ? 'лет' : 'мес.';
+  return `${count} ${unit}`;
+}
+
 function programCardFields(program = {}) {
   return loyaltyCardFields({
     title: program.name || 'Абонемент',
     subtitle: compositionLabel(program),
     status: program.status === 'active' ? 'Активен' : 'Закрыт',
-    metaLeft: program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || '—'),
+    metaLeft: program.termValue || termLabel(program),
     metaRight: money(program.price),
   });
 }
@@ -111,8 +123,8 @@ function programConditions(program = {}) {
     `Цена: ${money(program.price)}`,
     `Состав: ${compositionLabel(program)}`,
     `Позиции Сервиса: ${(program.procedureNames || []).filter(Boolean).join(' · ') || 'Не выбраны'}`,
-    `Срок: ${program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || '—')}`,
-    `Начало срока: ${startLabel(program.startRule)}`,
+    `Срок: ${program.termValue || termLabel(program)}`,
+    `Начало срока: ${startLabel(program.startRule)}${program.startRule === 'date' && program.startDate ? ` — ${program.startDate}` : ''}`,
     `Частота: ${frequencyLabel(program)}`,
     `Несколько единиц за событие: ${program.multiplePerEvent ? 'Разрешено' : 'Нет'}`,
     `Состояние: ${program.status === 'active' ? 'Активен' : 'Закрыт'}`,
@@ -130,7 +142,7 @@ function instanceInfo(instance = {}, program = {}) {
     { label: 'Использовано', value: instanceProgress(instance, program) },
     { label: 'Остаток', value: program.compositionMode === 'unlimited' ? 'Безлимит' : String(Math.max(0, Number(instance.remaining || 0))) },
     { label: 'Начало', value: instance.startsAt || startLabel(program.startRule) },
-    { label: 'Срок', value: instance.expiresAt || program.termValue || 'Бессрочно' },
+    { label: 'Срок', value: instance.expiresAt || program.termValue || termLabel(program) },
     { label: 'Состояние', value: instance.status === 'closed' ? 'Завершён' : 'Активен' },
   ]);
 }
@@ -165,18 +177,106 @@ function openConditions(program = {}) {
   });
 }
 
-function procedureOptions() {
-  const procedures = getProcedures();
-  const options = procedures.map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value);
-  return [{ value: '', label: options.length ? 'Выберите позицию' : 'Позиции Сервиса пока не созданы' }, ...options];
+function procedures() {
+  return getProcedures().map((item) => ({ id: String(item.id || ''), name: item.name || 'Позиция Сервиса' })).filter((item) => item.id);
+}
+
+function procedureChecklist() {
+  const items = procedures();
+  return items.length
+    ? checkList(items.map((item) => ({ value: item.id, label: item.name })), { className: 'subscription-service-list' })
+    : emptyState('Позиции Сервиса пока не созданы', 'Сначала добавьте позиции в Сервис.');
 }
 
 function procedureNameById(id = '') {
-  return getProcedures().find((item) => String(item.id || '') === String(id || ''))?.name || '';
+  return procedures().find((item) => item.id === String(id || ''))?.name || '';
+}
+
+function initSubscriptionConstructor(layer) {
+  const form = layer?.querySelector?.('[data-subscription-form]');
+  if (!form) return;
+  initDatePickers(form);
+  initCheckList(form);
+  const composition = form.querySelector('[name="compositionMode"]');
+  const termType = form.querySelector('[name="termType"]');
+  const startRule = form.querySelector('[name="startRule"]');
+  const frequency = form.querySelector('[name="frequencyPeriod"]');
+  const quantityHost = form.querySelector('[data-subscription-quantity-fields]');
+
+  const syncQuantities = () => {
+    if (!quantityHost || !composition) return;
+    const ids = collectCheckList(form, '[data-subscription-service-list] input[type="checkbox"]');
+    if (composition.value === 'single' && ids.length > 1) {
+      const keep = ids.at(-1);
+      form.querySelectorAll('[data-subscription-service-list] input[type="checkbox"]').forEach((input) => {
+        if (input.value !== keep) {
+          input.checked = false;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      return;
+    }
+    const visible = composition.value === 'single' || composition.value === 'per-position';
+    quantityHost.hidden = !visible;
+    quantityHost.innerHTML = visible ? ids.map((id) => field({
+      label: `Количество — ${procedureNameById(id) || 'позиция'}`,
+      name: `quantity_${id}`,
+      type: 'number',
+      min: '1',
+      step: '1',
+      inputmode: 'numeric',
+      value: '1',
+    })).join('') : '';
+  };
+
+  const syncComposition = () => {
+    const mode = composition?.value || 'common-limit';
+    const common = form.querySelector('[data-subscription-common-limit]');
+    if (common) common.hidden = mode !== 'common-limit';
+    syncQuantities();
+  };
+  const syncTerm = () => {
+    const value = termType?.value || 'duration';
+    form.querySelectorAll('[data-subscription-term-panel]').forEach((panel) => { panel.hidden = panel.dataset.subscriptionTermPanel !== value; });
+  };
+  const syncStart = () => {
+    const datePanel = form.querySelector('[data-subscription-start-date]');
+    if (datePanel) datePanel.hidden = startRule?.value !== 'date';
+  };
+  const syncFrequency = () => {
+    const limit = form.querySelector('[data-subscription-frequency-limit]');
+    if (limit) limit.hidden = frequency?.value === 'none';
+  };
+
+  composition?.addEventListener('change', syncComposition);
+  termType?.addEventListener('change', syncTerm);
+  startRule?.addEventListener('change', syncStart);
+  frequency?.addEventListener('change', syncFrequency);
+  form.querySelector('[data-subscription-service-list]')?.addEventListener('change', syncQuantities);
+  syncComposition();
+  syncTerm();
+  syncStart();
+  syncFrequency();
+}
+
+function addPeriod(dateValue, count, unit) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  const amount = Math.max(1, Number(count || 1));
+  if (unit === 'days') date.setDate(date.getDate() + amount);
+  else if (unit === 'years') date.setFullYear(date.getFullYear() + amount);
+  else date.setMonth(date.getMonth() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+function instanceDates(program = {}, issuedAt = '') {
+  const startsAt = program.startRule === 'date' ? (program.startDate || '') : program.startRule === 'first-use' ? '' : issuedAt;
+  if (program.termType === 'indefinite') return { startsAt, expiresAt: '' };
+  if (program.termType === 'date') return { startsAt, expiresAt: program.termEndDate || '' };
+  return { startsAt, expiresAt: startsAt ? addPeriod(startsAt, program.termCount, program.termUnit) : '' };
 }
 
 async function openCreateProgramQ(root, rerender) {
-  const serviceOptions = procedureOptions();
   const layer = mountModal(root, modal(`${loyaltyHeader('Новый абонемент', {
     c: { label: 'Сохранить', data: 'data-subscription-save', aria: 'Сохранить программу абонемента' },
   })}
@@ -190,49 +290,59 @@ async function openCreateProgramQ(root, rerender) {
         { value: 'common-limit', label: 'Общий лимит на выбранные позиции' },
         { value: 'unlimited', label: 'Безлимит по выбранным позициям' },
       ] })}
-      ${select({ label: 'Позиция Сервиса 1', name: 'procedure1', value: '', options: serviceOptions })}
-      ${field({ label: 'Количество позиции 1', name: 'quantity1', type: 'number', min: '0', step: '1', inputmode: 'numeric' })}
-      ${select({ label: 'Позиция Сервиса 2', name: 'procedure2', value: '', options: serviceOptions })}
-      ${field({ label: 'Количество позиции 2', name: 'quantity2', type: 'number', min: '0', step: '1', inputmode: 'numeric' })}
-      ${field({ label: 'Общий лимит', name: 'commonLimit', type: 'number', min: '0', step: '1', inputmode: 'numeric' })}
+      <div data-subscription-service-list>${procedureChecklist()}</div>
+      <div data-subscription-quantity-fields hidden></div>
+      <div data-subscription-common-limit>${field({ label: 'Общий лимит', name: 'commonLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric' })}</div>
       ${select({ label: 'Срок действия', name: 'termType', value: 'duration', options: [
         { value: 'indefinite', label: 'Бессрочный' },
         { value: 'duration', label: 'N дней / месяцев / лет' },
         { value: 'date', label: 'До конкретной даты' },
       ] })}
-      ${field({ label: 'Значение срока', name: 'termValue', placeholder: 'Например: 12 месяцев или 31.12.2027' })}
+      <div data-subscription-term-panel="duration">${twoColumnLayout(
+        field({ label: 'Количество', name: 'termCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '12' }),
+        select({ label: 'Период', name: 'termUnit', value: 'months', options: [{ value: 'days', label: 'Дней' }, { value: 'months', label: 'Месяцев' }, { value: 'years', label: 'Лет' }] }),
+        { ariaLabel: 'Срок абонемента' },
+      )}</div>
+      <div data-subscription-term-panel="date" hidden>${datePicker({ label: 'Действует до', name: 'termEndDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}</div>
       ${select({ label: 'Начало срока', name: 'startRule', value: 'issue', options: [
         { value: 'issue', label: 'С оформления / покупки' },
         { value: 'first-use', label: 'С первого использования' },
         { value: 'date', label: 'С конкретной даты' },
       ] })}
-      ${field({ label: 'Конкретная дата начала', name: 'startDate', type: 'date' })}
+      <div data-subscription-start-date hidden>${datePicker({ label: 'Дата начала', name: 'startDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}</div>
       ${select({ label: 'Ограничение частоты', name: 'frequencyPeriod', value: 'none', options: [
         { value: 'none', label: 'Без ограничения' },
         { value: 'day', label: 'Не более N раз в день' },
         { value: 'week', label: 'Не более N раз в неделю' },
         { value: 'month', label: 'Не более N раз в месяц' },
       ] })}
-      ${field({ label: 'N использований', name: 'frequencyLimit', type: 'number', min: '0', step: '1', inputmode: 'numeric' })}
+      <div data-subscription-frequency-limit hidden>${field({ label: 'N использований', name: 'frequencyLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '1' })}</div>
       ${select({ label: 'Несколько единиц за одно событие', name: 'multiplePerEvent', value: 'no', options: [{ value: 'no', label: 'Нет' }, { value: 'yes', label: 'Да' }] })}
       <div class="form-error" data-subscription-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Новый абонемент' }));
   if (!layer) return null;
+  initSubscriptionConstructor(layer);
   const form = layer.querySelector('[data-subscription-form]');
   layer.querySelector('[data-subscription-save]')?.addEventListener('click', async () => {
     const error = layer.querySelector('[data-subscription-error]');
     const validation = formValidationMessage(form);
     if (validation) { if (error) error.textContent = validation; return; }
     const values = formObject(form);
-    const procedureIds = [values.procedure1, values.procedure2].filter(Boolean);
+    const procedureIds = collectCheckList(form, '[data-subscription-service-list] input[type="checkbox"]');
+    if (!procedureIds.length) { if (error) error.textContent = 'Выберите позиции Сервиса'; return; }
+    if (values.compositionMode === 'single' && procedureIds.length !== 1) { if (error) error.textContent = 'Для этой модели выберите одну позицию'; return; }
     const procedureNames = procedureIds.map(procedureNameById).filter(Boolean);
+    const quantityByProcedure = Object.fromEntries(procedureIds.map((id) => [id, Math.max(1, Number(values[`quantity_${id}`] || 1))]));
     const commonLimit = Math.max(0, Number(values.commonLimit || 0));
-    const quantity1 = Math.max(0, Number(values.quantity1 || 0));
-    const quantity2 = Math.max(0, Number(values.quantity2 || 0));
-    if (values.compositionMode !== 'unlimited' && !commonLimit && !quantity1 && !quantity2) {
-      if (error) error.textContent = 'Укажите количество или общий лимит';
-      return;
-    }
+    if (values.compositionMode === 'common-limit' && !commonLimit) { if (error) error.textContent = 'Укажите общий лимит'; return; }
+    const termType = values.termType || 'duration';
+    const termCount = Math.max(1, Number(values.termCount || 1));
+    const termUnit = values.termUnit || 'months';
+    const termEndDate = values.termEndDate || '';
+    if (termType === 'date' && !termEndDate) { if (error) error.textContent = 'Укажите дату окончания'; return; }
+    if (values.startRule === 'date' && !values.startDate) { if (error) error.textContent = 'Укажите дату начала'; return; }
+    if (values.startRule === 'date' && termType === 'date' && values.startDate > termEndDate) { if (error) error.textContent = 'Дата начала не может быть позже даты окончания'; return; }
+    const frequencyLimit = values.frequencyPeriod === 'none' ? 0 : Math.max(1, Number(values.frequencyLimit || 1));
     programs.push({
       id: uid('subscription-program'),
       name: values.name,
@@ -242,14 +352,16 @@ async function openCreateProgramQ(root, rerender) {
       procedureIds,
       procedureNames,
       commonLimit,
-      quantity1,
-      quantity2,
-      termType: values.termType || 'duration',
-      termValue: values.termValue || '',
+      quantityByProcedure,
+      termType,
+      termCount,
+      termUnit,
+      termEndDate,
+      termValue: termLabel({ termType, termCount, termUnit, termEndDate }),
       startRule: values.startRule || 'issue',
       startDate: values.startDate || '',
       frequencyPeriod: values.frequencyPeriod || 'none',
-      frequencyLimit: Math.max(0, Number(values.frequencyLimit || 0)),
+      frequencyLimit,
       multiplePerEvent: values.multiplePerEvent === 'yes',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -264,20 +376,29 @@ async function openCreateProgramQ(root, rerender) {
 async function openIssueQ(root, program, rerender) {
   const people = availablePeople(fallbackPeople);
   const options = [{ value: '', label: 'Выберите контакт' }, ...people.map(personOption).filter((item) => item.value)];
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = instanceDates(program, today);
   const layer = mountModal(root, modal(`${loyaltyHeader('Оформить абонемент', {
     c: { label: 'Оформить', data: 'data-subscription-issue-save', aria: 'Оформить абонемент' },
   })}
     <form class="form-grid" data-subscription-issue-form>
       ${select({ label: 'Контакт', name: 'personKey', value: '', options })}
       ${field({ label: 'Цена', name: 'price', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: program.price || 0 })}
-      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
-      ${field({ label: 'Дата начала / правило', name: 'startsAt', placeholder: startLabel(program.startRule) })}
-      ${field({ label: 'Срок / дата окончания', name: 'expiresAt', placeholder: program.termType === 'indefinite' ? 'Бессрочно' : program.termValue })}
+      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: today, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
+      ${field({ label: 'Начало', name: 'startPreview', value: dates.startsAt || startLabel(program.startRule), disabled: true })}
+      ${field({ label: 'Срок', name: 'termPreview', value: dates.expiresAt ? `До ${dates.expiresAt}` : (program.termValue || termLabel(program)), disabled: true })}
       <div class="form-error" data-subscription-issue-error></div>
     </form>`, { variant: 'q', surface: 'app', title: 'Оформить абонемент' }));
   if (!layer) return null;
   initDatePickers(layer);
   const form = layer.querySelector('[data-subscription-issue-form]');
+  layer.querySelector('[name="issuedAt"]')?.addEventListener('change', (event) => {
+    const next = instanceDates(program, event.target.value || today);
+    const start = layer.querySelector('[name="startPreview"]');
+    const term = layer.querySelector('[name="termPreview"]');
+    if (start) start.value = next.startsAt || startLabel(program.startRule);
+    if (term) term.value = next.expiresAt ? `До ${next.expiresAt}` : (program.termValue || termLabel(program));
+  });
   layer.querySelector('[data-subscription-issue-save]')?.addEventListener('click', async () => {
     const values = formObject(form);
     const error = layer.querySelector('[data-subscription-issue-error]');
@@ -285,7 +406,10 @@ async function openIssueQ(root, program, rerender) {
     if (!person) { if (error) error.textContent = 'Укажите контакт'; return; }
     const total = program.compositionMode === 'unlimited'
       ? 0
-      : Math.max(0, Number(program.commonLimit || 0) || Number(program.quantity1 || 0) + Number(program.quantity2 || 0));
+      : program.compositionMode === 'common-limit'
+        ? Math.max(0, Number(program.commonLimit || 0))
+        : Object.values(program.quantityByProcedure || {}).reduce((sum, value) => sum + Math.max(0, Number(value || 0)), 0);
+    const resolvedDates = instanceDates(program, values.issuedAt);
     instances.push({
       id: uid('subscription-instance'),
       programId: program.id,
@@ -295,8 +419,8 @@ async function openIssueQ(root, program, rerender) {
       used: 0,
       remaining: total,
       status: 'active',
-      startsAt: values.startsAt || startLabel(program.startRule),
-      expiresAt: values.expiresAt || (program.termType === 'indefinite' ? 'Бессрочно' : program.termValue),
+      startsAt: resolvedDates.startsAt || startLabel(program.startRule),
+      expiresAt: resolvedDates.expiresAt || (program.termType === 'indefinite' ? 'Бессрочно' : program.termValue),
       history: [],
     });
     layer.v2Close?.();
@@ -363,7 +487,7 @@ export async function renderSubscription(root) {
     ]);
     bindViewSettings(root, 'Абонемент', {
       type: 'subscription',
-      fields: () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termValue: '12 месяцев', status: 'active' }),
+      fields: () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' }),
       onSaved: render,
     });
     root.querySelector('[data-subscription-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
