@@ -12,9 +12,10 @@ type AuxiliaryBundle = {
   products: JsonObject[];
   productHistory: JsonObject[];
   cardAppearanceTemplates: JsonObject[];
+  depositPrograms: JsonObject[];
 };
 
-const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates']);
+const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates', 'depositPrograms']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -38,6 +39,7 @@ function normalize(value: unknown): AuxiliaryBundle {
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),
     cardAppearanceTemplates: (Array.isArray(source.cardAppearanceTemplates) ? source.cardAppearanceTemplates : []).map((item) => clone(objectValue(item))),
+    depositPrograms: (Array.isArray(source.depositPrograms) ? source.depositPrograms : []).map((item) => clone(objectValue(item))),
   };
 }
 
@@ -53,6 +55,13 @@ function canonical(value: AuxiliaryBundle) {
 
 function json(value: unknown): Prisma.InputJsonValue {
   return clone(value) as Prisma.InputJsonValue;
+}
+
+const DEPOSIT_MUTABLE_FIELDS = new Set(['status', 'archivedAt', 'cardAppearance', 'photo', 'photoPosition']);
+
+function protectedDepositSnapshot(value: unknown) {
+  const source = clone(objectValue(value));
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !DEPOSIT_MUTABLE_FIELDS.has(key)));
 }
 
 @Injectable()
@@ -138,6 +147,31 @@ export class AuxiliaryStateService {
     });
   }
 
+  private protectDepositPrograms(before: unknown[], after: unknown[]) {
+    const beforeById = new Map<string, JsonObject>(
+      before
+        .map((value): [string, JsonObject] => {
+          const entity = objectValue(value);
+          return [text(entity.id), entity];
+        })
+        .filter(([id]) => Boolean(id)),
+    );
+    const seen = new Set<string>();
+    return after.map((value) => {
+      const entity = clone(objectValue(value));
+      const id = text(entity.id);
+      if (!id) throw new BadRequestException('У депозитной программы отсутствует id');
+      if (seen.has(id)) throw new BadRequestException('Депозитная программа продублирована');
+      seen.add(id);
+      const previous = beforeById.get(id);
+      if (!previous) return entity;
+      if (JSON.stringify(stable(protectedDepositSnapshot(previous))) !== JSON.stringify(stable(protectedDepositSnapshot(entity)))) {
+        throw new ConflictException('Условия созданной депозитной программы нельзя изменять. Создайте новую программу.');
+      }
+      return entity;
+    });
+  }
+
   private async assertInvestmentMutationAllowed(tenantId: string, before: unknown[], after: unknown[]) {
     const beforeById = new Map<string, JsonObject>(
       before
@@ -174,9 +208,9 @@ export class AuxiliaryStateService {
     const current = normalize(row.data);
     const value = objectValue(body).value;
     const requested = Array.isArray(value) ? clone(value) : [];
-    const next = key === 'investments'
-      ? this.protectInvestmentAgreements(current.investments, requested)
-      : requested;
+    let next = requested;
+    if (key === 'investments') next = this.protectInvestmentAgreements(current.investments, requested);
+    if (key === 'depositPrograms') next = this.protectDepositPrograms(current.depositPrograms, requested);
     if (key === 'investments') {
       await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
     }
