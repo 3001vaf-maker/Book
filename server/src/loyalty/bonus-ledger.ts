@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
@@ -8,7 +9,6 @@ type BonusLot = {
   operation: JsonObject;
   remaining: number;
   expiresAt: string;
-  workingAt: string;
 };
 
 function clone<T>(value: T): T {
@@ -42,7 +42,7 @@ function json(value: unknown): Prisma.InputJsonValue {
 }
 
 function id(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${randomUUID()}`;
 }
 
 function stateParts(value: unknown) {
@@ -50,10 +50,6 @@ function stateParts(value: unknown) {
   state.personalAccounts = Array.isArray(state.personalAccounts) ? state.personalAccounts.map((item: unknown) => clone(objectValue(item))) : [];
   state.accountOperations = Array.isArray(state.accountOperations) ? state.accountOperations.map((item: unknown) => clone(objectValue(item))) : [];
   return state;
-}
-
-function accountIdForPerson(state: JsonObject, personKey: string) {
-  return text(state.personalAccounts.find((item: JsonObject) => text(item.personKey) === personKey)?.id);
 }
 
 function ensureAccount(state: JsonObject, personKey: string) {
@@ -152,12 +148,7 @@ export function reconcileBonusLedger(value: unknown, at: Date = new Date()) {
     const direction = text(operation.direction);
     const amount = positive(operation.amount);
     if (direction === 'credit' && amount > 0) {
-      lots.push({
-        operation,
-        remaining: amount,
-        expiresAt: text(operation.expiresAt),
-        workingAt: text(operation.workingAt),
-      });
+      lots.push({ operation, remaining: amount, expiresAt: text(operation.expiresAt) });
     } else if (direction === 'debit' && amount > 0) {
       if (Array.isArray(operation.allocations) && operation.allocations.length) {
         applyExplicitAllocations(lots, operation.allocations, atMs);
@@ -171,8 +162,10 @@ export function reconcileBonusLedger(value: unknown, at: Date = new Date()) {
   for (const account of state.personalAccounts) {
     const accountId = text(account.id);
     const lots = lotsByAccount.get(accountId) || [];
-    account.bonusBalance = availableBalance(lots, nowMs);
-    account.updatedAt = new Date().toISOString();
+    const previous = positive(account.bonusBalance);
+    const next = availableBalance(lots, nowMs);
+    account.bonusBalance = next;
+    if (Math.abs(previous - next) > 0.000001) account.updatedAt = new Date().toISOString();
     for (const lot of lots) lot.operation.remaining = Math.max(0, lot.remaining);
   }
   return state;
@@ -201,10 +194,8 @@ export async function writeLoyaltyState(db: Db, tenantId: string, auxiliary: Jso
 
 export async function loyaltyBonusBalance(db: Db, tenantId: string, personKey: string, at: Date = new Date()) {
   const { loyalty } = await readLoyaltyState(db, tenantId);
-  const accountId = accountIdForPerson(loyalty, text(personKey));
-  if (!accountId) return 0;
-  const reconciled = reconcileBonusLedger(loyalty, at);
-  return positive(reconciled.personalAccounts.find((item: JsonObject) => text(item.id) === accountId)?.bonusBalance);
+  const account = loyalty.personalAccounts.find((item: JsonObject) => text(item.personKey) === text(personKey));
+  return positive(account?.bonusBalance);
 }
 
 export async function consumeLoyaltyBonus(db: Db, tenantId: string, {
@@ -219,20 +210,20 @@ export async function consumeLoyaltyBonus(db: Db, tenantId: string, {
   occurredAt: Date;
 }) {
   const requested = positive(amount);
-  if (requested <= 0) return { amount: 0, balanceAfter: 0, operationId: '' };
+  if (requested <= 0) return { amount: 0, balanceAfter: 0, operationId: '', allocations: [] };
   const { auxiliary, loyalty: raw } = await readLoyaltyState(db, tenantId);
   const loyalty = reconcileBonusLedger(raw, occurredAt);
   const account = ensureAccount(loyalty, personKey);
-  const lots = loyalty.accountOperations
-    .filter((operation: JsonObject) => text(operation.accountId) === text(account.id) && text(operation.nominal) === 'bonus' && text(operation.direction) === 'credit')
+  const lots: BonusLot[] = loyalty.accountOperations
+    .filter((operation: JsonObject) => text(operation.accountId) === text(account.id)
+      && text(operation.nominal) === 'bonus'
+      && text(operation.direction) === 'credit')
     .map((operation: JsonObject) => ({
       operation,
       remaining: positive(operation.remaining == null ? operation.amount : operation.remaining),
       expiresAt: text(operation.expiresAt),
-      workingAt: text(operation.workingAt),
     }));
-  const atMs = occurredAt.getTime();
-  const allocations = allocateDebit(lots, requested, atMs);
+  const allocations = allocateDebit(lots, requested, occurredAt.getTime());
   const auditAt = new Date().toISOString();
   const operationId = id('loyalty-payment');
   loyalty.accountOperations.push({
@@ -352,16 +343,33 @@ export async function restoreLoyaltyBonus(db: Db, tenantId: string, {
   return { amount: requested, operations: restored };
 }
 
+export async function removeLoyaltyFinanceOperations(db: Db, tenantId: string, financeOperationIds: string[]) {
+  const ids = new Set((Array.isArray(financeOperationIds) ? financeOperationIds : []).map(text).filter(Boolean));
+  if (!ids.size) return { removed: 0 };
+  const { auxiliary, loyalty: raw } = await readLoyaltyState(db, tenantId);
+  const loyalty = stateParts(raw);
+  const before = loyalty.accountOperations.length;
+  loyalty.accountOperations = loyalty.accountOperations.filter((operation: JsonObject) => {
+    const financeId = text(operation.financeOperationId);
+    const sourceId = text(operation.sourceId);
+    return !ids.has(financeId) && !ids.has(sourceId);
+  });
+  const removed = before - loyalty.accountOperations.length;
+  if (removed) await writeLoyaltyState(db, tenantId, auxiliary, loyalty);
+  return { removed };
+}
+
 export async function loyaltyForPerson(db: Db, tenantId: string, personKeys: string[]) {
   const keys = new Set((Array.isArray(personKeys) ? personKeys : []).map(text).filter(Boolean));
-  const { auxiliary, loyalty: raw } = await readLoyaltyState(db, tenantId);
+  const { loyalty: raw } = await readLoyaltyState(db, tenantId);
   const loyalty = reconcileBonusLedger(raw);
-  await writeLoyaltyState(db, tenantId, auxiliary, loyalty);
   const accounts = loyalty.personalAccounts.filter((account: JsonObject) => keys.has(text(account.personKey)));
   const accountIds = new Set(accounts.map((account: JsonObject) => text(account.id)));
-  const assignments = (Array.isArray(loyalty.assignments) ? loyalty.assignments : []).filter((assignment: JsonObject) => keys.has(text(assignment.personKey)));
+  const assignments = (Array.isArray(loyalty.assignments) ? loyalty.assignments : [])
+    .filter((assignment: JsonObject) => keys.has(text(assignment.personKey)));
   const instances = ['deposits', 'certificates', 'subscriptions'].flatMap((collection) =>
-    (Array.isArray(loyalty[collection]) ? loyalty[collection] : []).filter((item: JsonObject) => keys.has(text(item.personKey))));
+    (Array.isArray(loyalty[collection]) ? loyalty[collection] : [])
+      .filter((item: JsonObject) => keys.has(text(item.personKey))));
   const programs = ['referralPrograms', 'bonusPrograms'].flatMap((collection) => Array.isArray(loyalty[collection]) ? loyalty[collection] : []);
   const visiblePrograms = programs.filter((program: JsonObject) => {
     const kind = text(program.kind);
