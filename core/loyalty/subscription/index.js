@@ -1,6 +1,7 @@
 import {
   datePicker,
   emptyState,
+  entityCardStack,
   field,
   formValidationMessage,
   initDatePickers,
@@ -21,7 +22,9 @@ import {
   availablePeople,
   bindViewSettings,
   formObject,
+  loyaltyCardFields,
   loyaltyHeader,
+  loyaltyVisualCard,
   money,
   mockPerson,
   notifyLoyaltyContext,
@@ -81,6 +84,32 @@ function frequencyLabel(program = {}) {
   return `Не более ${count} в неделю`;
 }
 
+function programCardFields(program = {}) {
+  return loyaltyCardFields({
+    title: program.name || 'Абонемент',
+    subtitle: compositionLabel(program),
+    status: program.status === 'active' ? 'Активен' : 'Закрыт',
+    metaLeft: program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || '—'),
+    metaRight: money(program.price),
+  });
+}
+
+function instanceProgress(instance = {}, program = {}) {
+  if (program.compositionMode === 'unlimited') return 'Безлимит';
+  const initial = Math.max(0, Number(instance.used || 0) + Number(instance.remaining || 0));
+  return `${Math.max(0, Number(instance.used || 0))} из ${initial}`;
+}
+
+function instanceCardFields(instance = {}, program = {}) {
+  return loyaltyCardFields({
+    title: instance.personName || 'Без имени',
+    subtitle: program.name || 'Абонемент',
+    status: instance.status === 'closed' ? 'Завершён' : 'Активен',
+    metaLeft: program.compositionMode === 'unlimited' ? 'Безлимит' : `Осталось ${Math.max(0, Number(instance.remaining || 0))}`,
+    metaRight: instanceProgress(instance, program),
+  });
+}
+
 function programInfo(program = {}) {
   return v2ListEntries([
     ['Цена', money(program.price)],
@@ -93,12 +122,6 @@ function programInfo(program = {}) {
     ['Условия', program.description || '—'],
     ['Состояние', program.status === 'active' ? 'Активен' : 'Закрыт'],
   ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
-}
-
-function instanceProgress(instance = {}, program = {}) {
-  if (program.compositionMode === 'unlimited') return 'Безлимит';
-  const initial = Math.max(0, Number(instance.used || 0) + Number(instance.remaining || 0));
-  return `${Math.max(0, Number(instance.used || 0))} из ${initial}`;
 }
 
 function instanceInfo(instance = {}, program = {}) {
@@ -301,12 +324,7 @@ async function openProgramLayer(root, programId, onChanged) {
       v2ListEntries([
         v2ListEntry({ title: 'Условия программы', subtitle: compositionLabel(program), rightTop: '[i]', interactive: true, initial: '', data: 'data-subscription-info', aria: 'Открыть условия программы' }),
       ]),
-      v2Section('Участники', issued.length ? v2ListEntries(issued.map((item) => v2ListEntry({
-        title: item.personName || 'Без имени',
-        subtitle: item.status === 'closed' ? 'Завершён' : 'Активен',
-        rightTop: instanceProgress(item, program),
-        interactive: true,
-        initial: (item.personName || '?').slice(0, 1).toUpperCase(),
+      v2Section('Участники', issued.length ? entityCardStack(issued.map((item) => loyaltyVisualCard('subscription', instanceCardFields(item, program), {
         data: `data-subscription-instance="${item.id}"`,
         aria: `Открыть абонемент ${item.personName || ''}`,
       }))) : emptyState('Экземпляров пока нет', 'Оформите абонемент конкретному человеку.')),
@@ -325,23 +343,23 @@ async function openProgramLayer(root, programId, onChanged) {
 
 export async function renderSubscription(root) {
   const render = async () => {
+    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
+      data: `data-subscription-program="${program.id}"`,
+      aria: `Открыть ${program.name}`,
+    }))) : emptyState('Абонементов пока нет', 'Создайте первую программу кнопкой «+».');
+
     root.innerHTML = page([
       loyaltyHeader('Абонемент', {
         settings: true,
         c: { label: '+', data: 'data-subscription-create', aria: 'Создать программу абонемента' },
       }),
-      programs.length ? v2ListEntries(programs.map((program) => v2ListEntry({
-        title: program.name,
-        subtitle: compositionLabel(program),
-        rightTop: money(program.price),
-        rightBottom: program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || ''),
-        interactive: true,
-        initial: program.name.slice(0, 1).toUpperCase(),
-        data: `data-subscription-program="${program.id}"`,
-        aria: `Открыть ${program.name}`,
-      }))) : emptyState('Абонементов пока нет', 'Создайте первую программу кнопкой «+».')
+      cards,
     ]);
-    bindViewSettings(root, 'Абонемент');
+    bindViewSettings(root, 'Абонемент', {
+      type: 'subscription',
+      fields: () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termValue: '12 месяцев', status: 'active' }),
+      onSaved: render,
+    });
     root.querySelector('[data-subscription-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
     root.querySelectorAll('[data-subscription-program]').forEach((node) => node.addEventListener('click', () => openProgramLayer(root, text(node.dataset.subscriptionProgram), render)));
     notifyLoyaltyContext();
