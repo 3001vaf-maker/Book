@@ -1,13 +1,23 @@
 import {
-  openNotice,
+  entityVisualCard,
+  openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
   v2ListEntries,
   v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
 import { getProfile } from '../profile/data.js';
+import {
+  loyaltyCardAppearance,
+  loyaltyCardFields,
+  loyaltyCardLabel,
+  loyaltyCardPhoto,
+  loyaltyCardPhotoPosition,
+  loyaltyCardScope,
+} from './card-presentation.js';
 
 export const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 export const text = (value) => String(value ?? '').trim();
@@ -41,18 +51,59 @@ export function loyaltyHeader(title, { settings = false, c = null, settingsData 
   });
 }
 
-export function bindViewSettings(root, title) {
+export function loyaltyVisualCard(type, fields, { data = '', aria = '', interactive = true } = {}) {
+  return entityVisualCard({
+    appearance: loyaltyCardAppearance(type),
+    fields,
+    image: loyaltyCardPhoto(type),
+    imagePosition: loyaltyCardPhotoPosition(type),
+    interactive,
+    data,
+    aria,
+  });
+}
+
+export function openLoyaltyAppearanceQ(root, {
+  type,
+  fields = loyaltyCardFields({ title: loyaltyCardLabel(type), subtitle: loyaltyCardLabel(type), status: 'Активна' }),
+  onSaved = () => {},
+} = {}) {
+  const scope = loyaltyCardScope(type);
+  const label = loyaltyCardLabel(type);
+  const resolveFields = typeof fields === 'function' ? fields : () => fields;
+  return openEntityCardAppearanceQ(root, {
+    title: 'Вид',
+    typeLabel: 'Тип карты',
+    typeOptions: [{ value: scope, label }],
+    initialType: scope,
+    targetOptions: () => [],
+    allowPhoto: true,
+    resolve: () => ({
+      appearance: loyaltyCardAppearance(type),
+      fields: resolveFields(),
+      photo: loyaltyCardPhoto(type),
+      photoPosition: loyaltyCardPhotoPosition(type),
+    }),
+    save: async ({ appearance, photo, editor }) => {
+      const current = getCardAppearanceTemplate(scope);
+      saveCardAppearanceTemplate(scope, {
+        appearance,
+        photo,
+        photoPosition: editor?.photoPosition || current?.photoPosition || loyaltyCardPhotoPosition(type),
+      });
+    },
+    onSaved,
+  });
+}
+
+export function bindViewSettings(root, title, { type, fields, onSaved = () => {} } = {}) {
   root?.querySelector?.('[data-loyalty-e-settings]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title,
       actions: [{
         id: 'appearance',
-        label: 'Вид карты',
-        onSelect: () => openNotice({
-          title: 'Вид карты',
-          message: 'Используется общий механизм вида карт. Бизнес-данные программы здесь не изменяются.',
-          surface: 'app',
-        }),
+        label: 'Вид',
+        onSelect: () => openLoyaltyAppearanceQ(root, { type, fields, onSaved }),
       }],
     });
   });
@@ -106,3 +157,5 @@ export function availablePeople(fallback = []) {
   const values = people();
   return values.length ? values : fallback;
 }
+
+export { loyaltyCardFields };
