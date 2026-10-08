@@ -24,7 +24,7 @@ const percentText = (value) => {
   return String(Math.round(number * 100) / 100);
 };
 
-const discountOptions = [
+const percentOptions = [
   { value: '', label: '—' },
   ...Array.from({ length: 100 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}%` })),
 ];
@@ -76,9 +76,9 @@ function paymentProcedureBlock(procedure, index) {
   return `<div class="payment-item-section" data-payment-procedure="${index}" data-payment-source-type="${escapeHtml(procedure?.sourceType || 'procedure')}" data-payment-source-id="${escapeHtml(procedure?.id || '')}" data-payment-name="${escapeHtml(itemName)}" data-payment-correction-mode="${correction.mode}" data-payment-price-percent="${escapeHtml(percentText(pricePercent))}">
     ${paymentItemHeader(itemName)}
     <div class="payment-edit-grid">
-      ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-price' })}
+      ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', readonly: true, data: 'data-payment-price' })}
       ${pricePercent > 0 ? field({ label: 'Условие', value: `${percentText(pricePercent)}%`, disabled: true, data: 'data-payment-price-condition' }) : ''}
-      ${select({ label: 'Ручная коррекция %', value: correction.mode === 'percent' ? percentText(correction.percent) : '', options: discountOptions, className: 'ui-select--center', data: 'data-payment-correction-percent', aria: 'Ручная коррекция цены в процентах' })}
+      ${select({ label: 'Ручная коррекция %', value: correction.mode === 'percent' ? percentText(correction.percent) : '', options: percentOptions, className: 'ui-select--center', data: 'data-payment-correction-percent', aria: 'Ручная коррекция цены в процентах' })}
       ${field({ label: 'Ручная коррекция ₽', value: correction.mode === 'money' ? moneyText(correction.money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-correction-money' })}
     </div>
   </div>`;
@@ -190,7 +190,7 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
     row.dataset.paymentPricePercent = percentText(pricePercent);
     row.dataset.paymentCorrectionMode = correction.mode;
     const { priceInput, percentInput, moneyInput } = rowValues(row);
-    if (priceInput && priceInput !== preserve) priceInput.value = moneyText(item.price);
+    if (priceInput) priceInput.value = moneyText(item.price);
     if (percentInput !== preserve) setPercentDisplay(percentInput, correction.mode === 'percent' ? correction.percent : 0);
     if (moneyInput && moneyInput !== preserve) moneyInput.value = correction.mode === 'money' ? moneyText(correction.money) : '';
     const conditionInput = row.querySelector('[data-payment-price-condition]');
@@ -244,8 +244,7 @@ export function initPaymentForm(root, {
   };
 
   root.querySelectorAll('[data-payment-procedure]').forEach((row) => {
-    const { priceInput, percentInput, moneyInput } = rowValues(row);
-    priceInput?.addEventListener('input', () => currentState(priceInput));
+    const { percentInput, moneyInput } = rowValues(row);
     percentInput?.addEventListener('change', () => {
       row.dataset.paymentCorrectionMode = percentInput.value ? 'percent' : 'none';
       if (percentInput.value && moneyInput) moneyInput.value = '';
