@@ -34,6 +34,7 @@ const assignment = source('LOYALTY_ASSIGNMENT_CONTRACT.md');
 const finance = source('LOYALTY_FINANCE_CONTRACT.md');
 const execution = source('LOYALTY_EXECUTION_CONTRACT.md');
 const loyaltyRoot = source('core/loyalty/index.js');
+const personalAccountUI = source('core/loyalty/personal-account/index.js');
 const depositData = source('core/loyalty/deposit/data.js');
 const depositUI = source('core/loyalty/deposit/index.js');
 const core = source('core.js');
@@ -114,16 +115,19 @@ if (!/id:\s*['"]loyalty['"][^\n]*label:\s*['"]Лояльность['"]/.test(cor
   errors.push('core.js must expose top-level F Loyalty');
 }
 if (!/renderLoyaltySection/.test(core)) errors.push('core.js must route Loyalty through its owner renderer');
+if (!/from ['"]\.\/personal-account\/index\.js['"]/.test(loyaltyRoot)) {
+  errors.push('core/loyalty/index.js must route Personal Account through its dedicated owner module');
+}
 
-const personalStart = loyaltyRoot.indexOf('function renderPersonalAccount');
-const personalEnd = loyaltyRoot.indexOf('function renderCertificate');
-const personalBlock = personalStart >= 0 && personalEnd > personalStart ? loyaltyRoot.slice(personalStart, personalEnd) : '';
-if (!personalBlock) errors.push('Personal Account UI block is missing');
-if (/label:\s*['"]\+['"]|Открыть личный счёт|data-loyalty-stage-action/.test(personalBlock)) {
+if (!/export async function renderPersonalAccount/.test(personalAccountUI)) errors.push('Personal Account UI owner is missing');
+if (/label:\s*['"]\+['"]|Открыть личный счёт|data-loyalty-stage-action/.test(personalAccountUI)) {
   errors.push('Personal Account must not expose manual open/create action');
 }
-if (/бонус/i.test(personalBlock)) errors.push('Personal Account UI must not expose a bonus balance');
-if (!/Денежный остаток/.test(personalBlock)) errors.push('Personal Account UI must expose money-only balance');
+if (/бонус/i.test(personalAccountUI)) errors.push('Personal Account UI must not expose a bonus balance');
+if (!/Денежный остаток/.test(personalAccountUI)) errors.push('Personal Account UI must expose money-only balance');
+if (!/автоматически|появляется автоматически|существует/.test(personalAccountUI)) {
+  errors.push('Personal Account UI must communicate automatic existence rather than manual assignment');
+}
 
 if (/\/finance\/deposits/.test(depositData)) {
   errors.push('Deposit browser data must not use /finance/deposits as its canonical API');
