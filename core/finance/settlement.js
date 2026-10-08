@@ -1,6 +1,5 @@
 // Settlement projects amount due, paid/refunded totals and outstanding amount for a concrete source.
-// This is operational calculation, NOT the reserved future Financial Model.
-// Low-level arithmetic lives in rules.js; money persistence lives in data/service.
+// Pure arithmetic lives in rules.js; money persistence lives in Finance data/service.
 // Canonical Settlement snapshots live in Finance. Record receives finance only as a read projection.
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
@@ -13,66 +12,61 @@ import {
   calculateSettlementPaymentState,
   clampFinancialPercent,
   financialNumber,
-  isStoredSettlement,
   normalizeStoredSettlement,
   recordSettlementItems,
 } from './rules.js';
 
-function settlementWithCurrentPricePercent(settlement = null, discountPercent = 0) {
+function settlementWithCurrentPricePercent(settlement = null, pricePercent = 0) {
   if (!settlement) return null;
-  const percent = clampFinancialPercent(discountPercent);
+  const percent = clampFinancialPercent(pricePercent);
   const items = (Array.isArray(settlement.items) ? settlement.items : []).map((item) => ({
     ...item,
     pricePercent: percent,
-    discountPercent: percent,
   }));
-  return calculateSettlement(items, { discountPercent: percent });
+  return calculateSettlement(items, { pricePercent: percent });
 }
 
-export function resolveRecordSettlement(record = null, { discountPercent = null } = {}) {
-  const currentPercent = discountPercent == null
-    ? recordSettlementDiscountPercent(record?.person)
-    : clampFinancialPercent(discountPercent);
+export function resolveRecordSettlement(record = null, { pricePercent = null } = {}) {
+  const currentPercent = pricePercent == null
+    ? recordSettlementPricePercent(record?.person)
+    : clampFinancialPercent(pricePercent);
   if (record?.id) {
     const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
     if (owned) {
-      // Once a real financial fact exists the stored Settlement is historical and immutable.
-      // Before payment, current personal/program conditions may change while an explicit
-      // manual price correction remains saved, so only PRICE_PERCENT is refreshed.
+      // A paid Settlement is historical. Before payment, current person/program conditions
+      // may change while an explicit manual correction remains saved.
       const movements = getActiveDDSMovementsForSource('record', record.id);
       return movements.length ? owned : settlementWithCurrentPricePercent(owned, currentPercent);
     }
   }
-  return calculateSettlement(recordSettlementItems(record), { discountPercent: currentPercent });
+  return calculateSettlement(recordSettlementItems(record), { pricePercent: currentPercent });
 }
 
-export function getRecordSettlement(record = null, { discountPercent = null } = {}) {
-  const settlement = resolveRecordSettlement(record, { discountPercent });
+export function getRecordSettlement(record = null, { pricePercent = null } = {}) {
+  const settlement = resolveRecordSettlement(record, { pricePercent });
   if (!record?.id) return calculateSettlementTotals(settlement, []);
   return calculateSettlementTotals(settlement, getActiveDDSMovementsForSource('record', record.id));
 }
 
-export function getRecordPaymentState(record = null, { discountPercent = null } = {}) {
-  const settlement = resolveRecordSettlement(record, { discountPercent });
+export function getRecordPaymentState(record = null, { pricePercent = null } = {}) {
+  const settlement = resolveRecordSettlement(record, { pricePercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
   const state = calculateSettlementPaymentState(settlement, movements);
   const date = String(record?.date || '').slice(0, 10);
   const to = String(record?.to || record?.from || '').slice(0, 5);
   const end = date && /^\d{2}:\d{2}$/.test(to) ? new Date(`${date}T${to}:00`) : null;
   const ended = Boolean(end && Number.isFinite(end.getTime()) && Date.now() >= end.getTime());
-  const fullyDiscounted = Number(settlement?.serviceTotal || 0) > 0.009
-    && Number(settlement?.planTotal || 0) <= 0.009
-    && Number(settlement?.discountTotal || 0) + 0.009 >= Number(settlement?.serviceTotal || 0);
-  const discountPaid = fullyDiscounted && ended && record?.attendance !== 'no-show';
-  return discountPaid ? {
+  const zeroPrice = Number(settlement?.serviceTotal || 0) > 0.009 && Number(settlement?.planTotal || 0) <= 0.009;
+  const settledByPriceRules = zeroPrice && ended && record?.attendance !== 'no-show';
+  return settledByPriceRules ? {
     ...state,
     fullyPaid: true,
     partiallyPaid: false,
     remaining: 0,
-    paidByDiscount: true,
+    settledByPriceRules: true,
   } : {
     ...state,
-    paidByDiscount: false,
+    settledByPriceRules: false,
   };
 }
 
@@ -123,7 +117,7 @@ export function recordSettlementPriceCondition(person = null) {
   };
 }
 
-export function recordSettlementDiscountPercent(person = null) {
+export function recordSettlementPricePercent(person = null) {
   return recordSettlementPriceCondition(person).percent;
 }
 
@@ -132,8 +126,7 @@ export function normalizeRecordSettlement(value = null) {
   return {
     items: Array.isArray(value.items) ? value.items.map((item) => ({ ...item })) : [],
     serviceTotal: Math.max(0, financialNumber(value.serviceTotal)),
-    discountPercent: value.discountPercent == null ? null : clampFinancialPercent(value.discountPercent),
-    discountTotal: Math.max(0, financialNumber(value.discountTotal)),
+    pricePercent: value.pricePercent == null ? null : clampFinancialPercent(value.pricePercent),
     correctionTotal: Math.max(0, financialNumber(value.correctionTotal)),
     pricePercentTotal: Math.max(0, financialNumber(value.pricePercentTotal)),
     planTotal: Math.max(0, financialNumber(value.planTotal)),
@@ -146,13 +139,13 @@ export function normalizeRecordSettlement(value = null) {
 export function hydrateRecordSettlement(record = null) {
   if (!record?.id) return record;
   const condition = recordSettlementPriceCondition(record?.person);
-  const { personDiscountPercent: _discountProjection, ...cleanRecord } = record;
+  const { personDiscountPercent: _priceProjection, ...cleanRecord } = record;
   const normalizedRecord = {
     ...cleanRecord,
     procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
     products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
   };
-  const projectedSettlement = getRecordSettlement(normalizedRecord, { discountPercent: condition.percent });
+  const projectedSettlement = getRecordSettlement(normalizedRecord, { pricePercent: condition.percent });
   return {
     ...normalizedRecord,
     priceCondition: condition,
