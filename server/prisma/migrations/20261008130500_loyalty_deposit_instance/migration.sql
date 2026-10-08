@@ -193,7 +193,7 @@ BEGIN
             SELECT value FROM jsonb_array_elements(COALESCE(operation_row."data"->'depositAllocations', '[]'::jsonb))
         LOOP
             allocation_id := COALESCE(allocation->>'depositId', allocation->>'sourceId', allocation->>'id', '');
-            IF allocation_id <> '' AND NOT allocation_id = ANY(result) THEN
+            IF allocation_id <> '' AND NOT (allocation_id = ANY(result)) THEN
                 result := array_append(result, allocation_id);
             END IF;
         END LOOP;
@@ -216,7 +216,7 @@ BEGIN
     IF TG_OP <> 'INSERT' THEN
         FOREACH candidate IN ARRAY loyalty_deposit_operation_ids(OLD)
         LOOP
-            IF candidate <> '' AND NOT candidate = ANY(affected) THEN
+            IF candidate <> '' AND NOT (candidate = ANY(affected)) THEN
                 affected := array_append(affected, candidate);
             END IF;
         END LOOP;
@@ -225,7 +225,7 @@ BEGIN
     IF TG_OP <> 'DELETE' THEN
         FOREACH candidate IN ARRAY loyalty_deposit_operation_ids(NEW)
         LOOP
-            IF candidate <> '' AND NOT candidate = ANY(affected) THEN
+            IF candidate <> '' AND NOT (candidate = ANY(affected)) THEN
                 affected := array_append(affected, candidate);
             END IF;
         END LOOP;
@@ -238,7 +238,10 @@ BEGIN
         PERFORM loyalty_deposit_recalculate(tenant_id, deposit_id);
     END LOOP;
 
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
