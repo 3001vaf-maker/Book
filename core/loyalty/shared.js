@@ -259,3 +259,41 @@ export function personLabel(person = {}) {
   const display = personDisplay(person);
   return display.name || display.uei || 'Без имени';
 }
+
+export function personOption(person = {}) {
+  const display = personDisplay(person);
+  return {
+    value: String(person?.key || person?.id || ''),
+    label: [display.uei, display.name].filter(Boolean).join(' · ') || 'Без имени',
+  };
+}
+
+export function resolvePerson(personKey = '') {
+  const key = String(personKey || '');
+  return people().find((item) => String(item?.key || item?.id || '') === key) || null;
+}
+
+export function rows(items = []) {
+  return v2ListEntries(items.map((item) => v2ListEntry({
+    title: item.title || '',
+    subtitle: item.subtitle || '',
+    rightTop: item.rightTop || '',
+    rightBottom: item.rightBottom || '',
+    interactive: Boolean(item.interactive),
+    initial: item.initial ?? '',
+    image: item.image || '',
+    data: item.data || '',
+    aria: item.aria || '',
+  })));
+}
+
+export function mockPerson(name, key) {
+  return { key, name, uei: '' };
+}
+
+export function availablePeople(fallback = []) {
+  const values = people();
+  return values.length ? values : fallback;
+}
+
+export { loyaltyCardFields };
