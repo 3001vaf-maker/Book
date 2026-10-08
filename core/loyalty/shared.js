@@ -11,6 +11,7 @@ import {
   v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
@@ -96,6 +97,7 @@ export function openLoyaltyAppearanceQ(root, {
         photo,
         photoPosition: editor?.photoPosition || current?.photoPosition || loyaltyCardPhotoPosition(type),
       });
+      await flushBusinessPersistence();
     },
     onSaved,
   });
