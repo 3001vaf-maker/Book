@@ -7,22 +7,24 @@ function list(value){return Array.isArray(value)?value:[];}
 function text(value){return String(value??'').trim();}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
-function depositIdentity(item={}){
+function issuedDepositUei(item={}){
   const personUei=text(item?.person?.uei).toUpperCase();
   const programUei=text(item?.terms?.programUei||item?.programUei).toUpperCase();
   const depositId=text(item?.depositId||item?.id);
   const suffix=depositId.replace(/[^A-Za-z0-9]/g,'').slice(0,6).toUpperCase();
-  const parts=[personUei,programUei,suffix].filter(Boolean);
-  return {
-    ...clone(item),
-    personUei,
-    programUei,
-    depositUei:parts.join('-'),
-    identityKey:[personUei,programUei,depositId].join(':'),
-  };
+  return [personUei,programUei,suffix].filter(Boolean).join('-');
 }
 
-function normalizeDeposits(value){return list(value).map((item)=>depositIdentity(item));}
+function normalizeDeposits(value){
+  const seen=new Set();
+  return list(value).map((item)=>{
+    const normalized={...clone(item),depositUei:issuedDepositUei(item)};
+    if(!normalized.depositUei)return normalized;
+    if(seen.has(normalized.depositUei))throw new Error('UEI депозита уже используется другим депозитом');
+    seen.add(normalized.depositUei);
+    return normalized;
+  });
+}
 
 export function getDepositPrograms(){return programs.map((item)=>clone(item));}
 
@@ -54,7 +56,7 @@ export async function listAllDeposits(){
 
 export async function fundDeposit({programId='',person=null,amount=0,walletId='',walletName='',occurredAt=null}={}){
   if(!programId||!person?.key||!walletId||!occurredAt)return null;
-  return depositIdentity(await payload(await apiRequest('/finance/deposits/fund',{
+  const result=await payload(await apiRequest('/finance/deposits/fund',{
     method:'POST',
     body:JSON.stringify({
       programId,
@@ -64,12 +66,13 @@ export async function fundDeposit({programId='',person=null,amount=0,walletId=''
       walletName,
       occurredAt:occurredAt instanceof Date?occurredAt.toISOString():occurredAt,
     }),
-  }),'Не удалось оформить депозит'));
+  }),'Не удалось оформить депозит');
+  return normalizeDeposits([result])[0]||null;
 }
 
 export async function withdrawDeposit({depositId='',amount=0,walletId='',walletName='',reason='',occurredAt=null}={}){
   if(!depositId||!walletId||!occurredAt)return null;
-  return depositIdentity(await payload(await apiRequest(`/finance/deposits/${encodeURIComponent(depositId)}/withdraw`,{
+  const result=await payload(await apiRequest(`/finance/deposits/${encodeURIComponent(depositId)}/withdraw`,{
     method:'POST',
     body:JSON.stringify({
       amount,
@@ -78,5 +81,6 @@ export async function withdrawDeposit({depositId='',amount=0,walletId='',walletN
       reason,
       occurredAt:occurredAt instanceof Date?occurredAt.toISOString():occurredAt,
     }),
-  }),'Не удалось вернуть остаток депозита'));
+  }),'Не удалось вернуть остаток депозита');
+  return normalizeDeposits([result])[0]||null;
 }
