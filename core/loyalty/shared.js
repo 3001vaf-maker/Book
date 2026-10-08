@@ -116,6 +116,56 @@ export function bindViewSettings(root, title, { type, fields, onSaved = () => {}
   });
 }
 
+export function openLoyaltyProgramSettings({
+  title = 'Программа',
+  status = 'active',
+  onCorrect = () => {},
+  onToggle = () => {},
+  onFinish = () => {},
+  onDelete = () => {},
+} = {}) {
+  const ended = status === 'ended' || status === 'closed';
+  const actions = [
+    { id: 'correct', label: 'Корректировать', onSelect: onCorrect },
+  ];
+  if (!ended) {
+    actions.push({
+      id: 'toggle',
+      label: status === 'paused' ? 'Возобновить' : 'Приостановить',
+      onSelect: onToggle,
+    });
+    actions.push({ id: 'finish', label: 'Завершить', onSelect: onFinish });
+  }
+  actions.push({ id: 'delete', label: 'Удалить', variant: 'danger', onSelect: onDelete });
+  return openSharedProfileSettingsMenu({ title, actions });
+}
+
+export function normalizeOptionalUei(value = '') {
+  return Array.from(String(value || '').toUpperCase())
+    .filter((char) => /[A-ZА-ЯЁ0-9]/.test(char))
+    .slice(0, 4)
+    .join('');
+}
+
+export function optionalUeiField({ name = 'uei', value = '' } = {}) {
+  return field({
+    label: 'UEI',
+    name,
+    value: normalizeOptionalUei(value),
+    maxlength: 4,
+    autocomplete: 'off',
+  });
+}
+
+export function initOptionalUeiField(root, name = 'uei') {
+  const input = root?.querySelector?.(`[name="${CSS.escape(name)}"]`);
+  if (!input || input.dataset.loyaltyUeiReady === 'true') return;
+  input.dataset.loyaltyUeiReady = 'true';
+  input.addEventListener('input', () => {
+    input.value = normalizeOptionalUei(input.value);
+  });
+}
+
 const TERM_UNIT_OPTIONS = [
   { value: 'days', label: 'Дней' },
   { value: 'months', label: 'Месяцев' },
@@ -137,7 +187,7 @@ export function loyaltyTermFields({
 } = {}) {
   const options = [{ value: 'indefinite', label: 'Бессрочно' }];
   if (allowDuration) options.push({ value: 'duration', label: 'N дней / месяцев / лет' });
-  if (allowRange) options.push({ value: 'range', label: 'С даты по дату' });
+  if (allowRange) options.push({ value: 'range', label: 'Период' });
   const resolvedMode = options.some((item) => item.value === mode) ? mode : options[0].value;
 
   const duration = allowDuration ? `<div data-loyalty-term-panel="duration" hidden>${twoColumnLayout(
@@ -147,8 +197,8 @@ export function loyaltyTermFields({
   )}</div>` : '';
 
   const range = allowRange ? `<div data-loyalty-term-panel="range" hidden>${twoColumnLayout(
-    datePicker({ label: startLabel, name: `${prefix}StartDate`, value: startDate, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: true }),
-    datePicker({ label: endLabel, name: `${prefix}EndDate`, value: endDate, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: true }),
+    datePicker({ label: startLabel, name: `${prefix}StartDate`, value: startDate, showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: true }),
+    datePicker({ label: endLabel, name: `${prefix}EndDate`, value: endDate, showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: true }),
     { ariaLabel: `${label}: даты` },
   )}</div>` : '';
 
@@ -190,7 +240,7 @@ export function loyaltyTermData(values = {}, prefix = 'term') {
   if (mode === 'range') {
     const startDate = text(values[`${prefix}StartDate`]);
     const endDate = text(values[`${prefix}EndDate`]);
-    const label = startDate && endDate ? `${startDate} — ${endDate}` : startDate ? `С ${startDate}` : endDate ? `До ${endDate}` : 'Срок не задан';
+    const label = startDate && endDate ? `${startDate} — ${endDate}` : startDate ? `С ${startDate}` : endDate ? `До ${endDate}` : 'Период не задан';
     return { type: 'range', count: 0, unit: '', startDate, endDate, label };
   }
   return { type: 'indefinite', count: 0, unit: '', startDate: '', endDate: '', label: 'Бессрочно' };

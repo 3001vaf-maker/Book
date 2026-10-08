@@ -82,12 +82,7 @@ function monthDayLabel(value) {
   return date ? MONTH_DAY_FORMATTER.format(date) : '';
 }
 
-function normalizeModalVariant(value = '') {
-  const variant = String(value || '').trim();
-  if (variant === 'bottom') return 'x';
-  if (variant === 'top') return 's';
-  if (variant === 'standard') return 'q';
-  if (variant === 'x' || variant === 's' || variant === 'q' || variant === 'technical') return variant;
+function normalizeModalVariant() {
   return 'q';
 }
 
@@ -394,7 +389,7 @@ function openMonthDayPicker(host) {
   if (!hidden) return;
   const current = parseMonthDay(hidden.value);
   const content = `<div class="modal-title"><h2>${escapeHtml(host.querySelector(':scope > span')?.textContent || 'Дата')}</h2></div><div data-month-day-calendar></div>${hidden.value ? `<div class="modal-actions">${button('Очистить', { data: 'data-month-day-clear', variant: 'secondary' })}</div>` : ''}`;
-  const modalRoot = mountModal(document.body, modal(content, { variant: 'x' }));
+  const modalRoot = mountModal(document.body, modal(content, { variant: 'q', title: host.querySelector(':scope > span')?.textContent || 'Дата' }));
   if (!modalRoot) return;
   const calendarRoot = modalRoot.querySelector('[data-month-day-calendar]');
   if (!calendarRoot) return;

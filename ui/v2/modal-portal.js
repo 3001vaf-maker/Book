@@ -111,14 +111,16 @@ function closeApplicationLayer(layer) {
   else layer.remove();
 }
 
+function qLayerKey(layer) {
+  if (layer?.dataset?.v2Q !== 'true') return '';
+  const explicit = String(layer.dataset.v2QKey || '').trim();
+  if (explicit) return explicit;
+  return String(layer.querySelector(':scope > .v2-layer')?.getAttribute('aria-label') || '').trim();
+}
+
 function prepareApplicationModal({ qLayer = false } = {}) {
   const layers = applicationLayers();
-  if (!layers.length) return;
-
-  if (qLayer) {
-    [...layers].reverse().forEach(closeApplicationLayer);
-    return;
-  }
+  if (!layers.length || qLayer) return;
 
   const current = layers.at(-1);
   if (current?.dataset.v2Q === 'true') return;
@@ -133,6 +135,11 @@ export function mountV2Layer(html, { root = null } = {}) {
   const kind = node.dataset.v2LayerKind || 'standard';
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
+
+  if (qLayer) {
+    const key = qLayerKey(node);
+    if (key && applicationLayers().some((layer) => qLayerKey(layer) === key)) return null;
+  }
 
   if (!technical) prepareApplicationModal({ qLayer });
 
@@ -223,11 +230,12 @@ export function mountV2Layer(html, { root = null } = {}) {
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
     if (!technical) unlockV2StageInteraction(app, lockedStage);
-    releaseHeaderLock();
-    if (qLayer) {
-      app?.classList.remove('has-v2-q-modal');
-      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    const anotherQ = qLayer && applicationLayers().some((layer) => layer.dataset.v2Q === 'true');
+    if (!anotherQ) {
+      releaseHeaderLock();
+      if (qLayer) app?.classList.remove('has-v2-q-modal');
     }
+    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
   const handleOutsidePointerDown = (event) => {

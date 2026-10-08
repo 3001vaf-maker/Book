@@ -32,46 +32,45 @@ import {
   availablePeople,
   bindViewSettings,
   formObject,
+  initOptionalUeiField,
   loyaltyCardFields,
   loyaltyHeader,
   loyaltyVisualCard,
   money,
-  mockPerson,
   notifyLoyaltyContext,
+  normalizeOptionalUei,
+  openLoyaltyProgramSettings,
+  optionalUeiField,
   personLabel,
   personOption,
   text,
   uid,
 } from '../shared.js';
 
-const fallbackPeople = [
-  mockPerson('Иван Петров', 'mock-person-1'),
-  mockPerson('Анна Иванова', 'mock-person-2'),
-  mockPerson('Мария Смирнова', 'mock-person-3'),
-];
+const fallbackPeople = [];
 
 let programs = [
   {
-    id: 'subscription-10', name: '10 посещений', description: 'Десять использований выбранной позиции.', price: 30000,
+    id: 'subscription-10', uei: '', name: '10 посещений', description: 'Десять использований выбранной позиции.', price: 30000,
     compositionMode: 'common-limit', procedureIds: [], procedureNames: ['Стрижка'], commonLimit: 10, quantityByProcedure: {},
     termType: 'duration', termCount: 12, termUnit: 'months', termEndDate: '', termValue: '12 мес.', startRule: 'issue', startDate: '', frequencyPeriod: 'none', frequencyLimit: 0,
     multiplePerEvent: false, status: 'active', createdAt: '2026-10-01T10:00:00.000Z',
   },
   {
-    id: 'subscription-unlimited', name: 'Годовой безлимит', description: 'Безлимит по выбранным позициям.', price: 90000,
+    id: 'subscription-unlimited', uei: '', name: 'Годовой безлимит', description: 'Безлимит по выбранным позициям.', price: 90000,
     compositionMode: 'unlimited', procedureIds: [], procedureNames: ['Уход', 'Стрижка'], commonLimit: 0, quantityByProcedure: {},
     termType: 'duration', termCount: 12, termUnit: 'months', termEndDate: '', termValue: '12 мес.', startRule: 'first-use', startDate: '', frequencyPeriod: 'week', frequencyLimit: 2,
     multiplePerEvent: true, status: 'active', createdAt: '2026-10-02T10:00:00.000Z',
   },
 ];
 
-let instances = [
-  { id: 'subscription-instance-1', programId: 'subscription-10', personKey: 'mock-person-2', personName: 'Анна Иванова', issuedAt: '2026-10-03T12:00:00.000Z', used: 3, remaining: 7, status: 'active', startsAt: '2026-10-03', expiresAt: '2027-10-03', history: [
-    { title: 'Использование', procedure: 'Стрижка', occurredAt: '2026-10-05T12:00:00.000Z' },
-    { title: 'Использование', procedure: 'Стрижка', occurredAt: '2026-10-06T12:00:00.000Z' },
-    { title: 'Использование', procedure: 'Стрижка', occurredAt: '2026-10-07T12:00:00.000Z' },
-  ] },
-];
+let instances = [];
+
+function statusLabel(status = '') {
+  if (status === 'paused') return 'Приостановлен';
+  if (status === 'ended' || status === 'closed') return 'Завершён';
+  return 'Активен';
+}
 
 function compositionLabel(program = {}) {
   if (program.compositionMode === 'unlimited') return 'Безлимит';
@@ -96,7 +95,7 @@ function frequencyLabel(program = {}) {
 
 function termLabel({ termType = 'indefinite', termCount = 0, termUnit = 'months', termEndDate = '' } = {}) {
   if (termType === 'indefinite') return 'Бессрочно';
-  if (termType === 'date') return termEndDate ? `До ${termEndDate}` : 'До даты';
+  if (termType === 'date') return termEndDate ? `До ${termEndDate}` : 'Период';
   const count = Math.max(1, Number(termCount || 1));
   const unit = termUnit === 'days' ? 'дн.' : termUnit === 'years' ? 'лет' : 'мес.';
   return `${count} ${unit}`;
@@ -104,9 +103,10 @@ function termLabel({ termType = 'indefinite', termCount = 0, termUnit = 'months'
 
 function programCardFields(program = {}) {
   return loyaltyCardFields({
+    uei: program.uei || '',
     title: program.name || 'Абонемент',
     subtitle: compositionLabel(program),
-    status: program.status === 'active' ? 'Активен' : 'Закрыт',
+    status: statusLabel(program.status),
     metaLeft: program.termValue || termLabel(program),
     metaRight: money(program.price),
   });
@@ -120,6 +120,7 @@ function instanceProgress(instance = {}, program = {}) {
 
 function programConditions(program = {}) {
   return [
+    `UEI: ${program.uei || '—'}`,
     `Цена: ${money(program.price)}`,
     `Состав: ${compositionLabel(program)}`,
     `Позиции Сервиса: ${(program.procedureNames || []).filter(Boolean).join(' · ') || 'Не выбраны'}`,
@@ -127,7 +128,7 @@ function programConditions(program = {}) {
     `Начало срока: ${startLabel(program.startRule)}${program.startRule === 'date' && program.startDate ? ` — ${program.startDate}` : ''}`,
     `Частота: ${frequencyLabel(program)}`,
     `Несколько единиц за событие: ${program.multiplePerEvent ? 'Разрешено' : 'Нет'}`,
-    `Состояние: ${program.status === 'active' ? 'Активен' : 'Закрыт'}`,
+    `Состояние: ${statusLabel(program.status)}`,
     '',
     program.description || 'Дополнительные условия не указаны.',
   ].join('\n');
@@ -171,20 +172,18 @@ function issuedList(items = [], program = {}) {
 }
 
 function openConditions(program = {}) {
-  return openDocumentViewer({
-    title: program.name || 'Условия абонемента',
-    content: programConditions(program),
-  });
+  return openDocumentViewer({ title: program.name || 'Условия абонемента', content: programConditions(program) });
 }
 
 function procedures() {
   return getProcedures().map((item) => ({ id: String(item.id || ''), name: item.name || 'Позиция Сервиса' })).filter((item) => item.id);
 }
 
-function procedureChecklist() {
+function procedureChecklist(selected = []) {
   const items = procedures();
+  const chosen = new Set((Array.isArray(selected) ? selected : []).map(String));
   return items.length
-    ? checkList(items.map((item) => ({ value: item.id, label: item.name })), { className: 'subscription-service-list' })
+    ? checkList(items.map((item) => ({ value: item.id, label: item.name, checked: chosen.has(item.id) })), { className: 'subscription-service-list' })
     : emptyState('Позиции Сервиса пока не созданы', 'Сначала добавьте позиции в Сервис.');
 }
 
@@ -192,16 +191,18 @@ function procedureNameById(id = '') {
   return procedures().find((item) => item.id === String(id || ''))?.name || '';
 }
 
-function initSubscriptionConstructor(layer) {
+function initSubscriptionConstructor(layer, editingProgram = null) {
   const form = layer?.querySelector?.('[data-subscription-form]');
   if (!form) return;
   initDatePickers(form);
   initCheckList(form);
+  initOptionalUeiField(form);
   const composition = form.querySelector('[name="compositionMode"]');
   const termType = form.querySelector('[name="termType"]');
   const startRule = form.querySelector('[name="startRule"]');
   const frequency = form.querySelector('[name="frequencyPeriod"]');
   const quantityHost = form.querySelector('[data-subscription-quantity-fields]');
+  const initialQuantities = editingProgram?.quantityByProcedure || {};
 
   const syncQuantities = () => {
     if (!quantityHost || !composition) return;
@@ -225,7 +226,7 @@ function initSubscriptionConstructor(layer) {
       min: '1',
       step: '1',
       inputmode: 'numeric',
-      value: '1',
+      value: initialQuantities[id] || 1,
     })).join('') : '';
   };
 
@@ -276,52 +277,55 @@ function instanceDates(program = {}, issuedAt = '') {
   return { startsAt, expiresAt: startsAt ? addPeriod(startsAt, program.termCount, program.termUnit) : '' };
 }
 
-async function openCreateProgramQ(root, rerender) {
-  const layer = mountModal(root, modal(`${loyaltyHeader('Новый абонемент', {
+async function openCreateProgramQ(root, rerender, editingProgram = null) {
+  const editing = Boolean(editingProgram?.id);
+  const title = editing ? 'Корректировать абонемент' : 'Новый абонемент';
+  const layer = mountModal(root, modal(`${loyaltyHeader(title, {
     c: { label: 'Сохранить', data: 'data-subscription-save', aria: 'Сохранить программу абонемента' },
   })}
     <form class="form-grid" data-subscription-form>
-      ${field({ label: 'Название', name: 'name', required: true })}
-      ${textareaField({ label: 'Описание / условия', name: 'description' })}
-      ${field({ label: 'Цена', name: 'price', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
-      ${select({ label: 'Модель состава', name: 'compositionMode', value: 'common-limit', options: [
+      ${field({ label: 'Название', name: 'name', value: editingProgram?.name || '', required: true })}
+      ${optionalUeiField({ name: 'uei', value: editingProgram?.uei || '' })}
+      ${textareaField({ label: 'Описание / условия', name: 'description', value: editingProgram?.description || '' })}
+      ${field({ label: 'Цена', name: 'price', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: editingProgram?.price || '' })}
+      ${select({ label: 'Модель состава', name: 'compositionMode', value: editingProgram?.compositionMode || 'common-limit', options: [
         { value: 'single', label: 'Одна позиция с количеством' },
         { value: 'per-position', label: 'Несколько позиций с отдельным количеством' },
         { value: 'common-limit', label: 'Общий лимит на выбранные позиции' },
         { value: 'unlimited', label: 'Безлимит по выбранным позициям' },
       ] })}
-      <div data-subscription-service-list>${procedureChecklist()}</div>
+      <div data-subscription-service-list>${procedureChecklist(editingProgram?.procedureIds || [])}</div>
       <div data-subscription-quantity-fields hidden></div>
-      <div data-subscription-common-limit>${field({ label: 'Общий лимит', name: 'commonLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric' })}</div>
-      ${select({ label: 'Срок действия', name: 'termType', value: 'duration', options: [
-        { value: 'indefinite', label: 'Бессрочный' },
-        { value: 'duration', label: 'N дней / месяцев / лет' },
-        { value: 'date', label: 'До конкретной даты' },
+      <div data-subscription-common-limit>${field({ label: 'Общий лимит', name: 'commonLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: editingProgram?.commonLimit || '' })}</div>
+      ${select({ label: 'Срок действия', name: 'termType', value: editingProgram?.termType || 'duration', options: [
+        { value: 'indefinite', label: 'Бессрочно' },
+        { value: 'duration', label: 'Период' },
+        { value: 'date', label: 'Период до даты' },
       ] })}
       <div data-subscription-term-panel="duration">${twoColumnLayout(
-        field({ label: 'Количество', name: 'termCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '12' }),
-        select({ label: 'Период', name: 'termUnit', value: 'months', options: [{ value: 'days', label: 'Дней' }, { value: 'months', label: 'Месяцев' }, { value: 'years', label: 'Лет' }] }),
+        field({ label: 'Количество', name: 'termCount', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: editingProgram?.termCount || 12 }),
+        select({ label: 'Период', name: 'termUnit', value: editingProgram?.termUnit || 'months', options: [{ value: 'days', label: 'Дней' }, { value: 'months', label: 'Месяцев' }, { value: 'years', label: 'Лет' }] }),
         { ariaLabel: 'Срок абонемента' },
       )}</div>
-      <div data-subscription-term-panel="date" hidden>${datePicker({ label: 'Действует до', name: 'termEndDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}</div>
-      ${select({ label: 'Начало срока', name: 'startRule', value: 'issue', options: [
+      <div data-subscription-term-panel="date" hidden>${datePicker({ label: 'До', name: 'termEndDate', value: editingProgram?.termEndDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}</div>
+      ${select({ label: 'Начало срока', name: 'startRule', value: editingProgram?.startRule || 'issue', options: [
         { value: 'issue', label: 'С оформления / покупки' },
         { value: 'first-use', label: 'С первого использования' },
-        { value: 'date', label: 'С конкретной даты' },
+        { value: 'date', label: 'С даты' },
       ] })}
-      <div data-subscription-start-date hidden>${datePicker({ label: 'Дата начала', name: 'startDate', showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}</div>
-      ${select({ label: 'Ограничение частоты', name: 'frequencyPeriod', value: 'none', options: [
+      <div data-subscription-start-date hidden>${datePicker({ label: 'Дата начала', name: 'startDate', value: editingProgram?.startDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}</div>
+      ${select({ label: 'Ограничение частоты', name: 'frequencyPeriod', value: editingProgram?.frequencyPeriod || 'none', options: [
         { value: 'none', label: 'Без ограничения' },
         { value: 'day', label: 'Не более N раз в день' },
         { value: 'week', label: 'Не более N раз в неделю' },
         { value: 'month', label: 'Не более N раз в месяц' },
       ] })}
-      <div data-subscription-frequency-limit hidden>${field({ label: 'N использований', name: 'frequencyLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: '1' })}</div>
-      ${select({ label: 'Несколько единиц за одно событие', name: 'multiplePerEvent', value: 'no', options: [{ value: 'no', label: 'Нет' }, { value: 'yes', label: 'Да' }] })}
+      <div data-subscription-frequency-limit hidden>${field({ label: 'N использований', name: 'frequencyLimit', type: 'number', min: '1', step: '1', inputmode: 'numeric', value: editingProgram?.frequencyLimit || 1 })}</div>
+      ${select({ label: 'Несколько единиц за одно событие', name: 'multiplePerEvent', value: editingProgram?.multiplePerEvent ? 'yes' : 'no', options: [{ value: 'no', label: 'Нет' }, { value: 'yes', label: 'Да' }] })}
       <div class="form-error" data-subscription-error></div>
-    </form>`, { variant: 'q', surface: 'app', title: 'Новый абонемент' }));
+    </form>`, { variant: 'q', surface: 'app', title }));
   if (!layer) return null;
-  initSubscriptionConstructor(layer);
+  initSubscriptionConstructor(layer, editingProgram);
   const form = layer.querySelector('[data-subscription-form]');
   layer.querySelector('[data-subscription-save]')?.addEventListener('click', async () => {
     const error = layer.querySelector('[data-subscription-error]');
@@ -343,8 +347,10 @@ async function openCreateProgramQ(root, rerender) {
     if (values.startRule === 'date' && !values.startDate) { if (error) error.textContent = 'Укажите дату начала'; return; }
     if (values.startRule === 'date' && termType === 'date' && values.startDate > termEndDate) { if (error) error.textContent = 'Дата начала не может быть позже даты окончания'; return; }
     const frequencyLimit = values.frequencyPeriod === 'none' ? 0 : Math.max(1, Number(values.frequencyLimit || 1));
-    programs.push({
-      id: uid('subscription-program'),
+    const next = {
+      ...(editingProgram || {}),
+      id: editingProgram?.id || uid('subscription-program'),
+      uei: normalizeOptionalUei(values.uei),
       name: values.name,
       description: values.description || '',
       price: Math.max(0, Number(String(values.price || '0').replace(',', '.')) || 0),
@@ -363,9 +369,11 @@ async function openCreateProgramQ(root, rerender) {
       frequencyPeriod: values.frequencyPeriod || 'none',
       frequencyLimit,
       multiplePerEvent: values.multiplePerEvent === 'yes',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    });
+      status: editingProgram?.status || 'active',
+      createdAt: editingProgram?.createdAt || new Date().toISOString(),
+    };
+    if (editing) programs = programs.map((item) => item.id === next.id ? next : item);
+    else programs.push(next);
     layer.v2Close?.();
     await rerender?.();
   });
@@ -384,7 +392,7 @@ async function openIssueQ(root, program, rerender) {
     <form class="form-grid" data-subscription-issue-form>
       ${select({ label: 'Контакт', name: 'personKey', value: '', options })}
       ${field({ label: 'Цена', name: 'price', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: program.price || 0 })}
-      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: today, showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
+      ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: today, showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
       ${field({ label: 'Начало', name: 'startPreview', value: dates.startsAt || startLabel(program.startRule), disabled: true })}
       ${field({ label: 'Срок', name: 'termPreview', value: dates.expiresAt ? `До ${dates.expiresAt}` : (program.termValue || termLabel(program)), disabled: true })}
       <div class="form-error" data-subscription-issue-error></div>
@@ -450,16 +458,31 @@ async function openProgramLayer(root, programId, onChanged) {
   if (!layer) return null;
   const render = async () => {
     const program = programs.find((item) => item.id === programId);
-    if (!program) { layer.v2Close?.(); return; }
+    if (!program) { layer.v2Close?.(); await onChanged?.(); return; }
     const issued = instances.filter((item) => item.programId === program.id);
     layer.innerHTML = page([
       loyaltyHeader(program.name || 'Абонемент', {
-        c: { label: 'Оформить', data: 'data-subscription-issue', aria: 'Оформить абонемент' },
+        settings: true,
+        settingsData: 'data-subscription-program-settings',
+        c: program.status === 'active' ? { label: 'Оформить', data: 'data-subscription-issue', aria: 'Оформить абонемент' } : null,
       }),
       v2Section('Участники', issuedList(issued, program)),
     ]);
     setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-subscription-info', aria: 'Условия абонемента' })]);
     layer.querySelector('[data-subscription-info]')?.addEventListener('click', () => openConditions(program));
+    layer.querySelector('[data-subscription-program-settings]')?.addEventListener('click', () => openLoyaltyProgramSettings({
+      title: program.name || 'Абонемент',
+      status: program.status,
+      onCorrect: () => openCreateProgramQ(root, async () => { await render(); await onChanged?.(); }, program),
+      onToggle: async () => { program.status = program.status === 'paused' ? 'active' : 'paused'; await render(); await onChanged?.(); },
+      onFinish: async () => { program.status = 'ended'; await render(); await onChanged?.(); },
+      onDelete: async () => {
+        programs = programs.filter((item) => item.id !== program.id);
+        instances = instances.filter((item) => item.programId !== program.id);
+        layer.v2Close?.();
+        await onChanged?.();
+      },
+    }));
     layer.querySelector('[data-subscription-issue]')?.addEventListener('click', () => openIssueQ(root, program, async () => {
       await render();
       await onChanged?.();
