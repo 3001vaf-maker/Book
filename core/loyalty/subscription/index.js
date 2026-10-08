@@ -1,16 +1,22 @@
 import {
   datePicker,
+  details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
   initDatePickers,
+  miniCard,
+  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
+  smallActionButton,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -100,54 +106,63 @@ function instanceProgress(instance = {}, program = {}) {
   return `${Math.max(0, Number(instance.used || 0))} из ${initial}`;
 }
 
-function instanceCardFields(instance = {}, program = {}) {
-  return loyaltyCardFields({
-    title: instance.personName || 'Без имени',
-    subtitle: program.name || 'Абонемент',
-    status: instance.status === 'closed' ? 'Завершён' : 'Активен',
-    metaLeft: program.compositionMode === 'unlimited' ? 'Безлимит' : `Осталось ${Math.max(0, Number(instance.remaining || 0))}`,
-    metaRight: instanceProgress(instance, program),
-  });
-}
-
-function programInfo(program = {}) {
-  return v2ListEntries([
-    ['Цена', money(program.price)],
-    ['Состав', compositionLabel(program)],
-    ['Позиции Сервиса', (program.procedureNames || []).filter(Boolean).join(' · ') || 'Не выбраны'],
-    ['Срок', program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || '—')],
-    ['Начало срока', startLabel(program.startRule)],
-    ['Частота', frequencyLabel(program)],
-    ['Несколько единиц за событие', program.multiplePerEvent ? 'Разрешено' : 'Нет'],
-    ['Условия', program.description || '—'],
-    ['Состояние', program.status === 'active' ? 'Активен' : 'Закрыт'],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+function programConditions(program = {}) {
+  return [
+    `Цена: ${money(program.price)}`,
+    `Состав: ${compositionLabel(program)}`,
+    `Позиции Сервиса: ${(program.procedureNames || []).filter(Boolean).join(' · ') || 'Не выбраны'}`,
+    `Срок: ${program.termType === 'indefinite' ? 'Бессрочно' : (program.termValue || '—')}`,
+    `Начало срока: ${startLabel(program.startRule)}`,
+    `Частота: ${frequencyLabel(program)}`,
+    `Несколько единиц за событие: ${program.multiplePerEvent ? 'Разрешено' : 'Нет'}`,
+    `Состояние: ${program.status === 'active' ? 'Активен' : 'Закрыт'}`,
+    '',
+    program.description || 'Дополнительные условия не указаны.',
+  ].join('\n');
 }
 
 function instanceInfo(instance = {}, program = {}) {
-  return v2ListEntries([
-    ['Владелец', instance.personName || '—'],
-    ['Программа', program.name || '—'],
-    ['Дата оформления', shortDateTime(instance.issuedAt, '—')],
-    ['Исходный состав', compositionLabel(program)],
-    ['Использовано', instanceProgress(instance, program)],
-    ['Остаток', program.compositionMode === 'unlimited' ? 'Безлимит' : String(Math.max(0, Number(instance.remaining || 0)))],
-    ['Начало', instance.startsAt || startLabel(program.startRule)],
-    ['Срок', instance.expiresAt || program.termValue || 'Бессрочно'],
-    ['Состояние', instance.status === 'closed' ? 'Завершён' : 'Активен'],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  return details([
+    { label: 'Владелец', value: instance.personName || '—' },
+    { label: 'Абонемент', value: program.name || '—' },
+    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
+    { label: 'Исходный состав', value: compositionLabel(program) },
+    { label: 'Использовано', value: instanceProgress(instance, program) },
+    { label: 'Остаток', value: program.compositionMode === 'unlimited' ? 'Безлимит' : String(Math.max(0, Number(instance.remaining || 0))) },
+    { label: 'Начало', value: instance.startsAt || startLabel(program.startRule) },
+    { label: 'Срок', value: instance.expiresAt || program.termValue || 'Бессрочно' },
+    { label: 'Состояние', value: instance.status === 'closed' ? 'Завершён' : 'Активен' },
+  ]);
 }
 
 function historyMarkup(instance = {}) {
   const history = Array.isArray(instance.history) ? instance.history : [];
-  if (!history.length) return emptyState('Использований пока нет', 'История появится после использования абонемента.');
-  return v2ListEntries([...history].reverse().map((item) => v2ListEntry({
+  if (!history.length) return emptyState('Истории пока нет', 'Использования абонемента появятся здесь.');
+  return miniCardRail([...history].reverse().map((item) => miniCard({
     title: item.title || 'Использование',
-    subtitle: item.procedure || '',
-    rightTop: shortDateTime(item.occurredAt, '—'),
-    interactive: false,
-    initial: '',
+    value: item.procedure || 'Использование',
+    subtitle: shortDateTime(item.occurredAt, '—'),
   })));
+}
+
+function issuedList(items = [], program = {}) {
+  if (!items.length) return emptyState('Участников пока нет', 'Оформите абонемент контакту.');
+  return v2ListEntries(items.map((item) => v2ListEntry({
+    title: item.personName || 'Без имени',
+    subtitle: program.compositionMode === 'unlimited' ? 'Безлимит' : `Осталось ${Math.max(0, Number(item.remaining || 0))}`,
+    rightTop: instanceProgress(item, program),
+    interactive: true,
+    initial: '',
+    data: `data-subscription-instance="${item.id}"`,
+    aria: `Открыть абонемент ${item.personName || ''}`,
+  })));
+}
+
+function openConditions(program = {}) {
+  return openDocumentViewer({
+    title: program.name || 'Условия абонемента',
+    content: programConditions(program),
+  });
 }
 
 function procedureOptions() {
@@ -246,18 +261,14 @@ async function openCreateProgramQ(root, rerender) {
   return layer;
 }
 
-function openConditionsS(root, program) {
-  return mountModal(root, modal(programInfo(program), { variant: 's', surface: 'app', title: program.name || 'Условия абонемента' }));
-}
-
 async function openIssueQ(root, program, rerender) {
   const people = availablePeople(fallbackPeople);
-  const options = [{ value: '', label: 'Выберите человека' }, ...people.map(personOption).filter((item) => item.value)];
+  const options = [{ value: '', label: 'Выберите контакт' }, ...people.map(personOption).filter((item) => item.value)];
   const layer = mountModal(root, modal(`${loyaltyHeader('Оформить абонемент', {
     c: { label: 'Оформить', data: 'data-subscription-issue-save', aria: 'Оформить абонемент' },
   })}
     <form class="form-grid" data-subscription-issue-form>
-      ${select({ label: 'Владелец', name: 'personKey', value: '', options })}
+      ${select({ label: 'Контакт', name: 'personKey', value: '', options })}
       ${field({ label: 'Цена', name: 'price', type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: program.price || 0 })}
       ${datePicker({ label: 'Дата оформления', name: 'issuedAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'bottom', modalSurface: 'app', allowClear: false })}
       ${field({ label: 'Дата начала / правило', name: 'startsAt', placeholder: startLabel(program.startRule) })}
@@ -271,7 +282,7 @@ async function openIssueQ(root, program, rerender) {
     const values = formObject(form);
     const error = layer.querySelector('[data-subscription-issue-error]');
     const person = people.find((item) => String(item?.key || item?.id || '') === String(values.personKey || ''));
-    if (!person) { if (error) error.textContent = 'Укажите владельца'; return; }
+    if (!person) { if (error) error.textContent = 'Укажите контакт'; return; }
     const total = program.compositionMode === 'unlimited'
       ? 0
       : Math.max(0, Number(program.commonLimit || 0) || Number(program.quantity1 || 0) + Number(program.quantity2 || 0));
@@ -303,8 +314,8 @@ async function openInstanceLayer(root, instanceId) {
   if (!layer) return null;
   layer.innerHTML = page([
     loyaltyHeader(program.name || 'Абонемент'),
-    v2Section('Абонемент', instanceInfo(instance, program)),
-    v2Section('История использования', historyMarkup(instance)),
+    instanceInfo(instance, program),
+    v2Section('История', historyMarkup(instance)),
   ]);
   notifyLoyaltyContext();
   return layer;
@@ -321,15 +332,10 @@ async function openProgramLayer(root, programId, onChanged) {
       loyaltyHeader(program.name || 'Абонемент', {
         c: { label: 'Оформить', data: 'data-subscription-issue', aria: 'Оформить абонемент' },
       }),
-      v2ListEntries([
-        v2ListEntry({ title: 'Условия программы', subtitle: compositionLabel(program), rightTop: '[i]', interactive: true, initial: '', data: 'data-subscription-info', aria: 'Открыть условия программы' }),
-      ]),
-      v2Section('Участники', issued.length ? entityCardStack(issued.map((item) => loyaltyVisualCard('subscription', instanceCardFields(item, program), {
-        data: `data-subscription-instance="${item.id}"`,
-        aria: `Открыть абонемент ${item.personName || ''}`,
-      }))) : emptyState('Экземпляров пока нет', 'Оформите абонемент конкретному человеку.')),
+      v2Section('Участники', issuedList(issued, program)),
     ]);
-    layer.querySelector('[data-subscription-info]')?.addEventListener('click', () => openConditionsS(root, program));
+    setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-subscription-info', aria: 'Условия абонемента' })]);
+    layer.querySelector('[data-subscription-info]')?.addEventListener('click', () => openConditions(program));
     layer.querySelector('[data-subscription-issue]')?.addEventListener('click', () => openIssueQ(root, program, async () => {
       await render();
       await onChanged?.();
