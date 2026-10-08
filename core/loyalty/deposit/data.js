@@ -1,4 +1,5 @@
 import { apiRequest } from '../../auth.js';
+import { describePriceConditionConflict, resolvePersonPriceCondition } from '../price-condition.js';
 
 let programs = [];
 let deposits = [];
@@ -132,20 +133,23 @@ export async function listAllDeposits(){
 
 async function assertPricePercentAvailable(programId='',person=null){
   const program=programs.find((item)=>text(item?.id)===text(programId))||null;
-  if(text(program?.benefitType)!=='discount'||percent(program?.benefitValue)<=0)return;
+  const incomingPercent=text(program?.benefitType)==='discount'?percent(program?.benefitValue):0;
+  if(incomingPercent<=0)return;
   const key=text(person?.key||person?.id);
   if(!key)return;
   const { getAllPeople } = await import('../../people/data.js');
   const owner=getAllPeople().find((item)=>text(item?.key||item?.id)===key)||person||{};
-  const personalPercent=percent(owner?.discountPercent);
-  if(personalPercent>0){
-    throw new Error(`У контакта уже действует личная скидка ${personalPercent}%. Сначала уберите личную скидку в профиле, затем оформите программу.`);
-  }
   await listPersonDeposits(key);
-  const active=getPersonDepositPriceConditions(key);
-  if(active.length){
-    const condition=active[0];
-    throw new Error(`У контакта уже действует скидка ${condition.percent}% по программе «${condition.name}». Одновременно может действовать только одна процентная скидка.`);
+  const incoming={
+    type:'program',
+    programType:'deposit',
+    programId:text(program?.id||programId),
+    name:text(program?.name)||'Депозит',
+    percent:incomingPercent,
+  };
+  const condition=resolvePersonPriceCondition(owner,[...getPersonDepositPriceConditions(key),incoming]);
+  if(condition.conflict){
+    throw new Error(`Процентная скидка задваивается: ${describePriceConditionConflict(condition)}. Оставьте один источник скидки и повторите оформление.`);
   }
 }
 
