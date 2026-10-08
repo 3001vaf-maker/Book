@@ -232,7 +232,7 @@ function historyMarkup(deposit = {}) {
   };
   return miniCardRail([...items].reverse().map((item) => miniCard({
     title: kindLabel(item?.kind),
-    value: `${item?.direction === 'in' ? '+' : '−'}${money(item?.amount)}`,
+    value: `${String(item?.direction || '').toUpperCase() === 'IN' ? '+' : '−'}${money(item?.amount)}`,
     subtitle: shortDateTime(item?.occurredAt, '—'),
   })));
 }
@@ -366,38 +366,38 @@ function depositBenefit(values = {}) {
   return '';
 }
 
-async function openCreateProgramQ(root, onSaved = () => {}, editingProgram = null) {
-  const editing = Boolean(editingProgram?.id);
-  const title = editing ? 'Корректировать депозит' : 'Новая депозитная программа';
-  const currentCode = editing ? programUei(editingProgram) : '';
+async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null) {
+  const copying = Boolean(sourceProgram?.id);
+  const title = copying ? 'Создать копию' : 'Новая депозитная программа';
+  const currentCode = '';
   const layer = mountModal(root, modal(`${depositHeaderContext({
     title,
     c: { label: 'Сохранить', data: 'data-deposit-program-save', aria: 'Сохранить депозитную программу' },
   })}
     <form class="form-grid" data-deposit-program-form>
-      ${field({ label: 'Название', name: 'name', value: editingProgram?.name || '', required: true })}
-      ${ueiField({ name: 'programUei', value: currentCode, required: false })}
-      ${select({ label: 'Сумма', name: 'amountMode', value: editingProgram?.amountMode || (Number(editingProgram?.amount || 0) > 0 ? 'fixed' : 'free'), options: [
+      ${field({ label: 'Название', name: 'name', value: sourceProgram?.name || '', required: true })}
+      ${ueiField({ name: 'programUei', value: '', required: false })}
+      ${select({ label: 'Сумма', name: 'amountMode', value: sourceProgram?.amountMode || (Number(sourceProgram?.amount || 0) > 0 ? 'fixed' : 'free'), options: [
         { value: 'fixed', label: 'Фиксированная сумма' },
         { value: 'free', label: 'Свободная сумма' },
       ] })}
-      <div data-deposit-amount-fixed>${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: editingProgram?.amount || '' })}</div>
-      ${select({ label: 'Срок', name: 'termMode', value: editingProgram?.termMode || 'indefinite', options: [
+      <div data-deposit-amount-fixed>${field({ label: 'Сумма программы', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: sourceProgram?.amount || '' })}</div>
+      ${select({ label: 'Срок', name: 'termMode', value: sourceProgram?.termMode || 'indefinite', options: [
         { value: 'indefinite', label: 'Бессрочно' },
         { value: 'dated', label: 'Период' },
       ] })}
       <div data-deposit-term-dates hidden>${twoColumnLayout(
-        datePicker({ label: 'С', name: 'termStartDate', value: editingProgram?.termStartDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
-        datePicker({ label: 'До', name: 'termEndDate', value: editingProgram?.termEndDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
+        datePicker({ label: 'С', name: 'termStartDate', value: sourceProgram?.termStartDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
+        datePicker({ label: 'До', name: 'termEndDate', value: sourceProgram?.termEndDate || '', showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false }),
         { ariaLabel: 'Период депозитной программы' },
       )}</div>
-      ${select({ label: 'Выгода', name: 'benefitType', value: editingProgram?.benefitType || 'none', options: [
+      ${select({ label: 'Выгода', name: 'benefitType', value: sourceProgram?.benefitType || 'none', options: [
         { value: 'none', label: 'Без дополнительной выгоды' },
         { value: 'discount', label: 'Скидка' },
         { value: 'accrual', label: 'Начисление' },
       ] })}
-      <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: editingProgram?.benefitValue || '' })}</div>
-      ${textareaField({ label: 'Условия', name: 'description', value: editingProgram?.description || '' })}
+      <div data-deposit-benefit-value hidden>${field({ label: 'Размер, %', name: 'benefitValue', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: sourceProgram?.benefitValue || '' })}</div>
+      ${textareaField({ label: 'Условия', name: 'description', value: sourceProgram?.description || '' })}
       <div class="form-error" data-deposit-program-error></div>
     </form>`, { variant: 'q', surface: 'app', title }));
   if (!layer) return null;
@@ -429,17 +429,27 @@ async function openCreateProgramQ(root, onSaved = () => {}, editingProgram = nul
       if (errorNode) errorNode.textContent = 'Дата начала не может быть позже даты окончания';
       return;
     }
+    if (copying) {
+      const sameName = String(values.name || '').trim() === String(sourceProgram?.name || '').trim();
+      const samePeriod = termMode === String(sourceProgram?.termMode || 'indefinite')
+        && termStartDate === String(sourceProgram?.termStartDate || '')
+        && termEndDate === String(sourceProgram?.termEndDate || '');
+      if (sameName && samePeriod) {
+        if (errorNode) errorNode.textContent = 'Измените название или период новой программы';
+        return;
+      }
+    }
     const benefit = depositBenefit(values);
     if (values.benefitType !== 'none' && !benefit) {
       if (errorNode) errorNode.textContent = 'Укажите размер выгоды';
       return;
     }
-    const id = editing ? editingProgram.id : uid();
+    const id = uid();
     try {
       const code = optionalProgramUei(values.programUei, currentCode);
       const now = new Date().toISOString();
       const program = {
-        ...(editingProgram || {}),
+        ...(sourceProgram || {}),
         id,
         name: values.name,
         amount,
@@ -452,20 +462,13 @@ async function openCreateProgramQ(root, onSaved = () => {}, editingProgram = nul
         benefitValue: Math.max(0, Number(String(values.benefitValue || '0').replace(',', '.')) || 0),
         benefit,
         description: values.description || '',
-        status: editingProgram?.status || 'active',
-        createdAt: editingProgram?.createdAt || now,
+        status: 'active',
+        archivedAt: null,
+        createdAt: now,
         updatedAt: now,
       };
-      const next = editing
-        ? getDepositPrograms().map((item) => String(item?.id) === String(id) ? program : item)
-        : [...getDepositPrograms(), program];
-      await saveDepositPrograms(next);
-      if (code !== currentCode) {
-        if (currentCode) {
-          try { detachUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, uei: currentCode, explicit: false }); } catch {}
-        }
-        if (code) createUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, value: code });
-      }
+      await saveDepositPrograms([...getDepositPrograms(), program]);
+      if (code) createUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id, value: code });
       layer.v2Close?.();
       await onSaved?.();
     } catch (error) {
@@ -604,6 +607,7 @@ function openProgramSettings(root, program, rerender) {
   return openLoyaltyProgramSettings({
     title: program.name || 'Депозит',
     status: program.status,
+    correctLabel: 'Создать копию',
     onCorrect: () => openCreateProgramQ(root, rerender, program),
     onToggle: async () => {
       await setProgramStatus(program.id, program.status === 'paused' ? 'active' : 'paused');
