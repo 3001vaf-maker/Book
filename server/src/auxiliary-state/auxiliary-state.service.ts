@@ -1,6 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { mergeClientLoyaltyState } from '../loyalty/settlement-projection';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 
@@ -13,10 +12,9 @@ type AuxiliaryBundle = {
   products: JsonObject[];
   productHistory: JsonObject[];
   cardAppearanceTemplates: JsonObject[];
-  loyalty: JsonObject;
 };
 
-const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates', 'loyalty']);
+const DATASETS = new Set(['wallets', 'investments', 'loans', 'tags', 'products', 'productHistory', 'cardAppearanceTemplates']);
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -40,7 +38,6 @@ function normalize(value: unknown): AuxiliaryBundle {
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),
     cardAppearanceTemplates: (Array.isArray(source.cardAppearanceTemplates) ? source.cardAppearanceTemplates : []).map((item) => clone(objectValue(item))),
-    loyalty: clone(objectValue(source.loyalty)),
   };
 }
 
@@ -50,14 +47,12 @@ function stable(value: any): any {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
 }
 
-function json(value: unknown): Prisma.InputJsonValue {
-  return clone(value) as Prisma.InputJsonValue;
+function canonical(value: AuxiliaryBundle) {
+  return JSON.stringify(stable(normalize(value)));
 }
 
-function retryable(error: unknown) {
-  const source = objectValue(error);
-  const code = text(source.code);
-  return code === 'P2034' || code === '40001';
+function json(value: unknown): Prisma.InputJsonValue {
+  return clone(value) as Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -67,23 +62,8 @@ export class AuxiliaryStateService {
     private readonly access: SaasAccessService,
   ) {}
 
-  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
-    let lastError: unknown = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await this.prisma.$transaction(work, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
-      } catch (error) {
-        lastError = error;
-        if (!retryable(error) || attempt === 2) throw error;
-      }
-    }
-    throw lastError;
-  }
-
-  private async ensureState(db: PrismaService | Prisma.TransactionClient, tenantId: string) {
-    return db.businessAuxiliaryState.upsert({
+  private async ensureState(tenantId: string) {
+    return this.prisma.businessAuxiliaryState.upsert({
       where: { tenantId },
       create: { tenantId, data: json(normalize({})) },
       update: {},
@@ -91,7 +71,7 @@ export class AuxiliaryStateService {
   }
 
   async get(tenantId: string) {
-    const row = await this.ensureState(this.prisma, tenantId);
+    const row = await this.ensureState(tenantId);
     return normalize(row.data);
   }
 
@@ -190,30 +170,18 @@ export class AuxiliaryStateService {
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     const key = text(dataset);
     if (!DATASETS.has(key)) throw new BadRequestException('Неизвестный набор связанных данных');
+    const row = await this.ensureState(tenantId);
+    const current = normalize(row.data);
     const value = objectValue(body).value;
-    const requested: JsonObject | JsonObject[] = key === 'loyalty'
-      ? clone(objectValue(value))
-      : (Array.isArray(value) ? value.map((item) => clone(objectValue(item))) : []);
-
-    return this.serializable(async (tx) => {
-      const row = await this.ensureState(tx, tenantId);
-      const current = normalize(row.data);
-      let next: JsonObject | JsonObject[] = requested;
-
-      if (key === 'loyalty') {
-        next = mergeClientLoyaltyState(current.loyalty, requested);
-      }
-      if (key === 'investments') {
-        next = this.protectInvestmentAgreements(current.investments, requested as JsonObject[]);
-        await this.assertInvestmentMutationAllowed(tenantId, current.investments, next as JsonObject[]);
-      }
-
-      (current as any)[key] = next;
-      await tx.businessAuxiliaryState.update({
-        where: { tenantId },
-        data: { data: json(current) },
-      });
-      return current;
-    });
+    const requested = Array.isArray(value) ? clone(value) : [];
+    const next = key === 'investments'
+      ? this.protectInvestmentAgreements(current.investments, requested)
+      : requested;
+    if (key === 'investments') {
+      await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
+    }
+    (current as any)[key] = next;
+    await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(current) } });
+    return current;
   }
 }

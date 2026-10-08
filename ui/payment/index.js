@@ -104,22 +104,9 @@ export function paymentForm({
   </div>`;
 }
 
-export function paymentMethods({
-  wallets = [],
-  total = 0,
-  showAction = true,
-  showTotal = true,
-  initialAllocations = [],
-  bonusAvailable = 0,
-  initialBonusAmount = 0,
-} = {}) {
+export function paymentMethods({ wallets = [], total = 0, showAction = true, showTotal = true, initialAllocations = [] } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
-  return `<div data-payment-methods
-    data-payment-total="${escapeHtml(moneyText(total))}"
-    data-payment-wallets="${walletData}"
-    data-payment-bonus-available="${escapeHtml(moneyText(bonusAvailable))}">
-    ${paymentMethodsMarkup({ wallets, total, showAction, showTotal, initialAllocations, bonusAvailable, initialBonusAmount })}
-  </div>`;
+  return `<div data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}">${paymentMethodsMarkup({ wallets, total, showAction, showTotal, initialAllocations })}</div>`;
 }
 
 function rowValues(row) {
@@ -272,8 +259,7 @@ export function initPaymentForm(root, {
 export function initPaymentMethods(root, { onPay = () => {}, onChange = () => {} } = {}) {
   if (!root) return null;
   const total = Math.max(0, numberValue(root.dataset.paymentTotal));
-  const bonusAvailable = Math.max(0, numberValue(root.dataset.paymentBonusAvailable));
   let wallets = [];
   try { wallets = JSON.parse(root.dataset.paymentWallets || '[]'); } catch { wallets = []; }
-  return initPaymentMethodsAllocation(root, { wallets, total, bonusAvailable, onPay, onChange });
+  return initPaymentMethodsAllocation(root, { wallets, total, onPay, onChange });
 }

@@ -76,4 +76,45 @@ export class FinanceController {
   special(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     return this.finance.recordSpecialOperation(request.auth!.tenantId, body);
   }
+
+
+  @Post('operations/payment')
+  payment(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.finance.recordPayment(request.auth!.tenantId, body);
+  }
+
+  @Post('operations/:operationId/refund')
+  refund(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.finance.recordRefund(request.auth!.tenantId, operationId, body);
+  }
+
+  @Put('operations/:operationId')
+  correctOperation(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.finance.correctOperation(request.auth!.tenantId, operationId, body);
+  }
+
+  @Delete('operations/:operationId/hard')
+  hardDeleteOperation(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+  ) {
+    return this.finance.hardDeleteOperation(request.auth!.tenantId, operationId);
+  }
+
+  @Post('operations/:operationId/cancel')
+  cancel(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.finance.cancelOperation(request.auth!.tenantId, operationId, body);
+  }
 }
