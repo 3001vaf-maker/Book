@@ -103,7 +103,7 @@ assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="1"/);
 assert.match(methodsHtml, /data-payment-tips-row hidden/);
-assert.match(methodsHtml, />Сохранить</>);
+assert.match(methodsHtml, />Сохранить</);
 assert.doesNotMatch(methodsHtml, /data-payment-mode|Разделить/);
 assert.doesNotMatch(methodsHtml, /type="number"[^>]*data-payment-allocation-amount/);
 
