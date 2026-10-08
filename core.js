@@ -1,6 +1,7 @@
 import { renderPeople } from './core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from './core/finance/index.js';
 import { inventoryNavigationItems, renderInventorySection } from './core/inventory/index.js';
+import { loyaltyNavigationItems, renderLoyaltySection } from './core/loyalty/index.js';
 import { renderJournal } from './journal/journal.js';
 import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
@@ -34,6 +35,7 @@ const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
   { id: 'finance', label: 'Финансы', capability: '' },
   { id: 'inventory', label: 'Склад', capability: '' },
+  { id: 'loyalty', label: 'Лояльность', capability: '' },
   { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
   { id: 'profile', label: 'Профиль', capability: '' },
@@ -52,6 +54,7 @@ const state = {
   secondary: {
     finance: 'cash',
     inventory: 'stock',
+    loyalty: 'deposit',
     settings: 'online-booking',
   },
 };
@@ -206,7 +209,7 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseBookCapability('chat.access');
-  if (section === 'finance' || section === 'inventory' || section === 'settings') {
+  if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
@@ -252,6 +255,7 @@ function activeRootSection() {
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
   if (section === 'inventory') return inventoryNavigationItems();
+  if (section === 'loyalty') return loyaltyNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
@@ -313,7 +317,6 @@ function sourceText(node, fallback = '') {
 function primarySource(surface) {
   const explicit = surface.querySelector('[data-v2-primary-action]');
   if (explicit) return explicit;
-
 
   const pageAction = surface.querySelector('.page-header-action button');
   if (pageAction) return pageAction;
@@ -459,6 +462,7 @@ function renderActiveWorkspaceSurface(surface) {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
   });
   if (section === 'inventory') return renderInventorySection(surface, ensureSecondary('inventory'));
+  if (section === 'loyalty') return renderLoyaltySection(surface, ensureSecondary('loyalty'));
   if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournal(surface, {
@@ -625,7 +629,6 @@ function renderWorkspace() {
     moduleDispose?.();
   };
 
-
   syncViewport();
 }
 
@@ -645,7 +648,6 @@ function renderSuspended() {
   });
   syncViewport();
 }
-
 
 function startRegularPlatformNotices() {
   disposePlatformNotices();
