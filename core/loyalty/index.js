@@ -64,13 +64,12 @@ function bindStageActions(root, title) {
 
 function renderPersonalAccount(root) {
   root.innerHTML = page([
-    header('Личный счёт', { settings: true, c: { label: '+', data: 'data-loyalty-stage-action', aria: 'Открыть личный счёт' } }),
+    header('Личный счёт'),
     previewRows([
-      { title: 'Иван Петров', subtitle: 'Деньги: 5 000 ₽', rightTop: '20 000 бонусов' },
-      { title: 'Анна Иванова', subtitle: 'Деньги: 0 ₽', rightTop: '1 250 бонусов' },
+      { title: 'Иван Петров', subtitle: 'Денежный остаток', rightTop: '5 000 ₽' },
+      { title: 'Анна Иванова', subtitle: 'Денежный остаток', rightTop: '0 ₽' },
     ]),
   ]);
-  bindStageActions(root, 'Личный счёт');
 }
 
 function renderCertificate(root) {
