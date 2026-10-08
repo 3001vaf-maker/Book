@@ -27,7 +27,8 @@ export {
   getRecordPaymentState,
   hydrateRecordSettlement,
   normalizeRecordSettlement,
-  recordSettlementDiscountPercent,
+  recordSettlementPriceCondition,
+  recordSettlementPricePercent,
   recordAmountDue,
   resolveRecordSettlement,
 } from './settlement.js';
