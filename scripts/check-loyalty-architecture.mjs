@@ -135,7 +135,7 @@ if (/data-loyalty-stage-action|previewCards|Интерфейс готов|виз
 }
 
 if (!/export async function renderPersonalAccount/.test(personalAccountUI)) errors.push('Personal Account UI owner is missing');
-if (/label:\s*['"]\+['"]|Открыть личный счёт|data-loyalty-stage-action/.test(personalAccountUI)) {
+if (/label:\s*['"]\+['"]|data-(?:personal-account|loyalty)-create|data-loyalty-stage-action/.test(personalAccountUI)) {
   errors.push('Personal Account must not expose manual open/create action');
 }
 if (/бонус/i.test(personalAccountUI)) errors.push('Personal Account UI must not expose a bonus balance');
