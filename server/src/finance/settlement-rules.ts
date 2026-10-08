@@ -41,15 +41,7 @@ function explicitCorrectionMode(item: JsonObject) {
   return 'none';
 }
 
-function legacyCorrectionMoney(item: JsonObject, price: number, pricePercent: number) {
-  const totalReduction = Math.min(settlementMoney(price), settlementMoney(item.discountMoney));
-  if (totalReduction <= 0) return 0;
-  const rate = settlementPercent(pricePercent) / 100;
-  if (rate >= 0.999999) return 0;
-  return settlementMoney(Math.max(0, Math.min(price, (totalReduction - price * rate) / (1 - rate))));
-}
-
-function correctionForItem(item: JsonObject, price: number, pricePercent: number) {
+function correctionForItem(item: JsonObject, price: number) {
   const mode = explicitCorrectionMode(item);
   if (mode === 'percent') {
     const value = settlementPercent(item.correctionPercent);
@@ -63,14 +55,7 @@ function correctionForItem(item: JsonObject, price: number, pricePercent: number
       money: value,
     };
   }
-
-  const hasCanonicalCorrection = item.correctionMode != null || item.correctionPercent != null || item.correctionMoney != null;
-  if (hasCanonicalCorrection) return { mode: 'none', percent: 0, money: 0 };
-
-  const reconstructed = legacyCorrectionMoney(item, price, pricePercent);
-  return reconstructed > 0
-    ? { mode: 'money', percent: price > 0 ? settlementPercent(reconstructed / price * 100) : 0, money: reconstructed }
-    : { mode: 'none', percent: 0, money: 0 };
+  return { mode: 'none', percent: 0, money: 0 };
 }
 
 function pricePercentForItem(item: JsonObject, defaultPercent: number) {
@@ -84,7 +69,7 @@ export function calculateCanonicalSettlement(values: unknown[], discountValue: u
     const item = objectValue(value);
     const price = settlementMoney(item.price ?? item.cost);
     const pricePercent = pricePercentForItem(item, defaultPercent);
-    const correction = correctionForItem(item, price, pricePercent);
+    const correction = correctionForItem(item, price);
     const correctedPrice = settlementMoney(price - correction.money);
     const pricePercentMoney = settlementMoney(Math.min(correctedPrice, correctedPrice * pricePercent / 100));
     const totalReduction = settlementMoney(correction.money + pricePercentMoney);
@@ -143,8 +128,7 @@ export function repriceCanonicalSettlement(values: unknown[], current: unknown, 
     };
     if (!prior) return { ...base, correctionMode: 'none' };
     const priorPrice = settlementMoney(prior.price ?? item.cost ?? item.price);
-    const priorPricePercent = prior.pricePercent == null ? settlementPercent(previous.discountPercent) : settlementPercent(prior.pricePercent);
-    const correction = correctionForItem(prior, priorPrice, priorPricePercent);
+    const correction = correctionForItem(prior, priorPrice);
     if (correction.mode === 'percent') return { ...base, correctionMode: 'percent', correctionPercent: correction.percent };
     if (correction.money > 0) return { ...base, correctionMode: 'money', correctionMoney: correction.money };
     return { ...base, correctionMode: 'none' };
