@@ -56,14 +56,6 @@ function percent(value: unknown) {
   return Math.max(0, Math.min(100, numberValue(value)));
 }
 
-function discountMode(item: JsonObject, defaultPercent = 0) {
-  const explicit = text(item.discountMode);
-  if (['percent', 'money', 'none'].includes(explicit)) return explicit;
-  if (item.discountPercent !== '' && item.discountPercent != null && percent(item.discountPercent) > 0) return 'percent';
-  if (item.discountMoney !== '' && item.discountMoney != null && money(item.discountMoney) > 0) return 'money';
-  return defaultPercent > 0 ? 'percent' : 'none';
-}
-
 function requiredOccurredAt(value: unknown) {
   const raw = text(value);
   if (!raw) throw new BadRequestException('Укажите фактическую дату и время операции');
@@ -87,27 +79,41 @@ function normalizeSettlement(value: unknown) {
   const items = arrayValue(source.items).map((item) => {
     const row = objectValue(item);
     const price = money(row.price ?? row.cost);
-    const discountMoney = Math.min(price, money(row.discountMoney));
-    const planAmount = Math.max(0, money(row.planAmount ?? (price - discountMoney)));
+    const hasCanonicalCorrection = row.correctionMode != null || row.correctionPercent != null || row.correctionMoney != null || row.correctedPrice != null;
+    const correctionModeValue = hasCanonicalCorrection ? text(row.correctionMode) : text(row.discountMode);
+    const correctionMode = ['percent', 'money', 'none'].includes(correctionModeValue) ? correctionModeValue : 'none';
+    const correctionPercent = percent(hasCanonicalCorrection ? row.correctionPercent : row.discountPercent);
+    const correctionMoney = Math.min(price, money(hasCanonicalCorrection ? row.correctionMoney : row.discountMoney));
+    const correctedPrice = Math.min(price, money(row.correctedPrice ?? (price - correctionMoney)));
+    const pricePercent = percent(row.pricePercent);
+    const inferredPricePercentMoney = Math.max(0, correctedPrice - money(row.planAmount ?? correctedPrice));
+    const pricePercentMoney = Math.min(correctedPrice, money(row.pricePercentMoney ?? inferredPricePercentMoney));
+    const planAmount = Math.max(0, money(row.planAmount ?? (correctedPrice - pricePercentMoney)));
     return {
       sourceType: text(row.sourceType) || 'procedure',
       sourceId: text(row.sourceId ?? row.id),
       name: text(row.name),
       price,
-      discountMode: ['percent', 'money', 'none'].includes(text(row.discountMode)) ? text(row.discountMode) : 'none',
-      discountPercent: percent(row.discountPercent),
-      discountMoney,
+      correctionMode,
+      correctionPercent,
+      correctionMoney,
+      correctedPrice,
+      pricePercent,
+      pricePercentMoney,
       planAmount,
     };
   });
-  const serviceTotal = money(source.serviceTotal ?? items.reduce((sum, item) => sum + item.price, 0));
-  const discountTotal = money(source.discountTotal ?? items.reduce((sum, item) => sum + item.discountMoney, 0));
-  const planTotal = money(source.planTotal ?? items.reduce((sum, item) => sum + item.planAmount, 0));
+  const serviceTotal = money(items.reduce((sum, item) => sum + item.price, 0));
+  const correctionTotal = money(items.reduce((sum, item) => sum + item.correctionMoney, 0));
+  const pricePercentTotal = money(items.reduce((sum, item) => sum + item.pricePercentMoney, 0));
+  const planTotal = money(items.reduce((sum, item) => sum + item.planAmount, 0));
+  const percents = [...new Set(items.map((item) => Math.round(item.pricePercent * 10000) / 10000))];
   return {
     items,
     serviceTotal,
-    discountPercent: source.discountPercent == null ? null : percent(source.discountPercent),
-    discountTotal,
+    pricePercent: source.pricePercent == null ? (percents.length === 1 ? percents[0] : null) : percent(source.pricePercent),
+    correctionTotal,
+    pricePercentTotal,
     planTotal,
   };
 }
@@ -249,55 +255,6 @@ export class FinanceService {
       }
     }
     throw lastError;
-  }
-
-  calculateSettlement(items: JsonObject[], discountValue: unknown = 0) {
-    const defaultPercent = percent(discountValue);
-    const prepared = items.map((item) => {
-      const price = money(item?.cost ?? item?.price);
-      const mode = discountMode(item, defaultPercent);
-      const selectedPercent = mode === 'percent'
-        ? percent(item?.discountPercent === '' || item?.discountPercent == null ? defaultPercent : item.discountPercent)
-        : 0;
-      const discountMoney = Math.min(price, money(mode === 'money' ? item?.discountMoney : price * selectedPercent / 100));
-      const resolvedPercent = price > 0 ? (mode === 'money' ? discountMoney / price * 100 : selectedPercent) : 0;
-      return {
-        sourceType: text(item?.sourceType) || 'procedure',
-        sourceId: text(item?.sourceId ?? item?.id),
-        name: text(item?.name),
-        price,
-        discountMode: mode,
-        discountPercent: percent(resolvedPercent),
-        discountMoney,
-        planAmount: Math.max(0, money(price - discountMoney)),
-      };
-    });
-    const percents = [...new Set(prepared.map((item) => Math.round(item.discountPercent * 10000) / 10000))];
-    return {
-      items: prepared,
-      serviceTotal: money(prepared.reduce((sum, item) => sum + item.price, 0)),
-      discountPercent: percents.length === 1 ? percents[0] : null,
-      discountTotal: money(prepared.reduce((sum, item) => sum + item.discountMoney, 0)),
-      planTotal: money(prepared.reduce((sum, item) => sum + item.planAmount, 0)),
-    };
-  }
-
-  repriceSettlement(items: JsonObject[], current: unknown, discountValue: unknown = 0) {
-    const previous = normalizeSettlement(current);
-    const priorItems = arrayValue(previous.items);
-    const bySource = new Map(priorItems.map((item) => [`${text(item?.sourceType) || 'procedure'}:${text(item?.sourceId)}`, objectValue(item)]));
-    const defaultPercent = previous.discountPercent == null ? percent(discountValue) : percent(previous.discountPercent);
-    const repriced = items.map((item) => {
-      const sourceType = text(item?.sourceType) || 'procedure';
-      const sourceId = text(item?.sourceId ?? item?.id);
-      const prior = bySource.get(`${sourceType}:${sourceId}`) || null;
-      const base = { ...item, sourceType, sourceId };
-      if (!prior) return { ...base, discountMode: defaultPercent > 0 ? 'percent' : 'none', discountPercent: defaultPercent };
-      if (prior.discountMode === 'money') return { ...base, discountMode: 'money', discountMoney: prior.discountMoney };
-      if (prior.discountMode === 'percent' || numberValue(prior.discountPercent) > 0) return { ...base, discountMode: 'percent', discountPercent: prior.discountPercent };
-      return { ...base, discountMode: 'none', discountPercent: 0, discountMoney: 0 };
-    });
-    return this.calculateSettlement(repriced, defaultPercent);
   }
 
   private async saveSettlementWith(db: Db, tenantId: string, sourceType: string, sourceId: string, value: unknown) {
