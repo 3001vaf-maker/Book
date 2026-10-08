@@ -1,4 +1,5 @@
 import {
+  details,
   emptyState,
   entityCardStack,
   field,
@@ -6,9 +7,12 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
+  smallActionButton,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -152,48 +156,60 @@ function programCardFields(program = {}) {
   });
 }
 
-function relationCardFields(relation = {}) {
-  return loyaltyCardFields({
-    title: `${relation.inviterName || '—'} → ${relation.inviteeName || '—'}`,
-    subtitle: relation.qualifyingEvent || 'Реферальная связь',
-    status: relationStatus(relation.status),
-    metaLeft: `Уровень ${relation.level || 1}`,
-    metaRight: relation.reward ? `${relation.reward} бонусов` : 'Без начисления',
-  });
-}
-
-function programInfo(program = {}) {
-  return v2ListEntries([
-    ['Срок программы', program.term || 'Бессрочно'],
-    ['Результативное событие', eventLabel(program.qualifyingEvent)],
-    ['Параметр события', program.eventValue || '—'],
-    ['Уровни', levelSummary(program)],
-    ['Ограничение награды', capLabel(program)],
-    ['Срок награды', rewardExpiryLabel(program)],
-    ['Выгода приглашённому', inviteeBenefitLabel(program)],
-    ['Момент начисления', timingLabel(program.rewardTiming)],
-    ['Повторяемость', recurrenceLabel(program)],
-    ['Доступность', assignmentLabel(program.assignment)],
-    ['Условия', program.description || '—'],
-    ['Состояние', program.status === 'active' ? 'Активна' : 'Неактивна'],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+function programConditions(program = {}) {
+  return [
+    `Срок программы: ${program.term || 'Бессрочно'}`,
+    `Результативное событие: ${eventLabel(program.qualifyingEvent)}`,
+    `Параметр события: ${program.eventValue || '—'}`,
+    `Уровни: ${levelSummary(program)}`,
+    `Ограничение награды: ${capLabel(program)}`,
+    `Срок награды: ${rewardExpiryLabel(program)}`,
+    `Выгода приглашённому: ${inviteeBenefitLabel(program)}`,
+    `Момент начисления: ${timingLabel(program.rewardTiming)}`,
+    `Повторяемость: ${recurrenceLabel(program)}`,
+    `Доступность: ${assignmentLabel(program.assignment)}`,
+    `Состояние: ${program.status === 'active' ? 'Активна' : 'Неактивна'}`,
+    '',
+    program.description || 'Дополнительные условия не указаны.',
+  ].join('\n');
 }
 
 function relationInfo(relation = {}, program = {}) {
-  return v2ListEntries([
-    ['Пригласил', relation.inviterName || '—'],
-    ['Приглашён', relation.inviteeName || '—'],
-    ['Дата связи', shortDateTime(relation.createdAt, '—')],
-    ['Программа', program.name || '—'],
-    ['Уровень', String(relation.level || 1)],
-    ['Состояние', relationStatus(relation.status)],
-    ['Реферальный код', relation.inviterCode || '—'],
-    ['Квалифицирующее событие', relation.qualifyingEvent || '—'],
-    ['База результата', relation.resultBase ? String(relation.resultBase) : '—'],
-    ['Начислено программой', `${Math.max(0, Number(relation.reward || 0))} бонусов`],
-    ['Доступно в этой программе', `${Math.max(0, Number(relation.rewardAvailable || 0))} бонусов`],
-    ['Срок награды', relation.rewardExpiresAt || rewardExpiryLabel(program)],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  return details([
+    { label: 'Пригласил', value: relation.inviterName || '—' },
+    { label: 'Приглашён', value: relation.inviteeName || '—' },
+    { label: 'Дата связи', value: shortDateTime(relation.createdAt, '—') },
+    { label: 'Программа', value: program.name || '—' },
+    { label: 'Уровень', value: String(relation.level || 1) },
+    { label: 'Состояние', value: relationStatus(relation.status) },
+    { label: 'Реферальный код', value: relation.inviterCode || '—' },
+    { label: 'Квалифицирующее событие', value: relation.qualifyingEvent || '—' },
+    { label: 'База результата', value: relation.resultBase ? String(relation.resultBase) : '—' },
+    { label: 'Начислено', value: `${Math.max(0, Number(relation.reward || 0))} бонусов` },
+    { label: 'Доступно', value: `${Math.max(0, Number(relation.rewardAvailable || 0))} бонусов` },
+    { label: 'Срок награды', value: relation.rewardExpiresAt || rewardExpiryLabel(program) },
+  ]);
+}
+
+function relationList(items = []) {
+  if (!items.length) return emptyState('Связей пока нет', 'Реферальные связи появятся после использования программы.');
+  return v2ListEntries(items.map((relation) => v2ListEntry({
+    title: `${relation.inviterName || '—'} → ${relation.inviteeName || '—'}`,
+    subtitle: relation.qualifyingEvent || 'Реферальная связь',
+    rightTop: relationStatus(relation.status),
+    rightBottom: relation.reward ? `${relation.reward} бонусов` : '',
+    interactive: true,
+    initial: '',
+    data: `data-referral-relation="${relation.id}"`,
+    aria: `Открыть реферальную связь ${relation.inviterName || ''} ${relation.inviteeName || ''}`,
+  })));
+}
+
+function openConditions(program = {}) {
+  return openDocumentViewer({
+    title: program.name || 'Условия реферальной программы',
+    content: programConditions(program),
+  });
 }
 
 function levelFields(level) {
@@ -303,10 +319,6 @@ async function openCreateProgramQ(root, rerender) {
   return layer;
 }
 
-function openConditionsS(root, program) {
-  return mountModal(root, modal(programInfo(program), { variant: 's', surface: 'app', title: program.name || 'Условия программы' }));
-}
-
 async function openRelationLayer(root, relationId) {
   const relation = relations.find((item) => item.id === relationId);
   if (!relation) return null;
@@ -315,12 +327,7 @@ async function openRelationLayer(root, relationId) {
   if (!layer) return null;
   layer.innerHTML = page([
     loyaltyHeader(`${relation.inviterName || '—'} → ${relation.inviteeName || '—'}`),
-    v2Section('Реферальная связь', relationInfo(relation, program)),
-    v2Section('Награда программы', v2ListEntries([
-      v2ListEntry({ title: 'Начислено', subtitle: `${Math.max(0, Number(relation.reward || 0))} бонусов`, interactive: false, initial: '' }),
-      v2ListEntry({ title: 'Доступно', subtitle: `${Math.max(0, Number(relation.rewardAvailable || 0))} бонусов`, interactive: false, initial: '' }),
-      v2ListEntry({ title: 'Срок', subtitle: relation.rewardExpiresAt || rewardExpiryLabel(program), interactive: false, initial: '' }),
-    ])),
+    relationInfo(relation, program),
   ]);
   notifyLoyaltyContext();
   return layer;
@@ -334,15 +341,10 @@ async function openProgramLayer(root, programId) {
   const items = relations.filter((item) => item.programId === program.id);
   layer.innerHTML = page([
     loyaltyHeader(program.name || 'Реферальная программа'),
-    v2ListEntries([
-      v2ListEntry({ title: 'Условия программы', subtitle: eventLabel(program.qualifyingEvent), rightTop: '[i]', interactive: true, initial: '', data: 'data-referral-info', aria: 'Открыть условия программы' }),
-    ]),
-    v2Section('Реферальные связи', items.length ? entityCardStack(items.map((relation) => loyaltyVisualCard('referral', relationCardFields(relation), {
-      data: `data-referral-relation="${relation.id}"`,
-      aria: `Открыть реферальную связь ${relation.inviterName || ''} ${relation.inviteeName || ''}`,
-    }))) : emptyState('Связей пока нет', 'Связь появится после использования персонального реферального идентификатора или подтверждённой ручной фиксации через Контакты.')),
+    v2Section('Связи', relationList(items)),
   ]);
-  layer.querySelector('[data-referral-info]')?.addEventListener('click', () => openConditionsS(root, program));
+  setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-referral-info', aria: 'Условия реферальной программы' })]);
+  layer.querySelector('[data-referral-info]')?.addEventListener('click', () => openConditions(program));
   layer.querySelectorAll('[data-referral-relation]').forEach((node) => node.addEventListener('click', () => openRelationLayer(root, text(node.dataset.referralRelation))));
   notifyLoyaltyContext();
   return layer;
