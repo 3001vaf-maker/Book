@@ -78,8 +78,8 @@ function paymentProcedureBlock(procedure, index) {
     <div class="payment-edit-grid">
       ${field({ label: 'Цена', value: moneyText(price), type: 'number', inputmode: 'decimal', min: 0, step: '0.01', readonly: true, data: 'data-payment-price' })}
       ${pricePercent > 0 ? field({ label: 'Условие', value: `${percentText(pricePercent)}%`, disabled: true, data: 'data-payment-price-condition' }) : ''}
-      ${select({ label: 'Ручная коррекция %', value: correction.mode === 'percent' ? percentText(correction.percent) : '', options: percentOptions, className: 'ui-select--center', data: 'data-payment-correction-percent', aria: 'Ручная коррекция цены в процентах' })}
-      ${field({ label: 'Ручная коррекция ₽', value: correction.mode === 'money' ? moneyText(correction.money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-correction-money' })}
+      ${select({ label: 'Ручная коррекция цены, %', value: correction.mode === 'percent' ? percentText(correction.percent) : '', options: percentOptions, className: 'ui-select--center', data: 'data-payment-correction-percent', aria: 'Ручная коррекция цены в процентах' })}
+      ${field({ label: 'Ручная коррекция цены, ₽', value: correction.mode === 'money' ? moneyText(correction.money) : '', type: 'number', inputmode: 'decimal', min: 0, step: '0.01', data: 'data-payment-correction-money' })}
     </div>
   </div>`;
 }
@@ -123,7 +123,7 @@ export function paymentMethods({
   initialAllocations = [],
   initialDepositAllocations = [],
 } = {}) {
-  const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
+  const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || deposit?.id || ''), name: String(wallet?.name || '') })) : []));
   const depositData = escapeHtml(JSON.stringify(Array.isArray(deposits) ? deposits.map((deposit) => ({
     depositId: String(deposit?.depositId || deposit?.id || ''),
     programName: String(deposit?.programName || deposit?.name || 'Депозит'),
