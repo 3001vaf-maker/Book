@@ -135,7 +135,7 @@ assert.match(methodsSource, /const serviceFromCash = Math\.min/);
 assert.match(methodsSource, /const applied = Math\.min\(due, depositReceived \+ serviceFromCash\)/);
 assert.match(methodsSource, /const tips = Math\.max\(0, cashReceived - serviceFromCash\)/);
 assert.match(methodsSource, /const remaining = Math\.max\(0, due - applied\)/);
-assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial,/s);
+assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial\s*\};/s);
 
 assert.match(paymentSource, /miniCard/);
 assert.match(paymentSource, /v2ZBodySections/);
