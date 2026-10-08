@@ -1,5 +1,6 @@
 import { escapeHtml } from '../utils/escape-html.js';
 import { mountV2Layer, v2Layer } from '../v2/index.js';
+import { v2QFrame } from '../v2/z-layout.js';
 
 let modalLevel = 0;
 
@@ -19,7 +20,8 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
   const variantClass = `modal--${kind}`;
   const surfaceClass = MODAL_SURFACES.has(surface) ? `modal--surface-${surface}` : '';
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
-  let html = v2Layer(content, {
+  const framedContent = resolvedVariant === 'q' ? v2QFrame(content) : content;
+  let html = v2Layer(framedContent, {
     kind,
     title: '',
     className: classes,
