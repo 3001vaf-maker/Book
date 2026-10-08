@@ -1,5 +1,5 @@
 // Pure Settlement/Finance rules. No persistence, UI or browser state.
-// Settlement arithmetic is independent from persistence and UI.
+// One canonical calculation: price -> manual correction -> automatic price percent -> amount due.
 
 export function financialNumber(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
@@ -35,21 +35,21 @@ function correctionMode(item = {}) {
 }
 
 function correctionForItem(item = {}, price = 0) {
-  const explicitMode = correctionMode(item);
-  if (explicitMode === 'percent') {
-    const correctionPercent = clampFinancialPercent(item?.correctionPercent);
+  const mode = correctionMode(item);
+  if (mode === 'percent') {
+    const percent = clampFinancialPercent(item?.correctionPercent);
     return {
-      mode: 'percent',
-      percent: correctionPercent,
-      money: financialMoney(Math.min(price, price * correctionPercent / 100)),
+      mode: percent > 0 ? 'percent' : 'none',
+      percent,
+      money: financialMoney(Math.min(price, price * percent / 100)),
     };
   }
-  if (explicitMode === 'money') {
-    const correctionMoney = financialMoney(Math.min(price, item?.correctionMoney));
+  if (mode === 'money') {
+    const money = financialMoney(Math.min(price, item?.correctionMoney));
     return {
-      mode: correctionMoney > 0 ? 'money' : 'none',
-      percent: price > 0 ? clampFinancialPercent(correctionMoney / price * 100) : 0,
-      money: correctionMoney,
+      mode: money > 0 ? 'money' : 'none',
+      percent: price > 0 ? clampFinancialPercent(money / price * 100) : 0,
+      money,
     };
   }
   return { mode: 'none', percent: 0, money: 0 };
@@ -69,55 +69,47 @@ export function recordSettlementItems(record = null) {
   ];
 }
 
-export function calculateSettlement(items = [], { discountPercent = 0 } = {}) {
-  const defaultPercent = clampFinancialPercent(discountPercent);
+export function calculateSettlement(items = [], { pricePercent = 0 } = {}) {
+  const defaultPercent = clampFinancialPercent(pricePercent);
   const prepared = (Array.isArray(items) ? items : []).map((item) => {
     const price = financialMoney(item?.price ?? item?.cost);
-    const pricePercent = itemPricePercent(item, defaultPercent);
+    const automaticPercent = itemPricePercent(item, defaultPercent);
     const correction = correctionForItem(item, price);
     const correctedPrice = financialMoney(price - correction.money);
-    const pricePercentMoney = financialMoney(Math.min(correctedPrice, correctedPrice * pricePercent / 100));
-    const totalReduction = financialMoney(correction.money + pricePercentMoney);
+    const pricePercentMoney = financialMoney(Math.min(correctedPrice, correctedPrice * automaticPercent / 100));
     return {
       sourceType: sourceType(item),
       sourceId: sourceId(item),
       name: String(item?.name || ''),
       price,
-      correctedPrice,
       correctionMode: correction.mode,
       correctionPercent: clampFinancialPercent(correction.percent),
       correctionMoney: correction.money,
-      pricePercent,
+      correctedPrice,
+      pricePercent: automaticPercent,
       pricePercentMoney,
-      discountMode: pricePercent > 0 ? 'percent' : correction.money > 0 ? 'money' : 'none',
-      discountPercent: pricePercent,
-      discountMoney: totalReduction,
       planAmount: financialMoney(correctedPrice - pricePercentMoney),
     };
   });
 
-  const serviceTotal = financialMoney(prepared.reduce((sum, item) => sum + item.price, 0));
-  const correctionTotal = financialMoney(prepared.reduce((sum, item) => sum + item.correctionMoney, 0));
-  const pricePercentTotal = financialMoney(prepared.reduce((sum, item) => sum + item.pricePercentMoney, 0));
-  const discountTotal = financialMoney(correctionTotal + pricePercentTotal);
-  const planTotal = financialMoney(prepared.reduce((sum, item) => sum + item.planAmount, 0));
   const percents = [...new Set(prepared.map((item) => Math.round(item.pricePercent * 10000) / 10000))];
-
   return {
     items: prepared,
-    serviceTotal,
-    discountPercent: percents.length === 1 ? percents[0] : null,
-    correctionTotal,
-    pricePercentTotal,
-    discountTotal,
-    planTotal,
+    serviceTotal: financialMoney(prepared.reduce((sum, item) => sum + item.price, 0)),
+    pricePercent: percents.length === 1 ? percents[0] : null,
+    correctionTotal: financialMoney(prepared.reduce((sum, item) => sum + item.correctionMoney, 0)),
+    pricePercentTotal: financialMoney(prepared.reduce((sum, item) => sum + item.pricePercentMoney, 0)),
+    planTotal: financialMoney(prepared.reduce((sum, item) => sum + item.planAmount, 0)),
   };
 }
 
-export function repriceSettlement(sources = [], currentSettlement = null) {
-  const priorItems = Array.isArray(currentSettlement?.items) ? currentSettlement.items : [];
+export function repriceSettlement(sources = [], currentSettlement = null, { pricePercent = null } = {}) {
+  const previous = normalizeStoredSettlement(currentSettlement);
+  const priorItems = Array.isArray(previous?.items) ? previous.items : [];
   const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
-  const defaultPricePercent = currentSettlement?.discountPercent == null ? 0 : clampFinancialPercent(currentSettlement.discountPercent);
+  const defaultPricePercent = pricePercent == null
+    ? clampFinancialPercent(previous?.pricePercent ?? 0)
+    : clampFinancialPercent(pricePercent);
   const items = (Array.isArray(sources) ? sources : []).map((source, index) => {
     const type = sourceType(source);
     const id = sourceId(source);
@@ -129,7 +121,7 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
       sourceId: id,
       name: String(source?.name || ''),
       price: financialMoney(source?.cost ?? source?.price),
-      pricePercent: prior?.pricePercent == null ? defaultPricePercent : clampFinancialPercent(prior.pricePercent),
+      pricePercent: defaultPricePercent,
     };
     if (!prior) return { ...base, correctionMode: 'none' };
     const priorPrice = financialMoney(prior?.price ?? source?.cost ?? source?.price);
@@ -138,7 +130,7 @@ export function repriceSettlement(sources = [], currentSettlement = null) {
     if (correction.money > 0) return { ...base, correctionMode: 'money', correctionMoney: correction.money };
     return { ...base, correctionMode: 'none' };
   });
-  return calculateSettlement(items, { discountPercent: defaultPricePercent });
+  return calculateSettlement(items, { pricePercent: defaultPricePercent });
 }
 
 export function isStoredSettlement(value = null) {
@@ -149,7 +141,7 @@ export function isStoredSettlement(value = null) {
 
 export function normalizeStoredSettlement(value = null) {
   if (!isStoredSettlement(value)) return null;
-  return calculateSettlement(value.items, { discountPercent: value.discountPercent ?? 0 });
+  return calculateSettlement(value.items, { pricePercent: value.pricePercent ?? 0 });
 }
 
 export function movementServiceAmount(item = null) {
@@ -233,8 +225,7 @@ export function calculateSettlementPaymentState(settlement = null, movements = [
 function itemSettlementAmount(item = null) {
   if (!item) return 0;
   if (Number.isFinite(Number(item.planAmount))) return Math.max(0, financialNumber(item.planAmount));
-  const price = Math.max(0, financialNumber(item.price));
-  return Math.max(0, price - Math.max(0, financialNumber(item.discountMoney)));
+  return calculateSettlement([item], { pricePercent: item?.pricePercent ?? 0 }).planTotal;
 }
 
 function movementItemAmount(movement = null, sourceTypeValue = '', sourceIdValue = '') {
