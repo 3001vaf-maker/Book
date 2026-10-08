@@ -20,8 +20,8 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
   const variantClass = `modal--${kind}`;
   const surfaceClass = MODAL_SURFACES.has(surface) ? `modal--surface-${surface}` : '';
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
-  const framedContent = resolvedVariant === 'q' ? v2QFrame(content) : content;
-  let html = v2Layer(framedContent, {
+  if (resolvedVariant === 'q') content = v2QFrame(content);
+  let html = v2Layer(content, {
     kind,
     title: '',
     className: classes,
