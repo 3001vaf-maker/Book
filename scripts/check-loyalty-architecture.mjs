@@ -66,7 +66,7 @@ for (const token of [
   'каждую N-ю операцию',
   'ступенчатые правила',
   'Срок жизни награды',
-  'покупатель, если он отличается от владельца',
+  'покупателя, если он отличается от владельца',
 ]) {
   if (!architecture.includes(token)) errors.push(`LOYALTY_ARCHITECTURE.md lost approved product detail: ${token}`);
 }
