@@ -93,7 +93,8 @@ export function v2ZFrame(content = '', { header = '' } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  return `${v2QHeader(header)}${v2QBody(content)}`;
+  const qHeader = String(header || '').trim() ? v2QHeader(header) : '';
+  return `${qHeader}${v2QBody(content)}`;
 }
 
 function resolveZSurface(root) {
