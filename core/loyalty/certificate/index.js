@@ -1,16 +1,22 @@
 import {
   datePicker,
+  details,
   emptyState,
   entityCardStack,
   field,
   formValidationMessage,
   initDatePickers,
+  miniCard,
+  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
+  smallActionButton,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -75,53 +81,60 @@ function programCardFields(program = {}) {
   });
 }
 
-function instanceCardFields(instance = {}) {
-  const program = programs.find((item) => item.id === instance.programId) || {};
-  return loyaltyCardFields({
-    title: instance.ownerName || 'Без имени',
-    subtitle: program.name || 'Сертификат',
-    status: instance.status === 'used' ? 'Использован' : 'Активен',
-    metaLeft: instance.buyerName && instance.buyerName !== instance.ownerName ? `Покупатель: ${instance.buyerName}` : 'Владелец = покупатель',
-    metaRight: instanceRight(instance),
-  });
-}
-
-function programInfo(program = {}) {
-  return v2ListEntries([
-    ['Тип', typeLabel(program.type)],
-    ['Номинал / право', programRight(program)],
-    ['Срок', program.term || 'Бессрочно'],
-    ['Частичное использование', program.partial ? 'Разрешено' : 'Нет'],
-    ['Условия', program.description || '—'],
-    ['Состояние', program.status === 'active' ? 'Активен' : 'Закрыт'],
-    ['Создан', shortDateTime(program.createdAt, '—')],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+function programConditions(program = {}) {
+  return [
+    `Тип: ${typeLabel(program.type)}`,
+    `Номинал / право: ${programRight(program)}`,
+    `Срок: ${program.term || 'Бессрочно'}`,
+    `Частичное использование: ${program.partial ? 'Разрешено' : 'Нет'}`,
+    `Состояние: ${program.status === 'active' ? 'Активен' : 'Закрыт'}`,
+    '',
+    program.description || 'Дополнительные условия не указаны.',
+  ].join('\n');
 }
 
 function instanceInfo(instance = {}) {
   const program = programs.find((item) => item.id === instance.programId) || {};
-  return v2ListEntries([
-    ['Владелец', instance.ownerName || '—'],
-    ['Покупатель', instance.buyerName || '—'],
-    ['Вид сертификата', program.name || '—'],
-    ['Исходное право', program.type === 'amount' ? money(instance.initialValue) : programRight(program)],
-    ['Остаток', program.type === 'amount' ? money(instance.balance) : instanceRight(instance)],
-    ['Дата оформления', shortDateTime(instance.issuedAt, '—')],
-    ['Срок', instance.expiresAt || program.term || 'Бессрочно'],
-    ['Состояние', instance.status === 'used' ? 'Использован' : 'Активен'],
-  ].map(([title, subtitle]) => v2ListEntry({ title, subtitle: String(subtitle), interactive: false, initial: '' })));
+  return details([
+    { label: 'Владелец', value: instance.ownerName || '—' },
+    { label: 'Покупатель', value: instance.buyerName || '—' },
+    { label: 'Сертификат', value: program.name || '—' },
+    { label: 'Исходное право', value: program.type === 'amount' ? money(instance.initialValue) : programRight(program) },
+    { label: 'Остаток', value: program.type === 'amount' ? money(instance.balance) : instanceRight(instance) },
+    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
+    { label: 'Срок', value: instance.expiresAt || program.term || 'Бессрочно' },
+    { label: 'Состояние', value: instance.status === 'used' ? 'Использован' : 'Активен' },
+  ]);
 }
 
 function historyMarkup(instance = {}) {
   const history = Array.isArray(instance.history) ? instance.history : [];
-  if (!history.length) return emptyState('Использований пока нет', 'История появится после использования сертификата.');
-  return v2ListEntries(history.map((item) => v2ListEntry({
+  if (!history.length) return emptyState('Истории пока нет', 'Использования сертификата появятся здесь.');
+  return miniCardRail(history.map((item) => miniCard({
     title: item.title || 'Использование',
+    value: item.amount ? `−${money(item.amount)}` : 'Использование',
     subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: item.amount ? `−${money(item.amount)}` : '',
-    interactive: false,
-    initial: '',
   })));
+}
+
+function issuedList(items = []) {
+  if (!items.length) return emptyState('Оформленных сертификатов пока нет', 'Оформите сертификат контакту.');
+  return v2ListEntries(items.map((item) => v2ListEntry({
+    title: item.ownerName || 'Без имени',
+    subtitle: item.buyerName && item.buyerName !== item.ownerName ? `Покупатель: ${item.buyerName}` : 'Покупатель = владелец',
+    rightTop: instanceRight(item),
+    interactive: true,
+    initial: '',
+    data: `data-certificate-instance="${item.id}"`,
+    aria: `Открыть сертификат ${item.ownerName || ''}`,
+  })));
+}
+
+function openConditions(program = {}) {
+  return openDocumentViewer({
+    title: program.name || 'Условия сертификата',
+    content: programConditions(program),
+  });
 }
 
 async function openCreateProgramQ(root, rerender) {
@@ -170,7 +183,7 @@ async function openCreateProgramQ(root, rerender) {
 
 async function openIssueQ(root, program, rerender) {
   const people = availablePeople(fallbackPeople);
-  const options = [{ value: '', label: 'Выберите человека' }, ...people.map(personOption).filter((item) => item.value)];
+  const options = [{ value: '', label: 'Выберите контакт' }, ...people.map(personOption).filter((item) => item.value)];
   const layer = mountModal(root, modal(`${loyaltyHeader('Оформить сертификат', {
     c: { label: 'Оформить', data: 'data-certificate-issue-save', aria: 'Оформить сертификат' },
   })}
@@ -190,7 +203,7 @@ async function openIssueQ(root, program, rerender) {
     const values = formObject(form);
     const buyer = people.find((item) => String(item?.key || item?.id || '') === String(values.buyerKey || ''));
     const owner = people.find((item) => String(item?.key || item?.id || '') === String(values.ownerKey || ''));
-    if (!buyer || !owner) { if (error) error.textContent = 'Укажите покупателя и владельца'; return; }
+    if (!buyer || !owner) { if (error) error.textContent = 'Укажите покупателя и получателя'; return; }
     const amount = program.type === 'amount' ? Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0) : 0;
     if (program.type === 'amount' && amount <= 0) { if (error) error.textContent = 'Укажите номинал'; return; }
     instances.push({
@@ -222,8 +235,8 @@ async function openInstanceLayer(root, instanceId) {
   if (!layer) return null;
   layer.innerHTML = page([
     loyaltyHeader(program.name || 'Сертификат'),
-    v2Section('Сертификат', instanceInfo(instance)),
-    v2Section('История использования', historyMarkup(instance)),
+    instanceInfo(instance),
+    v2Section('История', historyMarkup(instance)),
   ]);
   notifyLoyaltyContext();
   return layer;
@@ -240,12 +253,10 @@ async function openProgramLayer(root, programId, onChanged) {
       loyaltyHeader(program.name || 'Сертификат', {
         c: { label: 'Оформить', data: 'data-certificate-issue', aria: 'Оформить сертификат' },
       }),
-      v2Section('Условия', programInfo(program)),
-      v2Section('Оформленные', issued.length ? entityCardStack(issued.map((item) => loyaltyVisualCard('certificate', instanceCardFields(item), {
-        data: `data-certificate-instance="${item.id}"`,
-        aria: `Открыть сертификат ${item.ownerName || ''}`,
-      }))) : emptyState('Экземпляров пока нет', 'Оформите сертификат конкретному владельцу.')),
+      issuedList(issued),
     ]);
+    setV2ZHeaderRows(layer, [smallActionButton({ icon: 'info', data: 'data-certificate-info', aria: 'Условия сертификата' })]);
+    layer.querySelector('[data-certificate-info]')?.addEventListener('click', () => openConditions(program));
     layer.querySelector('[data-certificate-issue]')?.addEventListener('click', () => openIssueQ(root, program, async () => {
       await render();
       await onChanged?.();
