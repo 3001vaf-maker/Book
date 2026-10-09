@@ -1,9 +1,57 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 
-type JsonObject = Record<string, any>;
 type Db = PrismaService | Prisma.TransactionClient;
+type JsonObject = Record<string, any>;
+
+type AccountRow = {
+  id: string;
+  tenantId: string;
+  personKey: string;
+  balance: unknown;
+  spendLimitPercent: unknown;
+  visibleToEndUser: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type MovementRow = {
+  id: string;
+  kind: string;
+  direction: 'IN' | 'OUT';
+  amount: unknown;
+  sourceType: string;
+  sourceId: string;
+  occurredAt: Date;
+  recordedAt: Date;
+  balanceAfter: unknown;
+  data: unknown;
+};
+
+type DebtRow = {
+  id: string;
+  tenantId: string;
+  personKey: string;
+  sourceType: string;
+  sourceId: string;
+  originalAmount: unknown;
+  outstandingAmount: unknown;
+  occurredAt: Date;
+  closedAt: Date | null;
+  data: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type PersonalAccountIdentity = {
+  requestedKey: string;
+  primaryKey: string;
+  uei: string;
+  memberKeys: string[];
+  primaryPerson: JsonObject;
+};
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -34,33 +82,6 @@ function percent(value: unknown, fallback = 100) {
   const raw = value == null || value === '' ? fallback : numberValue(value);
   return Math.max(0, Math.min(100, Math.round(raw * 100) / 100));
 }
-
-function personKeyFromData(value: unknown) {
-  const data = objectValue(value);
-  const person = objectValue(data.person);
-  return text(data.personKey || person.key || person.personKey || person.id);
-}
-
-function accountDelta(kind: string, data: JsonObject) {
-  if (kind === 'personal-account-funding') return personalAccountMoney(data.amount);
-  if (kind === 'personal-account-withdrawal') return -personalAccountMoney(data.amount);
-  if (kind === 'payment') return -personalAccountMoney(data.personalAccountAmount);
-  if (kind === 'refund') return personalAccountMoney(data.personalAccountRestored);
-  return 0;
-}
-
-export type PersonalAccountSettings = {
-  visibleToEndUser: boolean;
-  spendLimitPercent: number;
-};
-
-export type PersonalAccountIdentity = {
-  requestedKey: string;
-  primaryKey: string;
-  uei: string;
-  memberKeys: string[];
-  primaryPerson: JsonObject;
-};
 
 export async function resolvePersonalAccountIdentity(db: Db, tenantId: string, personKeyValue: unknown): Promise<PersonalAccountIdentity> {
   const requestedKey = text(personKeyValue);
@@ -93,121 +114,325 @@ export async function resolvePersonalAccountIdentity(db: Db, tenantId: string, p
     || people.find(({ row, person }) => memberKeys.includes(text(person.key || row.key)))
     || matched;
   const primaryKey = text(primary.person.key || primary.row.key) || requestedKey;
+  if (!memberKeys.includes(primaryKey)) memberKeys.unshift(primaryKey);
 
   return {
     requestedKey,
     primaryKey,
     uei,
-    memberKeys,
+    memberKeys: [...new Set(memberKeys)],
     primaryPerson: clone(primary.person),
   };
 }
 
-export function personalAccountSettingsFromPerson(person: unknown): PersonalAccountSettings {
-  const data = objectValue(person);
-  const settings = objectValue(data.personalAccount);
-  return {
-    visibleToEndUser: settings.visibleToEndUser !== false,
-    spendLimitPercent: percent(settings.spendLimitPercent, 100),
-  };
+async function accountRow(db: Db, tenantId: string, personKey: string, lock = false) {
+  const rows = lock
+    ? await db.$queryRaw<AccountRow[]>`SELECT * FROM "LoyaltyPersonalAccount" WHERE "tenantId" = ${tenantId} AND "personKey" = ${personKey} FOR UPDATE`
+    : await db.$queryRaw<AccountRow[]>`SELECT * FROM "LoyaltyPersonalAccount" WHERE "tenantId" = ${tenantId} AND "personKey" = ${personKey}`;
+  return rows[0] || null;
 }
 
-export async function readPersonalAccountSettings(db: Db, tenantId: string, personKey: unknown) {
-  const identity = await resolvePersonalAccountIdentity(db, tenantId, personKey);
-  return { identity, settings: personalAccountSettingsFromPerson(identity.primaryPerson) };
+async function insertAccountIfMissing(db: Db, tenantId: string, personKey: string) {
+  await db.$executeRaw`
+    INSERT INTO "LoyaltyPersonalAccount" ("id", "tenantId", "personKey", "balance", "spendLimitPercent", "visibleToEndUser", "createdAt", "updatedAt")
+    VALUES (${randomUUID()}, ${tenantId}, ${personKey}, 0, 100, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT ("tenantId", "personKey") DO NOTHING
+  `;
 }
 
-export async function updatePersonalAccountSettingsWith(
-  db: Db,
-  tenantId: string,
-  personKey: unknown,
-  value: unknown,
-) {
-  const identity = await resolvePersonalAccountIdentity(db, tenantId, personKey);
-  const source = objectValue(value);
-  const current = personalAccountSettingsFromPerson(identity.primaryPerson);
-  const settings: PersonalAccountSettings = {
-    visibleToEndUser: source.visibleToEndUser == null ? current.visibleToEndUser : source.visibleToEndUser !== false,
-    spendLimitPercent: source.spendLimitPercent == null ? current.spendLimitPercent : percent(source.spendLimitPercent, current.spendLimitPercent),
-  };
-  const row = await db.person.findUnique({ where: { tenantId_key: { tenantId, key: identity.primaryKey } } });
-  if (!row) throw new BadRequestException('Человек не найден');
-  const person = objectValue(row.data);
-  await db.person.update({
-    where: { id: row.id },
-    data: { data: clone({ ...person, personalAccount: settings }) as Prisma.InputJsonValue },
-  });
-  return { ...identity, primaryPerson: { ...identity.primaryPerson, personalAccount: settings }, settings };
-}
+async function canonicalAccount(db: Db, tenantId: string, personKeyValue: unknown, lock = false) {
+  const identity = await resolvePersonalAccountIdentity(db, tenantId, personKeyValue);
+  await insertAccountIfMissing(db, tenantId, identity.primaryKey);
+  let primary = await accountRow(db, tenantId, identity.primaryKey, true);
+  if (!primary) throw new NotFoundException('Личный счёт не найден');
 
-export async function personalAccountOperations(db: Db, tenantId: string, personKey: unknown) {
-  const identity = await resolvePersonalAccountIdentity(db, tenantId, personKey);
-  const members = new Set(identity.memberKeys);
-  const rows = await db.financeOperation.findMany({
-    where: {
-      tenantId,
-      status: 'completed',
-      kind: { in: ['personal-account-funding', 'personal-account-withdrawal', 'payment', 'refund'] },
-    },
-    orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
-  });
-  return {
-    identity,
-    operations: rows.filter((row) => members.has(personKeyFromData(row.data)) && Math.abs(accountDelta(row.kind, objectValue(row.data))) > 0.009),
-  };
-}
-
-export async function personalAccountBalance(db: Db, tenantId: string, personKey: unknown) {
-  const { identity, operations } = await personalAccountOperations(db, tenantId, personKey);
-  const balance = personalAccountMoney(operations.reduce((sum, row) => sum + accountDelta(row.kind, objectValue(row.data)), 0));
-  return { identity, balance, operations };
-}
-
-export async function validatePersonalAccountSpend(
-  db: Db,
-  tenantId: string,
-  person: unknown,
-  source: { type: string; id: string },
-  amountValue: unknown,
-  settlementTotalValue: unknown,
-) {
-  const personData = objectValue(person);
-  const key = text(personData.key || personData.personKey || personData.id);
-  const amount = personalAccountMoney(amountValue);
-  if (amount <= 0) return { amount: 0, balance: 0, limit: 0, remainingLimit: 0, settings: personalAccountSettingsFromPerson({}) };
-  const { identity, balance } = await personalAccountBalance(db, tenantId, key);
-  if (amount > balance + 0.009) throw new BadRequestException('На Личном счёте недостаточно средств');
-
-  const { settings } = await readPersonalAccountSettings(db, tenantId, identity.primaryKey);
-  const settlementTotal = personalAccountMoney(settlementTotalValue);
-  const limit = personalAccountMoney(settlementTotal * settings.spendLimitPercent / 100);
-  const sourceRows = await db.financeOperation.findMany({
-    where: {
-      tenantId,
-      sourceType: text(source.type),
-      sourceId: text(source.id),
-      status: 'completed',
-      kind: { in: ['payment', 'refund'] },
-    },
-    select: { kind: true, data: true },
-  });
-  const used = personalAccountMoney(sourceRows.reduce((sum, row) => {
-    const data = objectValue(row.data);
-    return sum + (row.kind === 'payment'
-      ? personalAccountMoney(data.personalAccountAmount)
-      : -personalAccountMoney(data.personalAccountRestored));
-  }, 0));
-  const remainingLimit = Math.max(0, personalAccountMoney(limit - used));
-  if (amount > remainingLimit + 0.009) {
-    throw new BadRequestException(`По Личному счёту для этой операции доступно не более ${remainingLimit}`);
+  for (const memberKey of identity.memberKeys) {
+    if (!memberKey || memberKey === identity.primaryKey) continue;
+    const secondary = await accountRow(db, tenantId, memberKey, true);
+    if (!secondary) continue;
+    const mergedBalance = personalAccountMoney(personalAccountMoney(primary.balance) + personalAccountMoney(secondary.balance));
+    await db.$executeRaw`
+      UPDATE "LoyaltyPersonalAccountMovement"
+      SET "personKey" = ${identity.primaryKey}
+      WHERE "tenantId" = ${tenantId} AND "personKey" = ${memberKey}
+    `;
+    await db.$executeRaw`
+      UPDATE "LoyaltyPersonalAccountDebt"
+      SET "personKey" = ${identity.primaryKey}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "tenantId" = ${tenantId} AND "personKey" = ${memberKey}
+    `;
+    await db.$executeRaw`
+      UPDATE "LoyaltyPersonalAccount"
+      SET "balance" = ${mergedBalance}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${primary.id}
+    `;
+    await db.$executeRaw`DELETE FROM "LoyaltyPersonalAccount" WHERE "id" = ${secondary.id}`;
+    primary = { ...primary, balance: mergedBalance, updatedAt: new Date() };
   }
-  return { amount, balance, limit, remainingLimit, settings, identity };
+
+  return { identity, account: lock ? primary : (await accountRow(db, tenantId, identity.primaryKey)) || primary };
 }
 
-export function personalAccountOperationDelta(kind: string, data: unknown) {
-  return accountDelta(kind, objectValue(data));
+function accountDto(row: AccountRow) {
+  return {
+    personKey: row.personKey,
+    balance: personalAccountMoney(row.balance),
+    spendLimitPercent: percent(row.spendLimitPercent),
+    visibleToEndUser: Boolean(row.visibleToEndUser),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-export function personalAccountOperationPersonKey(data: unknown) {
-  return personKeyFromData(data);
+function movementDto(row: MovementRow) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    direction: row.direction,
+    amount: personalAccountMoney(row.amount),
+    sourceType: row.sourceType,
+    sourceId: row.sourceId,
+    occurredAt: row.occurredAt.toISOString(),
+    recordedAt: row.recordedAt.toISOString(),
+    balanceAfter: personalAccountMoney(row.balanceAfter),
+    data: objectValue(row.data),
+  };
+}
+
+function debtDto(row: DebtRow) {
+  const outstandingAmount = personalAccountMoney(row.outstandingAmount);
+  return {
+    id: row.id,
+    sourceType: row.sourceType,
+    sourceId: row.sourceId,
+    originalAmount: personalAccountMoney(row.originalAmount),
+    outstandingAmount,
+    occurredAt: row.occurredAt.toISOString(),
+    closedAt: row.closedAt ? row.closedAt.toISOString() : '',
+    status: outstandingAmount <= 0.009 ? 'closed' : 'open',
+    data: objectValue(row.data),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function personalAccountSnapshot(db: Db, tenantId: string, personKeyValue: unknown) {
+  const { identity, account } = await canonicalAccount(db, tenantId, personKeyValue);
+  const personKey = identity.primaryKey;
+  const [movements, debts] = await Promise.all([
+    db.$queryRaw<MovementRow[]>`
+      SELECT "id", "kind", "direction", "amount", "sourceType", "sourceId", "occurredAt", "recordedAt", "balanceAfter", "data"
+      FROM "LoyaltyPersonalAccountMovement"
+      WHERE "tenantId" = ${tenantId} AND "personKey" = ${personKey}
+      ORDER BY "occurredAt" DESC, "recordedAt" DESC
+    `,
+    db.$queryRaw<DebtRow[]>`
+      SELECT * FROM "LoyaltyPersonalAccountDebt"
+      WHERE "tenantId" = ${tenantId} AND "personKey" = ${personKey}
+      ORDER BY "occurredAt" DESC, "createdAt" DESC
+    `,
+  ]);
+  return {
+    ...accountDto(account),
+    uei: identity.uei,
+    memberKeys: identity.memberKeys,
+    debtTotal: personalAccountMoney(debts.reduce((sum, row) => sum + personalAccountMoney(row.outstandingAmount), 0)),
+    hasActivity: movements.length > 0 || debts.length > 0,
+    movements: movements.map(movementDto),
+    debts: debts.map(debtDto),
+  };
+}
+
+export async function listPersonalAccountsWithActivity(db: Db, tenantId: string) {
+  const rows = await db.$queryRaw<AccountRow[]>`
+    SELECT account.*
+    FROM "LoyaltyPersonalAccount" account
+    WHERE account."tenantId" = ${tenantId}
+      AND (
+        EXISTS (
+          SELECT 1 FROM "LoyaltyPersonalAccountMovement" movement
+          WHERE movement."tenantId" = account."tenantId" AND movement."personKey" = account."personKey"
+        )
+        OR EXISTS (
+          SELECT 1 FROM "LoyaltyPersonalAccountDebt" debt
+          WHERE debt."tenantId" = account."tenantId" AND debt."personKey" = account."personKey"
+        )
+      )
+    ORDER BY account."updatedAt" DESC
+  `;
+  const seen = new Set<string>();
+  const result = [];
+  for (const row of rows) {
+    try {
+      const snapshot = await personalAccountSnapshot(db, tenantId, row.personKey);
+      if (!snapshot.hasActivity || seen.has(snapshot.personKey)) continue;
+      seen.add(snapshot.personKey);
+      result.push(snapshot);
+    } catch {
+      // Historical money facts stay in Finance even if the profile card was removed.
+    }
+  }
+  return result;
+}
+
+export async function updatePersonalAccountSettingsWith(db: Db, tenantId: string, personKeyValue: unknown, value: unknown) {
+  const source = objectValue(value);
+  const { identity, account } = await canonicalAccount(db, tenantId, personKeyValue, true);
+  const spendLimitPercent = source.spendLimitPercent == null ? percent(account.spendLimitPercent) : percent(source.spendLimitPercent);
+  const visibleToEndUser = source.visibleToEndUser == null ? Boolean(account.visibleToEndUser) : source.visibleToEndUser !== false;
+  await db.$executeRaw`
+    UPDATE "LoyaltyPersonalAccount"
+    SET "spendLimitPercent" = ${spendLimitPercent}, "visibleToEndUser" = ${visibleToEndUser}, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "tenantId" = ${tenantId} AND "personKey" = ${identity.primaryKey}
+  `;
+  return personalAccountSnapshot(db, tenantId, identity.primaryKey);
+}
+
+export async function applyPersonalAccountMovement(db: Db, input: {
+  eventId: string;
+  tenantId: string;
+  personKey: string;
+  kind: string;
+  direction: 'IN' | 'OUT';
+  amount: unknown;
+  sourceType: string;
+  sourceId: string;
+  occurredAt: Date;
+  data?: JsonObject;
+  chargeTotal?: unknown;
+  enforceSpendLimit?: boolean;
+}) {
+  const eventId = text(input.eventId);
+  const tenantId = text(input.tenantId);
+  const amount = personalAccountMoney(input.amount);
+  if (!eventId || !tenantId || !text(input.personKey) || !text(input.kind) || !text(input.sourceType) || !text(input.sourceId)) {
+    throw new BadRequestException('Некорректное движение Личного счёта');
+  }
+  if (amount <= 0) throw new BadRequestException('Сумма должна быть больше нуля');
+  const duplicate = await db.$queryRaw<MovementRow[]>`SELECT * FROM "LoyaltyPersonalAccountMovement" WHERE "id" = ${eventId}`;
+  if (duplicate[0]) return movementDto(duplicate[0]);
+
+  const { identity, account } = await canonicalAccount(db, tenantId, input.personKey, true);
+  const current = personalAccountMoney(account.balance);
+  if (input.direction === 'OUT') {
+    if (amount > current + 0.009) throw new BadRequestException('На Личном счёте недостаточно средств');
+    if (input.enforceSpendLimit) {
+      const allowed = personalAccountMoney(personalAccountMoney(input.chargeTotal) * percent(account.spendLimitPercent) / 100);
+      if (amount > allowed + 0.009) throw new BadRequestException(`С Личного счёта можно оплатить не более ${percent(account.spendLimitPercent)}% этой операции`);
+    }
+  }
+  const next = input.direction === 'IN' ? personalAccountMoney(current + amount) : personalAccountMoney(current - amount);
+  const payload = JSON.stringify(input.data || {});
+  await db.$executeRaw`
+    UPDATE "LoyaltyPersonalAccount"
+    SET "balance" = ${next}, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "tenantId" = ${tenantId} AND "personKey" = ${identity.primaryKey}
+  `;
+  await db.$executeRaw`
+    INSERT INTO "LoyaltyPersonalAccountMovement"
+      ("id", "tenantId", "personKey", "kind", "direction", "amount", "sourceType", "sourceId", "occurredAt", "recordedAt", "balanceAfter", "data")
+    VALUES
+      (${eventId}, ${tenantId}, ${identity.primaryKey}, ${text(input.kind)}, ${input.direction}, ${amount}, ${text(input.sourceType)}, ${text(input.sourceId)}, ${input.occurredAt}, CURRENT_TIMESTAMP, ${next}, ${payload}::jsonb)
+  `;
+  return { ...movementDto({
+    id: eventId,
+    kind: text(input.kind),
+    direction: input.direction,
+    amount,
+    sourceType: text(input.sourceType),
+    sourceId: text(input.sourceId),
+    occurredAt: input.occurredAt,
+    recordedAt: new Date(),
+    balanceAfter: next,
+    data: input.data || {},
+  }), personKey: identity.primaryKey };
+}
+
+export async function personalAccountSpendAvailability(db: Db, tenantId: string, personKey: unknown, chargeTotal: unknown) {
+  const { identity, account } = await canonicalAccount(db, tenantId, personKey);
+  const balance = personalAccountMoney(account.balance);
+  const limitAmount = personalAccountMoney(personalAccountMoney(chargeTotal) * percent(account.spendLimitPercent) / 100);
+  return {
+    personKey: identity.primaryKey,
+    balance,
+    spendLimitPercent: percent(account.spendLimitPercent),
+    maxSpend: Math.min(balance, limitAmount),
+  };
+}
+
+export async function syncPersonalAccountDebt(db: Db, input: {
+  tenantId: string;
+  personKey: string;
+  sourceType: string;
+  sourceId: string;
+  outstandingAmount: unknown;
+  occurredAt: Date;
+  data?: JsonObject;
+}) {
+  const tenantId = text(input.tenantId);
+  const sourceType = text(input.sourceType);
+  const sourceId = text(input.sourceId);
+  const outstandingAmount = personalAccountMoney(input.outstandingAmount);
+  if (!tenantId || !text(input.personKey) || !sourceType || !sourceId) throw new BadRequestException('Некорректная задолженность');
+  const { identity } = await canonicalAccount(db, tenantId, input.personKey, true);
+  const existing = await db.$queryRaw<DebtRow[]>`
+    SELECT * FROM "LoyaltyPersonalAccountDebt"
+    WHERE "tenantId" = ${tenantId} AND "sourceType" = ${sourceType} AND "sourceId" = ${sourceId}
+    FOR UPDATE
+  `;
+  const current = existing[0] || null;
+  const payload = JSON.stringify(input.data || {});
+  if (!current) {
+    if (outstandingAmount <= 0.009) return null;
+    await db.$executeRaw`
+      INSERT INTO "LoyaltyPersonalAccountDebt"
+        ("id", "tenantId", "personKey", "sourceType", "sourceId", "originalAmount", "outstandingAmount", "occurredAt", "closedAt", "data", "createdAt", "updatedAt")
+      VALUES
+        (${randomUUID()}, ${tenantId}, ${identity.primaryKey}, ${sourceType}, ${sourceId}, ${outstandingAmount}, ${outstandingAmount}, ${input.occurredAt}, NULL, ${payload}::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+  } else {
+    const originalAmount = Math.max(personalAccountMoney(current.originalAmount), outstandingAmount);
+    const closedAt = outstandingAmount <= 0.009 ? new Date() : null;
+    await db.$executeRaw`
+      UPDATE "LoyaltyPersonalAccountDebt"
+      SET "personKey" = ${identity.primaryKey}, "originalAmount" = ${originalAmount}, "outstandingAmount" = ${outstandingAmount},
+          "closedAt" = ${closedAt}, "data" = ${payload}::jsonb, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${current.id}
+    `;
+  }
+  const rows = await db.$queryRaw<DebtRow[]>`
+    SELECT * FROM "LoyaltyPersonalAccountDebt"
+    WHERE "tenantId" = ${tenantId} AND "sourceType" = ${sourceType} AND "sourceId" = ${sourceId}
+  `;
+  return rows[0] ? debtDto(rows[0]) : null;
+}
+
+export async function personalAccountDebtById(db: Db, tenantIdValue: unknown, debtIdValue: unknown, lock = false) {
+  const tenantId = text(tenantIdValue);
+  const debtId = text(debtIdValue);
+  const rows = lock
+    ? await db.$queryRaw<DebtRow[]>`SELECT * FROM "LoyaltyPersonalAccountDebt" WHERE "tenantId" = ${tenantId} AND "id" = ${debtId} FOR UPDATE`
+    : await db.$queryRaw<DebtRow[]>`SELECT * FROM "LoyaltyPersonalAccountDebt" WHERE "tenantId" = ${tenantId} AND "id" = ${debtId}`;
+  return rows[0] || null;
+}
+
+export async function reducePersonalAccountDebt(db: Db, tenantIdValue: unknown, debtIdValue: unknown, paidValue: unknown, closedAt = new Date()) {
+  const tenantId = text(tenantIdValue);
+  const debtId = text(debtIdValue);
+  const paid = personalAccountMoney(paidValue);
+  if (paid <= 0) throw new BadRequestException('Сумма погашения должна быть больше нуля');
+  const debt = await personalAccountDebtById(db, tenantId, debtId, true);
+  if (!debt) throw new NotFoundException('Задолженность не найдена');
+  const outstanding = personalAccountMoney(debt.outstandingAmount);
+  if (outstanding <= 0.009) throw new BadRequestException('Задолженность уже закрыта');
+  if (paid > outstanding + 0.009) throw new BadRequestException('Платёж превышает задолженность');
+  const next = personalAccountMoney(outstanding - paid);
+  const nextClosedAt = next <= 0.009 ? closedAt : null;
+  await db.$executeRaw`
+    UPDATE "LoyaltyPersonalAccountDebt"
+    SET "outstandingAmount" = ${next}, "closedAt" = ${nextClosedAt}, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${debt.id}
+  `;
+  const rows = await db.$queryRaw<DebtRow[]>`SELECT * FROM "LoyaltyPersonalAccountDebt" WHERE "id" = ${debt.id}`;
+  return rows[0] ? debtDto(rows[0]) : null;
 }
