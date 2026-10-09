@@ -65,6 +65,8 @@ model Tenant {
   businessOperationalState BusinessOperationalState?
   documentArchive          TenantDocumentArchive?
   businessAuxiliaryState   BusinessAuxiliaryState?
+  loyaltyDepositPrograms   LoyaltyDepositProgram[]
+  loyaltyDepositInstances  LoyaltyDepositInstance[]
   financeSettlements       FinanceSettlement[]
   financeArticles          FinanceArticle[]
   financeOperations        FinanceOperation[]
@@ -397,6 +399,46 @@ model BusinessAuxiliaryState {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model LoyaltyDepositProgram {
+  id        String   @id @default(cuid())
+  tenantId  String
+  programId String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, programId])
+  @@index([tenantId, createdAt])
+}
+
+model LoyaltyDepositInstance {
+  id                String   @id
+  tenantId          String
+  depositId         String
+  programId         String
+  programName       String   @default("")
+  personKey         String
+  person            Json
+  terms             Json
+  initialAmount     Decimal  @db.Decimal(14, 2)
+  principalBalance  Decimal  @db.Decimal(14, 2)
+  benefitBalance    Decimal  @db.Decimal(14, 2)
+  balance            Decimal  @db.Decimal(14, 2)
+  status             String   @default("active")
+  fundedAt           DateTime
+  fundingOperationId String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, depositId])
+  @@index([tenantId, personKey, status])
+  @@index([tenantId, programId])
 }
 
 model FinanceArticle {
