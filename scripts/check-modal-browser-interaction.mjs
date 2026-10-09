@@ -71,13 +71,17 @@ for (const [name, engine, contextOptions] of [
     await activate(points[0]);
     await page.locator('[data-service-workplace="test-space"]').waitFor();
     await page.waitForTimeout(300);
-    // Profile settings intentionally hands off to the next X by explicitly closing itself.
-    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: settings handoff left an extra modal`);
+    // Global X contract: an older caller may request parent close before opening
+    // a child X, but Shared modal ownership must preserve the distinct parent.
+    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: distinct child X replaced its parent`);
     const checkbox = '[data-service-workplace="test-space"]';
     const checkboxPoints = await targetPoints(checkbox);
     assert.ok(checkboxPoints.every((point) => point.hit), `${name}: workplace checkbox obscured`);
     await activate(checkboxPoints[1]);
     assert.equal(await page.locator('[data-test-selection]').textContent(), '1', `${name}: selection did not update`);
+    await closeTopSheet();
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: closing child X did not reveal parent X`);
+    assert.equal(await page.locator('[data-shared-profile-settings-menu]').count(), 1, `${name}: parent X was destroyed by child X`);
     await closeTopSheet();
     assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: stage remained locked`);
 
@@ -86,7 +90,10 @@ for (const [name, engine, contextOptions] of [
     await page.waitForTimeout(300);
     await activate((await targetPoints(menuSelector))[1]);
     await page.waitForTimeout(300);
+    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: repeated distinct child X did not stack`);
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
+    await closeTopSheet();
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: parent X missing after second child close`);
     await closeTopSheet();
 
     // Actual time correction path: parent X must survive the nested TimePicker X,
@@ -187,7 +194,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (nested TimePicker X, actual time correction, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
+    console.log(`${name}: PASS (global nested X ownership, TimePicker correction, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
