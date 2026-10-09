@@ -52,14 +52,29 @@ function historyFor(person = {}) {
   return mockHistory.get(personKey(person)) || [];
 }
 
-function accountCardFields(person = {}) {
-  const balance = balanceFor(person);
+export function personalAccountCardFields({ person = null, title = '', balance = null } = {}) {
+  const resolvedBalance = balance == null ? balanceFor(person || {}) : Math.max(0, Number(balance) || 0);
   return loyaltyCardFields({
-    title: personLabel(person),
+    title: title || personLabel(person || {}),
     subtitle: 'Личный счёт',
-    status: 'Есть остаток',
+    status: resolvedBalance > 0.009 ? 'Есть остаток' : 'Нулевой остаток',
     metaLeft: 'Денежный остаток',
-    metaRight: money(balance),
+    metaRight: money(resolvedBalance),
+  });
+}
+
+export function personalAccountVisualCard({
+  person = null,
+  title = '',
+  balance = null,
+  data = '',
+  aria = '',
+  interactive = true,
+} = {}) {
+  return loyaltyVisualCard('personal-account', personalAccountCardFields({ person, title, balance }), {
+    data,
+    aria,
+    interactive,
   });
 }
 
@@ -78,10 +93,11 @@ function historyRail(person = {}) {
 }
 
 function accountInfo(person = {}) {
+  const balance = balanceFor(person);
   return details([
     { label: 'Контакт', value: personLabel(person) },
-    { label: 'Денежный остаток', value: money(balanceFor(person)) },
-    { label: 'Состояние', value: 'Есть деньги контакта' },
+    { label: 'Денежный остаток', value: money(balance) },
+    { label: 'Состояние', value: balance > 0.009 ? 'Есть деньги контакта' : 'Нулевой остаток' },
   ]);
 }
 
@@ -101,7 +117,8 @@ export async function renderPersonalAccount(root) {
   const allContacts = availablePeople(fallbackPeople);
   const values = allContacts.filter((person) => balanceFor(person) > 0.009);
   const cards = values.length
-    ? entityCardStack(values.map((person) => loyaltyVisualCard('personal-account', accountCardFields(person), {
+    ? entityCardStack(values.map((person) => personalAccountVisualCard({
+        person,
         data: `data-personal-account-person="${personKey(person)}"`,
         aria: `Открыть личный счёт ${personLabel(person)}`,
       })))
@@ -114,7 +131,7 @@ export async function renderPersonalAccount(root) {
 
   bindViewSettings(root, 'Личный счёт', {
     type: 'personal-account',
-    fields: () => accountCardFields(values[0] || fallbackPeople[0]),
+    fields: () => personalAccountCardFields({ person: values[0] || fallbackPeople[0] }),
     onSaved: () => renderPersonalAccount(root),
   });
   root.querySelectorAll('[data-personal-account-person]').forEach((node) => {
