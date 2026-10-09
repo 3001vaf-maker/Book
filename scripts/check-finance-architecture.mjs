@@ -512,3 +512,14 @@ if (errors.length) {
 }
 
 console.log('finance architecture check: OK');
+
+
+// Settlement math has one canonical owner shared by browser and server.
+const SERVER_SETTLEMENT_DUPLICATE = 'server/src/finance/settlement-rules.ts';
+if (existsSync(SERVER_SETTLEMENT_DUPLICATE)) {
+  fail('server/src/finance/settlement-rules.ts must not exist; use core/finance/rules.js');
+}
+const financeServerSource = readFileSync('server/src/finance/finance.service.ts', 'utf8');
+if (!financeServerSource.includes("../../../core/finance/rules.js")) {
+  fail('FinanceService must use the canonical core/finance/rules.js Settlement calculator');
+}
