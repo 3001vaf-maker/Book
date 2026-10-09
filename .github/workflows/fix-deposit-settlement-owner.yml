@@ -1,0 +1,107 @@
+name: One-time canonical Settlement owner cleanup
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/fix-deposit-settlement-owner.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Keep one authoritative server Settlement path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'expected block not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          finance = Path('server/src/finance/finance.service.ts')
+          text = finance.read_text()
+          import_line = "import { calculateCanonicalSettlement, repriceCanonicalSettlement } from './settlement-rules';\n"
+          anchor = "import { SaasAccessService } from '../saas-access/saas-access.service';\n"
+          if import_line not in text:
+              if anchor not in text:
+                  raise SystemExit('Finance import anchor not found')
+              text = text.replace(anchor, anchor + import_line, 1)
+          constructor = """  constructor(\n    private readonly prisma: PrismaService,\n    private readonly access: SaasAccessService,\n  ) {}\n\n  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {\n"""
+          replacement = """  constructor(\n    private readonly prisma: PrismaService,\n    private readonly access: SaasAccessService,\n  ) {}\n\n  calculateSettlement(items: JsonObject[], pricePercent: unknown = 0) {\n    return calculateCanonicalSettlement(items, pricePercent);\n  }\n\n  repriceSettlement(items: JsonObject[], current: unknown, pricePercent: unknown = 0) {\n    return repriceCanonicalSettlement(items, current, pricePercent);\n  }\n\n  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {\n"""
+          if 'calculateSettlement(items: JsonObject[]' not in text:
+              if constructor not in text:
+                  raise SystemExit('Finance constructor anchor not found')
+              text = text.replace(constructor, replacement, 1)
+          finance.write_text(text)
+
+          record = Path('server/src/record/record.service.ts')
+          text = record.read_text()
+          text = text.replace("import { calculateCanonicalSettlement, repriceCanonicalSettlement } from '../finance/settlement-rules';\n", '')
+          if 'calculateCanonicalSettlement(' not in text or 'repriceCanonicalSettlement(' not in text:
+              raise SystemExit('Record direct Settlement calls not found')
+          text = text.replace('calculateCanonicalSettlement(', 'this.finance.calculateSettlement(')
+          text = text.replace('repriceCanonicalSettlement(', 'this.finance.repriceSettlement(')
+          record.write_text(text)
+
+          rules = Path('server/src/finance/settlement-rules.ts')
+          text = rules.read_text()
+          text = text.replace('export function calculateCanonicalSettlement(values: unknown[], discountValue: unknown = 0) {\n  const defaultPercent = settlementPercent(discountValue);', 'export function calculateCanonicalSettlement(values: unknown[], pricePercentValue: unknown = 0) {\n  const defaultPercent = settlementPercent(pricePercentValue);')
+          text = text.replace("    const totalReduction = settlementMoney(correction.money + pricePercentMoney);\n", '')
+          text = text.replace("      pricePercentMoney,\n      discountMode: pricePercent > 0 ? 'percent' : correction.money > 0 ? 'money' : 'none',\n      discountPercent: pricePercent,\n      discountMoney: totalReduction,\n      planAmount:", "      pricePercentMoney,\n      planAmount:")
+          text = text.replace("  const discountTotal = settlementMoney(correctionTotal + pricePercentTotal);\n", '')
+          text = text.replace("    discountPercent: percents.length === 1 ? percents[0] : null,\n    correctionTotal,\n    pricePercentTotal,\n    discountTotal,", "    pricePercent: percents.length === 1 ? percents[0] : null,\n    correctionTotal,\n    pricePercentTotal,")
+          text = text.replace('export function repriceCanonicalSettlement(values: unknown[], current: unknown, discountValue: unknown = 0) {\n', 'export function repriceCanonicalSettlement(values: unknown[], current: unknown, pricePercentValue: unknown = 0) {\n')
+          text = text.replace('  const defaultPercent = settlementPercent(discountValue);\n', '  const defaultPercent = settlementPercent(pricePercentValue);\n')
+          if 'discountMode:' in text or 'discountMoney:' in text or 'discountTotal' in text:
+              raise SystemExit('Legacy discount output still exists in server Settlement rules')
+          rules.write_text(text)
+
+          payment = Path('journal/record-payment.js')
+          text = payment.read_text()
+          legacy = """    pricePercentMoney: item.pricePercentMoney,\n    discountMode: item.discountMode,\n    discountPercent: item.discountPercent,\n    discountMoney: item.discountMoney,\n"""
+          if legacy in text:
+              text = text.replace(legacy, "    pricePercentMoney: item.pricePercentMoney,\n", 1)
+          payment.write_text(text)
+
+          # The authoritative server caller is FinanceService. Record may not bypass it.
+          record_text = record.read_text()
+          if "../finance/settlement-rules" in record_text or 'calculateCanonicalSettlement(' in record_text or 'repriceCanonicalSettlement(' in record_text:
+              raise SystemExit('Record still bypasses Finance Settlement owner')
+          finance_text = finance.read_text()
+          if "from './settlement-rules'" not in finance_text or 'calculateSettlement(items: JsonObject[]' not in finance_text or 'repriceSettlement(items: JsonObject[]' not in finance_text:
+              raise SystemExit('Finance canonical Settlement owner methods missing')
+          PY
+      - name: Verify focused architecture before commit
+        run: |
+          node scripts/check-record-ownership.mjs
+          node scripts/check-finance-architecture.mjs
+          node --check journal/record-payment.js
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name '3001vaf-maker'
+          git config user.email '30.01vaf@gmail.com'
+          git add server/src/finance/finance.service.ts server/src/finance/settlement-rules.ts server/src/record/record.service.ts journal/record-payment.js
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git commit -m 'Make Finance the single Settlement owner'
+          git push origin HEAD:staging
