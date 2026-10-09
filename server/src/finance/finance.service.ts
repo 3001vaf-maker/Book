@@ -80,11 +80,10 @@ function normalizeSettlement(value: unknown) {
   const items = arrayValue(source.items).map((item) => {
     const row = objectValue(item);
     const price = money(row.price ?? row.cost);
-    const hasCanonicalCorrection = row.correctionMode != null || row.correctionPercent != null || row.correctionMoney != null || row.correctedPrice != null;
-    const correctionModeValue = hasCanonicalCorrection ? text(row.correctionMode) : text(row.discountMode);
+    const correctionModeValue = text(row.correctionMode);
     const correctionMode = ['percent', 'money', 'none'].includes(correctionModeValue) ? correctionModeValue : 'none';
-    const correctionPercent = percent(hasCanonicalCorrection ? row.correctionPercent : row.discountPercent);
-    const correctionMoney = Math.min(price, money(hasCanonicalCorrection ? row.correctionMoney : row.discountMoney));
+    const correctionPercent = percent(row.correctionPercent);
+    const correctionMoney = Math.min(price, money(row.correctionMoney));
     const correctedPrice = Math.min(price, money(row.correctedPrice ?? (price - correctionMoney)));
     const pricePercent = percent(row.pricePercent);
     const inferredPricePercentMoney = Math.max(0, correctedPrice - money(row.planAmount ?? correctedPrice));
