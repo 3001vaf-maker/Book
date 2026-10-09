@@ -23,10 +23,6 @@ function closeSelector(surface) {
 }
 
 function commitSelectorValue(surface, value, label, meta = '', indicatorColor = '') {
-  // Opening Shared Select from an existing X replaces that X by contract. Keep
-  // direct references captured before replacement so the detached owning input
-  // can still receive the committed value/change event without creating a
-  // nested modal stack.
   const input = surface?.uiSourceInput || document.getElementById(surface?.dataset.inputId || '');
   const trigger = surface?.uiSourceTrigger || input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
   if (!input || !trigger) {
@@ -137,7 +133,7 @@ function openSelector(trigger) {
     </div>
   </div>`;
 
-  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор' }));
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker' }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
   surface.uiSourceInput = input;

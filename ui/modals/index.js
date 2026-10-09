@@ -6,6 +6,7 @@ let modalLevel = 0;
 
 const MODAL_VARIANTS = new Set(['q', 'x', 's', 'technical']);
 const MODAL_SURFACES = new Set(['app']);
+const X_ROLES = new Set(['action', 'editor', 'picker']);
 
 function v2Kind(variant = '') {
   if (variant === 'x') return 'bottom';
@@ -14,7 +15,7 @@ function v2Kind(variant = '') {
   return 'standard';
 }
 
-export function modal(content, { title = '', className = '', variant = 'q', surface = '' } = {}) {
+export function modal(content, { title = '', className = '', variant = 'q', surface = '', xRole = '' } = {}) {
   const resolvedVariant = MODAL_VARIANTS.has(variant) ? variant : 'q';
   const kind = v2Kind(resolvedVariant);
   const variantClass = `modal--${kind}`;
@@ -27,6 +28,10 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
     className: classes,
   });
   if (resolvedVariant === 'q') html = html.replace('data-v2-layer ', 'data-v2-layer data-v2-q="true" ');
+  if (resolvedVariant === 'x') {
+    const resolvedRole = X_ROLES.has(xRole) ? xRole : 'editor';
+    html = html.replace('data-v2-layer ', `data-v2-layer data-v2-x-role="${resolvedRole}" `);
+  }
   if (title) html = html.replace('aria-label=""', `aria-label="${escapeHtml(title)}"`);
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
