@@ -1,0 +1,73 @@
+name: One-time Settlement calculator unification
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/unify-settlement-calculator.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Use one canonical Settlement calculator
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('server/src/finance/finance.service.ts')
+          s = p.read_text()
+          old_import = "import { calculateCanonicalSettlement, repriceCanonicalSettlement } from './settlement-rules';"
+          new_import = "import { calculateSettlement as calculateCanonicalSettlement, repriceSettlement as repriceCanonicalSettlement } from '../../../core/finance/rules.js';"
+          if old_import not in s:
+              raise SystemExit('Expected server Settlement import not found')
+          s = s.replace(old_import, new_import, 1)
+          old_calc = "return calculateCanonicalSettlement(items, pricePercent);"
+          new_calc = "return calculateCanonicalSettlement(items, { pricePercent });"
+          old_reprice = "return repriceCanonicalSettlement(items, current, pricePercent);"
+          new_reprice = "return repriceCanonicalSettlement(items, current, { pricePercent });"
+          if old_calc not in s or old_reprice not in s:
+              raise SystemExit('Expected Finance Settlement wrappers not found')
+          s = s.replace(old_calc, new_calc, 1).replace(old_reprice, new_reprice, 1)
+          p.write_text(s)
+
+          duplicate = Path('server/src/finance/settlement-rules.ts')
+          if not duplicate.exists():
+              raise SystemExit('Server duplicate calculator missing before cleanup')
+          duplicate.unlink()
+
+          # Guard the architectural invariant: one calculator source only.
+          check = Path('scripts/check-finance-architecture.mjs')
+          c = check.read_text()
+          marker = "const SERVER_SETTLEMENT_DUPLICATE = 'server/src/finance/settlement-rules.ts';"
+          if marker not in c:
+              c += "\n\n// Settlement math has one canonical owner shared by browser and server.\nconst SERVER_SETTLEMENT_DUPLICATE = 'server/src/finance/settlement-rules.ts';\nif (existsSync(SERVER_SETTLEMENT_DUPLICATE)) {\n  fail('server/src/finance/settlement-rules.ts must not exist; use core/finance/rules.js');\n}\nconst financeServerSource = readFileSync('server/src/finance/finance.service.ts', 'utf8');\nif (!financeServerSource.includes(\"../../../core/finance/rules.js\")) {\n  fail('FinanceService must use the canonical core/finance/rules.js Settlement calculator');\n}\n"
+              check.write_text(c)
+          PY
+      - name: Verify focused checks
+        run: |
+          node scripts/check-finance-architecture.mjs
+          node scripts/check-record-ownership.mjs
+          cd server
+          npm install
+          npx prisma generate
+          npm run build
+      - name: Commit canonical calculator cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name '3001vaf-maker'
+          git config user.email '30.01vaf@gmail.com'
+          git add server/src/finance/finance.service.ts scripts/check-finance-architecture.mjs
+          git add -u server/src/finance/settlement-rules.ts
+          git diff --cached --check
+          git commit -m 'Use one canonical Settlement calculator'
+          git push origin HEAD:staging
