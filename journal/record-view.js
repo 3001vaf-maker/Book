@@ -276,13 +276,14 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
-  const openProcedureCorrection = () => {
+  const openProcedureCorrection = (procedureIndex) => {
     if (isPaid()) return;
     openRecordProcedureCorrection({
       date: dateKey(state.date),
       workplaceId: state.workplaceId,
       from: state.from,
       selectedProcedures: state.procedures,
+      procedureIndex,
       excludeId: record.id,
       onApply: ({ procedures, to }) => {
         state = {
@@ -356,6 +357,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const render = () => {
     scheduleStartRender();
     const paid = isPaid();
+    const currentRecord = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    const cancelled = currentRecord?.status === 'cancelled';
     const personSource = state.person || findPerson(record) || {};
     const currentPerson = personSource?.key
       ? people().find((person) => String(person.key) === String(personSource.key)) || personSource
@@ -377,9 +380,17 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       discount: Number(discountPercent) > 0 ? `${formatPercent(discountPercent)}%` : '0%',
       total: formatMoney(finance?.planTotal),
       procedures: [
-        ...state.procedures.map((item) => ({
+        ...state.procedures.map((item, index) => ({
           name: item.name || '',
           right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+          ...(!paid && !cancelled ? {
+            action: {
+              label: '⚙',
+              className: 'record-procedure-settings-button',
+              data: `data-record-view-procedure-edit="${index}"`,
+              aria: `Настройки процедуры ${item.name || ''}`,
+            },
+          } : {}),
         })),
         ...state.products.map((item) => ({
           name: item.name || '',
@@ -419,6 +430,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }
 
+    root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
+      const index = Number(node.dataset.recordViewProcedureEdit);
+      if (!Number.isInteger(index) || !state.procedures[index]) return;
+      openProcedureCorrection(index);
+    }));
     m.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
       if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
@@ -476,11 +492,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     openSharedProfileSettingsMenu({
       title: 'Настройки записи',
       actions: [
-        !cancelled && !isPaid() ? {
-          id: 'procedure-correction',
-          label: 'Корректировка',
-          onSelect: openProcedureCorrection,
-        } : null,
         !cancelled ? {
           id: 'move',
           label: 'Перенос',
