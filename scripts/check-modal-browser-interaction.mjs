@@ -21,7 +21,7 @@ for (const [name, engine, contextOptions] of [
       await page.goto(`${base}/tests/modal-hit-targets-browser.html${suffix}`);
       await page.locator('html[data-modal-test-ready="true"]').waitFor();
       await page.locator('[data-v2-app]').waitFor();
-      await page.waitForTimeout(300); // Shared entrance animation must settle before geometry assertions.
+      await page.waitForTimeout(300);
     };
     const targetPoints = async (selector) => page.locator(selector).evaluate((node) => {
       const r = node.getBoundingClientRect();
@@ -55,14 +55,24 @@ for (const [name, engine, contextOptions] of [
       await page.mouse.up();
       await page.waitForFunction((expected) => document.querySelectorAll('[data-modal]').length === expected, before - 1);
     };
+    const tapOrClick = async (locator) => {
+      if (contextOptions.hasTouch) await locator.tap();
+      else await locator.click();
+    };
+    const chooseTime1015 = async () => {
+      const hour10 = page.locator('[data-time-wheel-type="hours"][data-value="10"][data-cycle="2"]');
+      const minute15 = page.locator('[data-time-wheel-type="minutes"][data-value="15"][data-cycle="2"]');
+      await tapOrClick(hour10);
+      await tapOrClick(minute15);
+      await page.waitForTimeout(250);
+      await tapOrClick(page.locator('[data-time-save]'));
+    };
 
     await open();
-    if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
-    else await page.locator('[data-test-settings]').click();
+    await tapOrClick(page.locator('[data-test-settings]'));
     await page.waitForTimeout(300);
     const menuSelector = '[data-shared-profile-action="workplaces"]';
 
-    // Negative control: the old 20px inset really places the first button under the 30px strip.
     await page.locator('.modal-sheet').evaluate((node) => { node.style.paddingTop = '20px'; });
     assert.equal((await targetPoints(menuSelector))[0].hit, false, `${name}: negative control did not reproduce overlap`);
     await page.locator('.modal-sheet').evaluate((node) => { node.style.removeProperty('padding-top'); });
@@ -71,7 +81,6 @@ for (const [name, engine, contextOptions] of [
     await activate(points[0]);
     await page.locator('[data-service-workplace="test-space"]').waitFor();
     await page.waitForTimeout(300);
-    // Profile settings intentionally hands off to the next X by explicitly closing itself.
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: settings handoff left an extra modal`);
     const checkbox = '[data-service-workplace="test-space"]';
     const checkboxPoints = await targetPoints(checkbox);
@@ -81,64 +90,75 @@ for (const [name, engine, contextOptions] of [
     await closeTopSheet();
     assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: stage remained locked`);
 
-    if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
-    else await page.locator('[data-test-settings]').click();
+    await tapOrClick(page.locator('[data-test-settings]'));
     await page.waitForTimeout(300);
     await activate((await targetPoints(menuSelector))[1]);
     await page.waitForTimeout(300);
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
     await closeTopSheet();
 
-    // Actual time correction path: parent X must survive the nested TimePicker X,
-    // and the chosen time must be committed back into that still-live parent.
-    if (contextOptions.hasTouch) await page.locator('[data-test-time-range]').tap();
-    else await page.locator('[data-test-time-range]').click();
+    // Shared time-range editor: editor X survives picker X and saves only by its Save button.
+    await tapOrClick(page.locator('[data-test-time-range]'));
     await page.locator('[data-shared-time-range-form]').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: time-range parent X missing`);
-    const fromTrigger = page.locator('[data-time-picker="from"] [data-time-open]');
-    if (contextOptions.hasTouch) await fromTrigger.tap();
-    else await fromTrigger.click();
+    assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'editor', `${name}: time-range X role is not editor`);
+    await tapOrClick(page.locator('[data-time-picker="from"] [data-time-open]'));
     await page.locator('.modal--time-picker-sheet').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: TimePicker replaced parent X instead of stacking`);
+    assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'picker', `${name}: TimePicker X role is not picker`);
     assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: time-range parent X was destroyed`);
-
-    const hour10 = page.locator('[data-time-wheel-type="hours"][data-value="10"][data-cycle="2"]');
-    const minute15 = page.locator('[data-time-wheel-type="minutes"][data-value="15"][data-cycle="2"]');
-    if (contextOptions.hasTouch) {
-      await hour10.tap();
-      await minute15.tap();
-    } else {
-      await hour10.click();
-      await minute15.click();
-    }
-    await page.waitForTimeout(250);
-
-    const timeSave = page.locator('[data-time-save]');
-    if (contextOptions.hasTouch) await timeSave.tap();
-    else await timeSave.click();
+    await chooseTime1015();
     await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
     assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: parent X did not survive TimePicker save`);
     assert.equal(await page.locator('[data-time-picker="from"] [data-time-value]').inputValue(), '10:15', `${name}: corrected time was not returned to parent X`);
-
-    const rangeSubmit = page.locator('[data-shared-time-range-form] button[type="submit"]');
-    if (contextOptions.hasTouch) await rangeSubmit.tap();
-    else await rangeSubmit.click();
+    await tapOrClick(page.locator('[data-shared-time-range-form] button[type="submit"]'));
     await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
     assert.equal(await page.locator('[data-test-time-result]').textContent(), '10:15-18:00', `${name}: corrected time range did not save`);
 
+    // Real Journal path: action X hands off to editor X; picker stacks over editor;
+    // closing editor discards draft; only editor Save commits the time change.
+    const openJournalEditorThroughAction = async () => {
+      await tapOrClick(page.locator('[data-test-journal-time]'));
+      await page.locator('[data-test-open-journal-time-editor]').waitFor();
+      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal action X missing`);
+      assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'action', `${name}: Journal first X role is not action`);
+      await tapOrClick(page.locator('[data-test-open-journal-time-editor]'));
+      await page.locator('[name="dayWorkplaceFrom"]').waitFor();
+      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: action X did not hand off to Journal editor X`);
+      assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'editor', `${name}: Journal working-time X role is not editor`);
+    };
+
+    await openJournalEditorThroughAction();
+    await tapOrClick(page.locator('[data-time-picker="dayWorkplaceFrom"] [data-time-open]'));
+    await page.locator('.modal--time-picker-sheet').waitFor();
+    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal TimePicker replaced editor X`);
+    assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'picker', `${name}: Journal TimePicker role is not picker`);
+    await chooseTime1015();
+    await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
+    assert.equal(await page.locator('[name="dayWorkplaceFrom"]').inputValue(), '10:15', `${name}: Journal picker value did not return to editor`);
+    assert.equal(await page.locator('[data-test-journal-time-result]').textContent(), '09:00-18:00', `${name}: Journal draft was saved before editor Save`);
+    await closeTopSheet();
+    assert.equal(await page.locator('[data-test-journal-time-result]').textContent(), '09:00-18:00', `${name}: closing Journal editor committed an unsaved draft`);
+
+    await openJournalEditorThroughAction();
+    assert.equal(await page.locator('[name="dayWorkplaceFrom"]').inputValue(), '09:00', `${name}: discarded Journal draft leaked into reopened editor`);
+    await tapOrClick(page.locator('[data-time-picker="dayWorkplaceFrom"] [data-time-open]'));
+    await page.locator('.modal--time-picker-sheet').waitFor();
+    await chooseTime1015();
+    await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
+    await tapOrClick(page.locator('[data-day-workplace-time-save]'));
+    await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
+    assert.equal(await page.locator('[data-test-journal-time-result]').textContent(), '10:15-18:00', `${name}: Journal Save did not commit corrected time`);
+
     // X veil: tapping Header A while X is active must only dismiss the X.
-    // The underlying A action must never fire from the same input.
-    if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
-    else await page.locator('[data-test-settings]').click();
+    await tapOrClick(page.locator('[data-test-settings]'));
     await page.locator('[data-modal]').waitFor();
     await activateSelector('[data-test-header-a]');
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through X veil`);
 
-    // Q owns only Header C outside its sheet. C must remain live and must not dismiss Q;
-    // tapping A is veil input: Q closes and A still must not fire.
-    if (contextOptions.hasTouch) await page.locator('[data-test-open-q]').tap();
-    else await page.locator('[data-test-open-q]').click();
+    // Q owns only Header C outside its sheet.
+    await tapOrClick(page.locator('[data-test-open-q]'));
     await page.locator('[data-test-q-content]').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
     await activateSelector('[data-test-header-c]');
@@ -148,25 +168,22 @@ for (const [name, engine, contextOptions] of [
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
 
-    // Journal selector stacks while choosing, then its committed change explicitly closes the owning X.
+    // Journal selector is a picker X over its editor X, then the selected workplace commits the owning control.
     for (let cycle = 0; cycle < 3; cycle += 1) {
       const journalTrigger = page.locator('[data-test-journal-workplace]');
-      if (contextOptions.hasTouch) await journalTrigger.tap();
-      else await journalTrigger.click();
+      await tapOrClick(journalTrigger);
 
       const journalSelect = page.locator('[data-journal-workplace-select]').locator('..').locator('[data-ui-select-trigger]');
       await journalSelect.waitFor();
       assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal parent X missing or duplicated`);
 
-      if (contextOptions.hasTouch) await journalSelect.tap();
-      else await journalSelect.click();
+      await tapOrClick(journalSelect);
       await page.locator('[data-ui-selector]').waitFor();
       assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal selector did not stack while parent input remained active`);
+      assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'picker', `${name}: selector X role is not picker`);
 
       const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
-      const option = page.locator(`[data-ui-select-option][data-value="${targetValue}"]`);
-      if (contextOptions.hasTouch) await option.tap();
-      else await option.click();
+      await tapOrClick(page.locator(`[data-ui-select-option][data-value="${targetValue}"]`));
 
       await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
       assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: Journal stage stayed inert after workplace switch`);
@@ -187,7 +204,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (nested TimePicker X, actual time correction, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
+    console.log(`${name}: PASS (X action→editor→picker contract, Journal time discard/save, selectors, veil, Q, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
