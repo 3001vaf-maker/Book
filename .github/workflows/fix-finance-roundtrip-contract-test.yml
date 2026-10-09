@@ -51,3 +51,5 @@ jobs:
           git diff --cached --check
           git commit -m 'Align Finance roundtrip test with price correction contract'
           git push origin HEAD:staging
+
+# one-time migration trigger
