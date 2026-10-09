@@ -21,7 +21,15 @@ function sourceKey(type, id) {
   return `${type}:${String(id || '')}`;
 }
 
-function paymentSourceOptions(wallets = [], deposits = []) {
+function personalAccountAvailable(personalAccount = null) {
+  if (!personalAccount || typeof personalAccount !== 'object') return 0;
+  const balance = Math.max(0, numberValue(personalAccount.balance));
+  const explicit = personalAccount.availableAmount == null ? balance : Math.max(0, numberValue(personalAccount.availableAmount));
+  return Math.min(balance, explicit);
+}
+
+function paymentSourceOptions(wallets = [], deposits = [], personalAccount = null) {
+  const accountAvailable = personalAccountAvailable(personalAccount);
   return [
     { value: '', label: 'Источник оплаты' },
     ...(Array.isArray(wallets) ? wallets : []).map((wallet) => ({
@@ -34,19 +42,25 @@ function paymentSourceOptions(wallets = [], deposits = []) {
         value: sourceKey('deposit', deposit?.depositId || deposit?.id),
         label: `${String(deposit?.programName || deposit?.name || 'Депозит')} · остаток ${moneyDisplay(deposit?.balance)}`,
       })),
+    ...(accountAvailable > 0.009 ? [{
+      value: sourceKey('personal-account', personalAccount?.personKey || 'account'),
+      label: `Личный счёт · доступно ${moneyDisplay(accountAvailable)}`,
+    }] : []),
   ];
 }
 
-function allocationRow(index, wallets, deposits, initial = {}) {
+function allocationRow(index, wallets, deposits, personalAccount, initial = {}) {
   const amount = initial?.amount == null ? '' : moneyInputText(initial.amount);
   const selected = initial?.depositId
     ? sourceKey('deposit', initial.depositId)
-    : (initial?.walletId ? sourceKey('wallet', initial.walletId) : '');
+    : (initial?.personalAccount === true
+      ? sourceKey('personal-account', personalAccount?.personKey || 'account')
+      : (initial?.walletId ? sourceKey('wallet', initial.walletId) : ''));
   return `<div class="form-grid" data-payment-allocation-row="${index}">
     ${select({
       label: 'Источник оплаты',
       value: selected,
-      options: paymentSourceOptions(wallets, deposits),
+      options: paymentSourceOptions(wallets, deposits, personalAccount),
       data: `data-payment-allocation-source="${index}"`,
       aria: `Источник оплаты ${index + 1}`,
     })}
@@ -82,26 +96,33 @@ function normalizeDepositAllocations(allocations = []) {
   })).filter((item) => item.depositId || item.amount > 0);
 }
 
-export function paymentAllocationState(allocations = [], total = 0, depositAllocations = []) {
+export function paymentAllocationState(allocations = [], total = 0, depositAllocations = [], personalAccountAllocation = null) {
   const wallets = normalizeWalletAllocations(allocations);
   const deposits = normalizeDepositAllocations(depositAllocations);
   const due = Math.max(0, numberValue(total));
   const cashReceived = wallets.reduce((sum, item) => sum + item.amount, 0);
   const depositReceived = deposits.reduce((sum, item) => sum + item.amount, 0);
+  const personalAccountAmount = Math.max(0, numberValue(personalAccountAllocation?.amount));
+  const personalAccountMaximum = Math.max(0, numberValue(personalAccountAllocation?.availableAmount));
+  const personalAccountValid = personalAccountAmount <= 0.009
+    || (personalAccountMaximum > 0.009 && personalAccountAmount <= personalAccountMaximum + 0.009);
   const depositValid = deposits.every((item) => item.depositId && item.amount > 0 && (!item.balance || item.amount <= item.balance + 0.009));
-  const sourcesValid = wallets.every((item) => item.walletId && item.amount > 0) && depositValid;
-  const depositOverflow = depositReceived > due + 0.009;
-  const serviceFromCash = Math.min(cashReceived, Math.max(0, due - depositReceived));
-  const applied = Math.min(due, depositReceived + serviceFromCash);
+  const sourcesValid = wallets.every((item) => item.walletId && item.amount > 0) && depositValid && personalAccountValid;
+  const nonCashReceived = depositReceived + personalAccountAmount;
+  const nonCashOverflow = nonCashReceived > due + 0.009;
+  const serviceFromCash = Math.min(cashReceived, Math.max(0, due - nonCashReceived));
+  const applied = Math.min(due, nonCashReceived + serviceFromCash);
   const tips = Math.max(0, cashReceived - serviceFromCash);
   const remaining = Math.max(0, due - applied);
-  const received = cashReceived + depositReceived;
-  const valid = received > 0 && sourcesValid && !depositOverflow;
+  const received = cashReceived + nonCashReceived;
+  const valid = received > 0 && sourcesValid && !nonCashOverflow;
   return {
     allocations: wallets,
     depositAllocations: deposits.map(({ balance, ...item }) => item),
+    personalAccountAmount,
     cashReceived,
     depositReceived,
+    personalAccountReceived: personalAccountAmount,
     received,
     tips,
     applied,
@@ -113,28 +134,38 @@ export function paymentAllocationState(allocations = [], total = 0, depositAlloc
 export function paymentMethodsMarkup({
   wallets = [],
   deposits = [],
+  personalAccount = null,
   total = 0,
   initialAllocations = [],
   initialDepositAllocations = [],
+  initialPersonalAccountAmount = 0,
   showAction = true,
   showTotal = true,
 } = {}) {
   const initial = [
     ...(Array.isArray(initialDepositAllocations) ? initialDepositAllocations.map((item) => ({ ...item, depositId: item?.depositId || item?.id })) : []),
+    ...(Math.max(0, numberValue(initialPersonalAccountAmount)) > 0.009 ? [{ personalAccount: true, amount: initialPersonalAccountAmount }] : []),
     ...(Array.isArray(initialAllocations) ? initialAllocations : []),
   ];
   const rowCount = Math.max(2, Math.min(4, initial.length || 0));
   return `<div class="form-grid" data-payment-allocation-owner>
     ${showTotal ? `<div data-payment-remaining>${totalReceipt('К оплате', total)}</div>` : ''}
     <div class="form-grid">
-      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, initial[index] || {})).join('')}
+      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, personalAccount, initial[index] || {})).join('')}
     </div>
     <div data-payment-tips-row hidden></div>
     ${showAction ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-allocation-submit' })}</div>` : ''}
   </div>`;
 }
 
-export function initPaymentMethodsAllocation(root, { wallets = [], deposits = [], total = 0, onPay = () => {}, onChange = () => {} } = {}) {
+export function initPaymentMethodsAllocation(root, {
+  wallets = [],
+  deposits = [],
+  personalAccount = null,
+  total = 0,
+  onPay = () => {},
+  onChange = () => {},
+} = {}) {
   if (!root) return null;
   const remainingNode = root.querySelector('[data-payment-remaining]');
   const tipsRow = root.querySelector('[data-payment-tips-row]');
@@ -145,10 +176,13 @@ export function initPaymentMethodsAllocation(root, { wallets = [], deposits = []
   }));
   const walletById = new Map((Array.isArray(wallets) ? wallets : []).map((item) => [String(item?.id || ''), item]));
   const depositById = new Map((Array.isArray(deposits) ? deposits : []).map((item) => [String(item?.depositId || item?.id || ''), item]));
+  const personalKey = String(personalAccount?.personKey || 'account');
+  const personalAvailable = personalAccountAvailable(personalAccount);
 
   function normalizedSources() {
     const walletAllocations = [];
     const depositAllocations = [];
+    let personalAccountAmount = 0;
     for (const { sourceInput, amountInput } of rows()) {
       const value = String(sourceInput?.value || '');
       const amount = Math.max(0, numberValue(amountInput?.value));
@@ -167,16 +201,36 @@ export function initPaymentMethodsAllocation(root, { wallets = [], deposits = []
           balance: Math.max(0, numberValue(deposit?.balance)),
           amount,
         });
+      } else if (type === 'personal-account' && id === personalKey) {
+        personalAccountAmount += amount;
       } else {
         walletAllocations.push({ walletId: '', walletName: '', amount });
       }
     }
-    return { walletAllocations, depositAllocations };
+    return { walletAllocations, depositAllocations, personalAccountAmount };
   }
 
   function state() {
     const values = normalizedSources();
-    return paymentAllocationState(values.walletAllocations, total, values.depositAllocations);
+    return paymentAllocationState(values.walletAllocations, total, values.depositAllocations, {
+      amount: values.personalAccountAmount,
+      availableAmount: personalAvailable,
+    });
+  }
+
+  function sourceMaximum(value) {
+    if (value.startsWith('deposit:')) {
+      const deposit = depositById.get(value.slice('deposit:'.length));
+      return Math.max(0, numberValue(deposit?.balance));
+    }
+    if (value === sourceKey('personal-account', personalKey)) return personalAvailable;
+    return null;
+  }
+
+  function clampSourceAmount(sourceInput, amountInput) {
+    const maximum = sourceMaximum(String(sourceInput?.value || ''));
+    if (maximum == null || !amountInput) return;
+    if (numberValue(amountInput.value) > maximum) amountInput.value = moneyInputText(maximum);
   }
 
   function sync() {
@@ -193,22 +247,11 @@ export function initPaymentMethodsAllocation(root, { wallets = [], deposits = []
 
   rows().forEach(({ sourceInput, amountInput }) => {
     sourceInput?.addEventListener('change', () => {
-      const value = String(sourceInput.value || '');
-      if (value.startsWith('deposit:')) {
-        const deposit = depositById.get(value.slice('deposit:'.length));
-        const current = Math.max(0, numberValue(amountInput?.value));
-        const maximum = Math.max(0, numberValue(deposit?.balance));
-        if (amountInput && current > maximum) amountInput.value = moneyInputText(maximum);
-      }
+      clampSourceAmount(sourceInput, amountInput);
       sync();
     });
     amountInput?.addEventListener('input', () => {
-      const value = String(sourceInput?.value || '');
-      if (value.startsWith('deposit:')) {
-        const deposit = depositById.get(value.slice('deposit:'.length));
-        const maximum = Math.max(0, numberValue(deposit?.balance));
-        if (numberValue(amountInput.value) > maximum) amountInput.value = moneyInputText(maximum);
-      }
+      clampSourceAmount(sourceInput, amountInput);
       sync();
     });
     amountInput?.addEventListener('blur', () => {
@@ -224,9 +267,11 @@ export function initPaymentMethodsAllocation(root, { wallets = [], deposits = []
     onPay?.({
       allocations: current.allocations,
       depositAllocations: current.depositAllocations,
+      personalAccountAmount: current.personalAccountAmount,
       receivedAmount: current.received,
       cashReceivedAmount: current.cashReceived,
       depositReceivedAmount: current.depositReceived,
+      personalAccountReceivedAmount: current.personalAccountReceived,
       appliedAmount: current.applied,
       tips: current.tips,
     });
