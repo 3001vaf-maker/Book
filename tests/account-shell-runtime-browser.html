@@ -138,21 +138,35 @@ ok(Boolean(fDeck()), 'real account F deck did not render');
 ok(ownerCount() === 1, 'initial account shell must have exactly one FEZ owner');
 ok(card('home')?.classList.contains('is-active'), 'home must be initial active F');
 
-mark('linked-investments');
-const acceptedInvestmentCard = root.querySelector('[data-account-investment="tenant-invest:investment-accepted"]');
-ok(Boolean(acceptedInvestmentCard?.classList.contains('entity-visual-card')), 'Accepted linked investment must appear as shared entity card in Overview');
-const proposal = root.querySelector('[data-account-investment-proposal="0"]');
-ok(Boolean(proposal?.classList.contains('list-entry')), 'Pending investment proposal must appear as shared List Entry');
+mark("linked-investments-overview");
+ok(!root.querySelector('[data-account-investment="tenant-invest:investment-accepted"]'), 'Accepted linked investment must not appear in Overview');
+ok(!root.querySelector('[data-account-investment-proposal]'), 'Pending investment proposal must not appear in Overview');
+
+await edgeOpen(1);
+await selectRoot('contacts',11);
+const relationship = root.querySelector('[data-global-relationship="tenant-invest"]');
+ok(Boolean(relationship), 'Professional contact card missing');
+relationship?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(140);
+ok(state.accountTab === 'contact-detail', 'Professional contact profile did not open');
+const contactZ = root.querySelector('[data-v2-z-layer].account-contact-detail-z');
+ok(Boolean(contactZ)", 'Professional contact profile must open as stacked Z');
+
+mark('linked-investments-contact');
+const acceptedInvestmentCard = contactZ?.querySelector('[data-account-investment="tenant-invest:investment-accepted"]');
+ok(Boolean(acceptedInvestmentCard?.classList.contains('entity-visual-card')), 'Accepted linked investment must appear as a full card in professional contact profile');
+const proposal = contactZ?.querySelector('[data-account-investment-proposal="tenant-invest:investment-pending"]');
+ok(Boolean(proposal?.classList.contains('entity-visual-card')), 'Pending investment proposal must appear as a full card in professional contact profile');
 acceptedInvestmentCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(90);
 let investmentZ = root.querySelector('[data-v2-z-layer].account-investment-z');
 ok(Boolean(investmentZ), 'Linked investor card must open a real stacked Z');
 ok(Boolean(root.querySelector('[data-account-investment-chat]')), 'Linked investor Z must expose shared D chat');
-ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROI');
+ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROIÙ');
 ok(investmentZ?.textContent.includes('История'), 'Linked investor Z must expose investment history');
-ok(investmentZ?.textContent.includes('Вложение'), 'Linked investor history must mirror project contribution');
-ok(investmentZ?.textContent.includes('Доход'), 'Linked investor history must mirror paid income');
-ok(investmentZ?.textContent.includes('Изменение оценки'), 'Linked investor history must include non-cash valuation');
+ok(investmentZ?.textContent.includes('Вложение')), 'Linked investor history must mirror project contribution');
+ok(investmentZ?.textContent.includes('Доход')), 'Linked investor history must mirror paid income');
+ok(investmentZ?.textContent.includes('Изменение оценки')), 'Linked investor history must include non-cash valuation');
 investmentZ?.v2Close?.();
 await wait(90);
 proposal?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
@@ -163,21 +177,23 @@ ok(Boolean(proposalModal?.querySelector('[data-account-investment-accept]')), 'I
 ok(Boolean(proposalModal?.querySelector('[data-account-investment-decline]')), 'Investment proposal Decline action missing');
 proposalModal?.v2Close?.();
 await wait(50);
-
-await edgeOpen(1);
-await selectRoot('profile',11);
-ok(shell() === initialShell, 'profile navigation rebuilt the whole account shell');
+contactZ?.v2Close?.();
+await wait(100);
 
 await edgeOpen(2);
-await selectRoot('contacts',12);
-ok(shell() === initialShell, 'contacts navigation rebuilt the whole account shell');
+await selectRoot('profile',12);
+ok(shell() === initialShell, 'profile navigation rebuilt the whole account shell');
 
 await edgeOpen(3);
-await selectRoot('history',13);
-ok(shell() === initialShell, 'history navigation rebuilt the whole account shell');
+await selectRoot('contacts',13);
+ok(shell() === initialShell, 'contacts navigation rebuilt the whole account shell');
 
 await edgeOpen(4);
-await selectRoot('home',14);
+await selectRoot('history',14);
+ok(shell() === initialShell, 'history navigation rebuilt the whole account shell');
+
+await edgeOpen(5);
+await selectRoot('home',15);
 ok(shell() === initialShell, 'home navigation rebuilt the whole account shell');
 
 // Repeat the cycle to expose handler accumulation that only appears after several renders.
