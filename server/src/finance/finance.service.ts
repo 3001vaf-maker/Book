@@ -4,25 +4,20 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 import { calculateSettlement as calculateCanonicalSettlement, repriceSettlement as repriceCanonicalSettlement } from '../../../core/finance/rules.js';
+import {
+  closeDepositForRefund,
+  consumeDepositAllocations,
+  createDepositInstance,
+  depositBenefitMode,
+  depositBenefitRate,
+  depositTermActiveAt,
+  restoreDepositAllocations,
+  reconsumeDepositAllocations,
+} from '../loyalty/deposit-state';
+import { resolvePersonPricePercent } from '../loyalty/price-condition';
 
 type JsonObject = Record<string, any>;
 type Db = PrismaService | Prisma.TransactionClient;
-
-type CanonicalDepositRow = {
-  depositId: string;
-  programId: string;
-  programName: string;
-  personKey: string;
-  person: unknown;
-  terms: unknown;
-  initialAmount: Prisma.Decimal;
-  principalBalance: Prisma.Decimal;
-  benefitBalance: Prisma.Decimal;
-  balance: Prisma.Decimal;
-  status: string;
-  fundedAt: Date;
-  fundingOperationId: string;
-};
 
 function objectValue(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
@@ -123,6 +118,19 @@ function validSettlement(value: unknown) {
   return settlement.items.length > 0 || settlement.planTotal > 0 ? settlement : null;
 }
 
+function canonicalSettlementInput(value: unknown, pricePercent: number) {
+  const requested = validSettlement(value);
+  if (!requested) throw new BadRequestException('У оплаты отсутствует расчёт');
+  const items = requested.items.map((item) => ({
+    ...item,
+    pricePercent: null,
+    pricePercentMoney: undefined,
+    planAmount: undefined,
+    correctedPrice: undefined,
+  }));
+  return calculateCanonicalSettlement(items, { pricePercent });
+}
+
 function allocationsValue(value: unknown) {
   return arrayValue(value)
     .map((entry) => {
@@ -144,6 +152,8 @@ function depositAllocationsValue(value: unknown) {
         depositId: text(row.depositId ?? row.sourceId ?? row.id),
         name: text(row.name ?? row.label),
         amount: money(row.amount),
+        principalAmount: money(row.principalAmount),
+        benefitAmount: money(row.benefitAmount),
       };
     })
     .filter((entry) => entry.depositId && entry.amount > 0);
@@ -152,18 +162,6 @@ function depositAllocationsValue(value: unknown) {
 function personKey(value: unknown) {
   const person = objectValue(value);
   return text(person.key ?? person.personKey ?? person.id);
-}
-
-function depositTermActiveAt(value: unknown, at: Date) {
-  const terms = objectValue(value);
-  const mode = text(terms.termMode).toLowerCase();
-  if (mode !== 'dated' && mode !== 'fixed') return true;
-  const day = at.toISOString().slice(0, 10);
-  const start = text(terms.termStartDate).slice(0, 10);
-  const end = text(terms.termEndDate).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(start) && day < start) return false;
-  return day <= end;
 }
 
 const DEFAULT_FINANCE_ARTICLES = [
@@ -326,8 +324,11 @@ export class FinanceService {
   }
 
   private async depositProgramsWith(db: Db, tenantId: string) {
-    const row = await db.businessAuxiliaryState.findUnique({ where: { tenantId } });
-    return arrayValue(objectValue(row?.data).depositPrograms).map((value) => clone(objectValue(value)));
+    const rows = await db.loyaltyDepositProgram.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: 'asc' }, { programId: 'asc' }],
+    });
+    return rows.map((row) => clone(objectValue(row.data)));
   }
 
   private async depositProgramWith(db: Db, tenantId: string, programId: string) {
@@ -340,16 +341,9 @@ export class FinanceService {
 
   private async canonicalDepositWith(db: Db, tenantId: string, depositId: string) {
     const id = text(depositId);
-    const rows = await db.$queryRaw<CanonicalDepositRow[]>(Prisma.sql`
-      SELECT
-        "depositId", "programId", "programName", "personKey", "person", "terms",
-        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
-        "fundedAt", "fundingOperationId"
-      FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId} AND "depositId" = ${id}
-      LIMIT 1
-    `);
-    const row = rows[0];
+    const row = await db.loyaltyDepositInstance.findUnique({
+      where: { tenantId_depositId: { tenantId, depositId: id } },
+    });
     if (!row) throw new BadRequestException('Депозит не найден или отменён');
     return {
       depositId: row.depositId,
@@ -363,7 +357,7 @@ export class FinanceService {
       benefitBalance: money(row.benefitBalance),
       balance: money(row.balance),
       status: text(row.status),
-      fundedAt: row.fundedAt instanceof Date ? row.fundedAt.toISOString() : String(row.fundedAt || ''),
+      fundedAt: row.fundedAt.toISOString(),
       fundingOperationId: row.fundingOperationId,
     };
   }
@@ -408,16 +402,10 @@ export class FinanceService {
 
   async listDeposits(tenantId: string, personId = '') {
     const key = text(personId);
-    const rows = await this.prisma.$queryRaw<CanonicalDepositRow[]>(Prisma.sql`
-      SELECT
-        "depositId", "programId", "programName", "personKey", "person", "terms",
-        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
-        "fundedAt", "fundingOperationId"
-      FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId}
-        AND (${key} = '' OR "personKey" = ${key})
-      ORDER BY "fundedAt" DESC
-    `);
+    const rows = await this.prisma.loyaltyDepositInstance.findMany({
+      where: { tenantId, ...(key ? { personKey: key } : {}) },
+      orderBy: [{ fundedAt: 'desc' }, { createdAt: 'desc' }],
+    });
     return rows.map((row) => ({
       depositId: row.depositId,
       programId: row.programId,
@@ -430,7 +418,7 @@ export class FinanceService {
       balance: money(row.balance),
       terms: clone(objectValue(row.terms)),
       status: row.status,
-      fundedAt: row.fundedAt instanceof Date ? row.fundedAt.toISOString() : String(row.fundedAt || ''),
+      fundedAt: row.fundedAt.toISOString(),
       fundingOperationId: row.fundingOperationId,
     }));
   }
@@ -452,6 +440,20 @@ export class FinanceService {
 
     await this.serializable(async (tx) => {
       const program = await this.depositProgramWith(tx, tenantId, programId);
+      const incomingPercent = depositBenefitMode(program) === 'discount' ? depositBenefitRate(program) : 0;
+      await resolvePersonPricePercent(tx, tenantId, person, occurredAt, incomingPercent > 0 ? [{
+        type: 'program', programType: 'deposit', programId, name: text(program.name) || 'Депозит', percent: incomingPercent,
+      }] : []);
+      await createDepositInstance(tx, tenantId, {
+        depositId,
+        programId,
+        programName: text(program.name) || 'Депозит',
+        person,
+        terms: clone(program),
+        amount,
+        occurredAt,
+        fundingOperationId: depositId,
+      });
       await this.createOperationWithEntries(tx, tenantId, {
         operationId: depositId,
         kind: 'deposit-funding',
@@ -497,8 +499,7 @@ export class FinanceService {
 
     await this.serializable(async (tx) => {
       const deposit = await this.canonicalDepositWith(tx, tenantId, id);
-      if (deposit.status !== 'active' || !depositTermActiveAt(deposit.terms, occurredAt)) throw new BadRequestException('Возврат по этому депозиту недоступен');
-      if (amount > deposit.principalBalance + 0.009) throw new BadRequestException('Сумма возврата превышает остаток реальных денег депозита');
+      await closeDepositForRefund(tx, tenantId, id, amount, occurredAt);
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
         kind: 'deposit-withdrawal',
@@ -814,8 +815,8 @@ export class FinanceService {
     const input = objectValue(body);
     const source = sourceValue(input.source);
     if (!source.type || !source.id) throw new BadRequestException('У оплаты отсутствует источник');
-    const settlement = validSettlement(input.settlement);
-    if (!settlement) throw new BadRequestException('У оплаты отсутствует расчёт');
+    const requestedSettlement = validSettlement(input.settlement);
+    if (!requestedSettlement) throw new BadRequestException('У оплаты отсутствует расчёт');
     const allocations = allocationsValue(input.allocations);
     const requestedDepositAllocations = depositAllocationsValue(input.depositAllocations);
     if (!allocations.length && !requestedDepositAllocations.length) throw new BadRequestException('Не выбран источник оплаты');
@@ -831,11 +832,13 @@ export class FinanceService {
     const operationId = randomUUID();
     const occurredAt = requiredOccurredAt(input.occurredAt);
     await this.serializable(async (tx) => {
-      const depositAllocations = await this.validateDepositAllocationsWith(tx, tenantId, requestedDepositAllocations, personKey(input.person), occurredAt);
-      await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
+      const condition = await resolvePersonPricePercent(tx, tenantId, input.person, occurredAt);
+      const settlement = canonicalSettlementInput(requestedSettlement, condition.percent);
       const paid = Math.max(0, await this.serviceNet(tx, tenantId, source.type, source.id));
       const due = Math.max(0, money(settlement.planTotal - paid));
       if (serviceAmount > due + 0.009) throw new BadRequestException('Оплата превышает остаток к оплате');
+      const depositAllocations = await consumeDepositAllocations(tx, tenantId, requestedDepositAllocations, personKey(input.person), occurredAt);
+      await this.saveSettlementWith(tx, tenantId, source.type, source.id, settlement);
       const components = splitAllocationComponents(allocations, cashServiceAmount, tips);
       await this.createOperationWithEntries(tx, tenantId, {
         operationId,
@@ -844,6 +847,7 @@ export class FinanceService {
         occurredAt,
         data: {
           workplace: text(input.workplace), person: clone(objectValue(input.person)), allocations, depositAllocations,
+          priceCondition: condition.source ? clone(condition.source) : null,
           cashTotal: cashAllocated, cashServiceAmount, total: money(serviceAmount + tips), serviceAmount, tips, settlement,
         },
         entries: components.map((entry) => ({ ...entry, direction: 'IN', economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE' })),
@@ -872,18 +876,30 @@ export class FinanceService {
     const tips = Math.min(money(requested - serviceAmount), tipsRemaining);
 
     const originalDeposits = depositAllocationsValue(paymentData.depositAllocations);
-    const alreadyRestored = new Map<string, number>();
+    const restoredByDeposit = new Map<string, { amount: number; principalAmount: number; benefitAmount: number }>();
     for (const refund of refunds) {
       for (const allocation of depositAllocationsValue(objectValue(refund.data).depositAllocations)) {
-        alreadyRestored.set(allocation.depositId, money((alreadyRestored.get(allocation.depositId) || 0) + allocation.amount));
+        const previous = restoredByDeposit.get(allocation.depositId) || { amount: 0, principalAmount: 0, benefitAmount: 0 };
+        restoredByDeposit.set(allocation.depositId, {
+          amount: money(previous.amount + allocation.amount),
+          principalAmount: money(previous.principalAmount + allocation.principalAmount),
+          benefitAmount: money(previous.benefitAmount + allocation.benefitAmount),
+        });
       }
     }
     let depositLeft = serviceAmount;
     const restoredDeposits: JsonObject[] = [];
     for (const original of originalDeposits) {
-      const available = Math.max(0, money(original.amount - (alreadyRestored.get(original.depositId) || 0)));
+      const previous = restoredByDeposit.get(original.depositId) || { amount: 0, principalAmount: 0, benefitAmount: 0 };
+      const originalPrincipal = original.principalAmount || original.amount;
+      const originalBenefit = original.benefitAmount;
+      const principalAvailable = Math.max(0, money(originalPrincipal - previous.principalAmount));
+      const benefitAvailable = Math.max(0, money(originalBenefit - previous.benefitAmount));
+      const available = money(principalAvailable + benefitAvailable);
       const restore = Math.min(depositLeft, available);
-      if (restore > 0) restoredDeposits.push({ ...original, amount: restore });
+      const principalAmount = Math.min(restore, principalAvailable);
+      const benefitAmount = Math.min(money(restore - principalAmount), benefitAvailable);
+      if (restore > 0) restoredDeposits.push({ ...original, amount: restore, principalAmount, benefitAmount });
       depositLeft = money(depositLeft - restore);
       if (depositLeft <= 0.009) break;
     }
@@ -895,6 +911,7 @@ export class FinanceService {
     const refundId = randomUUID();
     const occurredAt = requiredOccurredAt(input.occurredAt);
     await this.serializable(async (tx) => {
+      await restoreDepositAllocations(tx, tenantId, restoredDeposits, occurredAt);
       await this.createOperationWithEntries(tx, tenantId, {
         operationId: refundId,
         kind: 'refund',
@@ -999,26 +1016,27 @@ export class FinanceService {
         nextEntries = [{ walletId, walletName, direction: definition.direction, economicType: definition.economicType, amount, component: current.kind, articleId: article.articleId, articleName: article.name, lineName: financeEntity.name, quantity: 1, unitPrice: amount, note }];
       }
     } else if (current.kind === 'payment') {
+      const requestedDeposits = input.depositAllocations == null ? depositAllocationsValue(currentData.depositAllocations) : depositAllocationsValue(input.depositAllocations);
+      if (depositAllocationsValue(currentData.depositAllocations).length || requestedDeposits.length) {
+        throw new BadRequestException('Оплату с депозитом нельзя корректировать напрямую. Отмените оплату и проведите её заново.');
+      }
       const settlement = validSettlement(currentData.settlement);
       if (!settlement) throw new BadRequestException('У оплаты отсутствует расчёт');
       const allocations = input.allocations == null ? allocationsValue(currentData.allocations) : allocationsValue(input.allocations);
-      const requestedDeposits = input.depositAllocations == null ? depositAllocationsValue(currentData.depositAllocations) : depositAllocationsValue(input.depositAllocations);
-      if (!allocations.length && !requestedDeposits.length) throw new BadRequestException('Не выбран источник оплаты');
+      if (!allocations.length) throw new BadRequestException('Не выбран источник оплаты');
       const cashAllocated = money(allocations.reduce((sum, entry) => sum + entry.amount, 0));
-      const depositAllocated = money(requestedDeposits.reduce((sum, entry) => sum + entry.amount, 0));
       const tips = Math.min(cashAllocated, money(input.tips == null ? currentData.tips : input.tips));
       const cashServiceAmount = money(cashAllocated - tips);
-      const serviceAmount = money(input.serviceAmount == null ? cashServiceAmount + depositAllocated : input.serviceAmount);
-      if (serviceAmount < 0 || (serviceAmount <= 0 && tips <= 0) || money(serviceAmount + tips) !== money(cashAllocated + depositAllocated)) {
+      const serviceAmount = money(input.serviceAmount == null ? cashServiceAmount : input.serviceAmount);
+      if (serviceAmount < 0 || (serviceAmount <= 0 && tips <= 0) || money(serviceAmount + tips) !== cashAllocated) {
         throw new BadRequestException('Сумма оплаты не совпадает с распределением по источникам');
       }
-      const deposits = await this.validateDepositAllocationsWith(this.prisma, tenantId, requestedDeposits, personKey(currentData.person), occurredAt, current.operationId);
       const otherPaid = await this.serviceNet(this.prisma, tenantId, current.sourceType, current.sourceId, current.operationId);
       const due = Math.max(0, money(settlement.planTotal - otherPaid));
       if (serviceAmount > due + 0.009) throw new BadRequestException('Оплата превышает остаток к оплате');
       const components = splitAllocationComponents(allocations, cashServiceAmount, tips);
       nextData = {
-        workplace: text(currentData.workplace), person: clone(objectValue(currentData.person)), allocations, depositAllocations: deposits,
+        workplace: text(currentData.workplace), person: clone(objectValue(currentData.person)), allocations, depositAllocations: [],
         cashTotal: cashAllocated, cashServiceAmount, total: money(serviceAmount + tips), serviceAmount, tips, settlement,
       };
       nextEntries = components.map((entry) => ({ ...entry, direction: 'IN', economicType: entry.component === 'tips' ? 'TIPS' : 'SERVICE_REVENUE' }));
@@ -1062,6 +1080,9 @@ export class FinanceService {
     const original = await this.prisma.financeOperation.findUnique({ where: { tenantId_operationId: { tenantId, operationId: id } } });
     if (!original) throw new NotFoundException('Операция не найдена');
     if (original.status === 'cancelled') return this.snapshot(tenantId);
+    if (original.kind === 'deposit-funding' || original.kind === 'deposit-withdrawal') {
+      throw new BadRequestException('Финансовый факт Депозита отменяется через сам Депозит, чтобы не разрушить его состояние.');
+    }
     await this.serializable(async (tx) => {
       const targets = [original];
       if (original.kind === 'payment') {
@@ -1069,6 +1090,14 @@ export class FinanceService {
         targets.push(...refunds);
       }
       for (const target of targets) {
+        const targetData = objectValue(target.data);
+        const depositAllocations = depositAllocationsValue(targetData.depositAllocations);
+        if (target.kind === 'payment' && depositAllocations.length) {
+          await restoreDepositAllocations(tx, tenantId, depositAllocations, occurredAt);
+        }
+        if (target.kind === 'refund' && depositAllocations.length) {
+          await reconsumeDepositAllocations(tx, tenantId, depositAllocations, personKey(targetData.person), occurredAt);
+        }
         await this.createReversalFor(tx, tenantId, target.operationId, text(input.reason) || 'incorrect-entry', occurredAt);
         await tx.financeOperation.update({ where: { id: target.id }, data: { status: 'cancelled' } });
       }
@@ -1089,6 +1118,10 @@ export class FinanceService {
         const next = related.map((row) => row.operationId).filter((relatedId) => !operationIds.has(relatedId));
         next.forEach((relatedId) => operationIds.add(relatedId));
         frontier = next;
+      }
+      const operations = await tx.financeOperation.findMany({ where: { tenantId, operationId: { in: [...operationIds] } }, select: { kind: true, data: true } });
+      if (operations.some((row) => row.kind === 'deposit-funding' || row.kind === 'deposit-withdrawal' || depositAllocationsValue(objectValue(row.data).depositAllocations).length)) {
+        throw new BadRequestException('Операция связана с Депозитом. Используйте отмену или удаление из контура Депозита.');
       }
       await tx.financeOperation.deleteMany({ where: { tenantId, operationId: { in: [...operationIds] } } });
     });
@@ -1112,7 +1145,13 @@ export class FinanceService {
         next.forEach((relatedId) => operationIds.add(relatedId));
         frontier = next;
       }
-      if (operationIds.size) await tx.financeOperation.deleteMany({ where: { tenantId, operationId: { in: [...operationIds] } } });
+      if (operationIds.size) {
+        const operations = await tx.financeOperation.findMany({ where: { tenantId, operationId: { in: [...operationIds] } }, select: { kind: true, data: true } });
+        if (operations.some((row) => row.kind === 'deposit-funding' || row.kind === 'deposit-withdrawal' || depositAllocationsValue(objectValue(row.data).depositAllocations).length)) {
+          throw new BadRequestException('Касса содержит связанные факты Депозита. Сначала закройте или перенесите их штатными действиями.');
+        }
+        await tx.financeOperation.deleteMany({ where: { tenantId, operationId: { in: [...operationIds] } } });
+      }
     });
     return this.snapshot(tenantId);
   }
