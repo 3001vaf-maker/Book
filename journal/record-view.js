@@ -248,8 +248,39 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     startTimer = setTimeout(() => render(), Math.min(delay + 50, 2147483647));
   };
 
-  const openRecordEditSelector = () => {
+  const openRecordEdit = (startAt) => {
     const paid = isPaid();
+    openRecordEditFlow({
+      startAt,
+      date: state.date,
+      workplaceId: state.workplaceId,
+      from: state.from,
+      to: state.to,
+      selectedProcedures: state.procedures,
+      excludeId: record.id,
+      chatPersonKey: state.person?.key || state.person?.id || '',
+      chatPersonKeys: chatKeysForState(state),
+      onApply: (next) => {
+        state = {
+          ...state,
+          date: next.date,
+          workplaceId: next.workplaceId,
+          from: next.from,
+          to: next.to,
+          ...(paid ? {} : { procedures: next.procedures }),
+          attendance: '',
+        };
+        render();
+      },
+    });
+  };
+
+  const openProcedureTimeCorrection = () => {
+    if (isPaid()) return;
+    openRecordEdit('procedure');
+  };
+
+  const openRecordTransferSelector = () => {
     const layer = mountModal(document.body, modal(
       `<div class="compact-form">${select({
         label: 'Изменить',
@@ -260,7 +291,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           { value: 'workplace', label: 'Пространство' },
           { value: 'date', label: 'Дата' },
           { value: 'time', label: 'Время' },
-          ...(!paid ? [{ value: 'procedure', label: 'Процедура' }] : []),
         ],
         aria: 'Выберите этап переноса записи',
       })}</div>`,
@@ -271,29 +301,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       const startAt = String(input.value || '');
       if (!startAt) return;
       layer.v2Close?.();
-      openRecordEditFlow({
-        startAt,
-        date: state.date,
-        workplaceId: state.workplaceId,
-        from: state.from,
-        to: state.to,
-        selectedProcedures: state.procedures,
-        excludeId: record.id,
-        chatPersonKey: state.person?.key || state.person?.id || '',
-        chatPersonKeys: chatKeysForState(state),
-        onApply: (next) => {
-          state = {
-            ...state,
-            date: next.date,
-            workplaceId: next.workplaceId,
-            from: next.from,
-            to: next.to,
-            ...(paid ? {} : { procedures: next.procedures }),
-            attendance: '',
-          };
-          render();
-        },
-      });
+      openRecordEdit(startAt);
     });
   };
 
@@ -452,10 +460,15 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     openSharedProfileSettingsMenu({
       title: 'Настройки записи',
       actions: [
+        !cancelled && !isPaid() ? {
+          id: 'procedure-time-correction',
+          label: 'Корректировка процедуры по времени',
+          onSelect: openProcedureTimeCorrection,
+        } : null,
         !cancelled ? {
           id: 'move',
           label: 'Перенос',
-          onSelect: openRecordEditSelector,
+          onSelect: openRecordTransferSelector,
         } : null,
         !cancelled ? {
           id: 'cancel',
