@@ -142,10 +142,23 @@ function applicationLayerKey(layer) {
   return label ? `${kind}:${label}` : '';
 }
 
-function prepareApplicationModal(node) {
+function xLayerRole(layer) {
+  if (layer?.dataset?.v2LayerKind !== 'bottom') return '';
+  const role = String(layer.dataset.v2XRole || '').trim();
+  return role === 'action' || role === 'picker' ? role : 'editor';
+}
+
+function canOpenApplicationModal(node) {
   const key = applicationLayerKey(node);
   if (!key) return true;
   return !applicationLayers().some((layer) => applicationLayerKey(layer) === key);
+}
+
+function applyXTransitionPolicy(node) {
+  if (node?.dataset?.v2LayerKind !== 'bottom') return;
+  const parent = applicationLayers().at(-1);
+  if (parent?.dataset?.v2LayerKind !== 'bottom') return;
+  if (xLayerRole(parent) === 'action') parent.v2Close?.();
 }
 
 export function mountV2Layer(html, { root = null } = {}) {
@@ -157,10 +170,11 @@ export function mountV2Layer(html, { root = null } = {}) {
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
 
-  if (!technical && !prepareApplicationModal(node)) return null;
+  if (!technical && !canOpenApplicationModal(node)) return null;
 
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
+  if (!technical) applyXTransitionPolicy(node);
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const locksHeader = Boolean(app && kind === 'standard' && !qLayer);
   const header = locksHeader ? app.querySelector?.('[data-v2-header]') : null;
