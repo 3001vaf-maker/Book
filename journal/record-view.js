@@ -23,6 +23,7 @@ import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../core/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
 import { openRecordEditFlow } from './record.js';
+import { openRecordProcedureCorrection } from './record-procedure-correction.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '', chatPersonKeys = [] } = {}) {
@@ -275,9 +276,24 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     });
   };
 
-  const openProcedureTimeCorrection = () => {
+  const openProcedureCorrection = () => {
     if (isPaid()) return;
-    openRecordEdit('procedure');
+    openRecordProcedureCorrection({
+      date: dateKey(state.date),
+      workplaceId: state.workplaceId,
+      from: state.from,
+      selectedProcedures: state.procedures,
+      excludeId: record.id,
+      onApply: ({ procedures, to }) => {
+        state = {
+          ...state,
+          procedures,
+          to: to || state.to,
+          attendance: '',
+        };
+        render();
+      },
+    });
   };
 
   const openRecordTransferSelector = () => {
@@ -461,9 +477,9 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       title: 'Настройки записи',
       actions: [
         !cancelled && !isPaid() ? {
-          id: 'procedure-time-correction',
-          label: 'Корректировка процедуры по времени',
-          onSelect: openProcedureTimeCorrection,
+          id: 'procedure-correction',
+          label: 'Корректировка',
+          onSelect: openProcedureCorrection,
         } : null,
         !cancelled ? {
           id: 'move',
