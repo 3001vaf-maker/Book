@@ -33,22 +33,23 @@ assert.equal(withProduct.finance.planTotal, 7000);
 assert.equal(withProduct.finance.items.find((item) => item.sourceId === 'product-1')?.sourceType, 'product');
 assert.equal(withProduct.finance.items.find((item) => item.sourceId === 'procedure-products')?.sourceType, 'procedure');
 
-const discountedProductSettlement = calculateSettlement(withProduct.finance.items.map((item) => item.sourceType === 'product'
-  ? { ...item, discountMode: 'percent', discountPercent: 10 }
-  : { ...item, discountMode: 'none', discountPercent: 0, discountMoney: 0 }));
+// A one-off product reduction is a manual price correction, not a person/program percentage.
+const correctedProductSettlement = calculateSettlement(withProduct.finance.items.map((item) => item.sourceType === 'product'
+  ? { ...item, correctionMode: 'percent', correctionPercent: 10 }
+  : { ...item, correctionMode: 'none', correctionPercent: 0, correctionMoney: 0 }));
 
-const rejectedByRecord = updateRecord(record.id, { finance: discountedProductSettlement });
+const rejectedByRecord = updateRecord(record.id, { finance: correctedProductSettlement });
 assert.equal(rejectedByRecord.finance.planTotal, 7000);
 
 const payment = paymentFixture({
   id: 'payment-products',
   recordId: record.id,
-  settlement: discountedProductSettlement,
+  settlement: correctedProductSettlement,
   allocations: [{ walletId: 'cash', walletName: 'Наличные', amount: 6800 }],
   serviceAmount: 6800,
 });
 hydrateFinanceFromServer(canonicalFinanceState({
-  settlements: [settlementRow(record.id, discountedProductSettlement)],
+  settlements: [settlementRow(record.id, correctedProductSettlement)],
   payments: [payment],
 }));
 
