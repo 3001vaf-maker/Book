@@ -19,8 +19,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 24
       - name: Remove retired percent snapshots and fix deposit benefit display
         run: |
           python3 - <<'PY'
@@ -55,21 +54,16 @@ jobs:
               "  if (String(deposit?.benefitMode || 'none') === 'accrual' || benefitBalance > 0.009) {\n"
           )
           PY
-      - name: Install root dependencies
-        run: npm ci
       - name: Check architecture
         run: npm run check
       - name: Run tests
         run: npm test
       - name: Install server dependencies
-        working-directory: server
-        run: npm ci
+        run: npm install --prefix server
       - name: Generate Prisma client
-        working-directory: server
-        run: npm run prisma:generate
+        run: npm run prisma:generate --prefix server
       - name: Build server
-        working-directory: server
-        run: npm run build
+        run: npm run build --prefix server
       - name: Commit cleanup
         run: |
           if git diff --quiet; then
