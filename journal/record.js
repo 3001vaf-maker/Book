@@ -14,7 +14,7 @@ import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.
 import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../core/profile/data.js';
 import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../core/profile/card-presentation.js';
-import { calculateSettlement, recordSettlementDiscountPercent } from '../core/finance/index.js';
+import { calculateSettlement, recordSettlementPricePercent } from '../core/finance/index.js';
 
 const RECORD_MODES = [
   { id: 'record', label: 'Создать запись' },
@@ -579,7 +579,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
     name: entry?.procedure?.name || '',
     cost: entry?.cost,
   })), {
-    discountPercent: recordSettlementDiscountPercent(currentPerson),
+    pricePercent: recordSettlementPricePercent(currentPerson),
   });
   const totalCost = () => settlement().planTotal;
   const openRecordSettings = () => {
@@ -654,7 +654,7 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
       phone: person.phone,
       groupText: capacity > 1 ? `Участники: ${currentPeople.length} / ${capacity}` : '',
       duration: durationText(duration()),
-      discount: `${recordSettlementDiscountPercent(currentPerson)}%`,
+      discount: `${recordSettlementPricePercent(currentPerson)}%`,
       total: `${total} ₽`,
       procedures: selectedProcedures.map((item) => ({
         name: item.procedure.name || '',
