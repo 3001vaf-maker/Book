@@ -89,7 +89,8 @@ for (const [name, engine, contextOptions] of [
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
     await closeTopSheet();
 
-    // Actual time correction path: parent X must survive the nested TimePicker X.
+    // Actual time correction path: parent X must survive the nested TimePicker X,
+    // and the chosen time must be committed back into that still-live parent.
     if (contextOptions.hasTouch) await page.locator('[data-test-time-range]').tap();
     else await page.locator('[data-test-time-range]').click();
     await page.locator('[data-shared-time-range-form]').waitFor();
@@ -100,16 +101,30 @@ for (const [name, engine, contextOptions] of [
     await page.locator('.modal--time-picker-sheet').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: TimePicker replaced parent X instead of stacking`);
     assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: time-range parent X was destroyed`);
+
+    const hour10 = page.locator('[data-time-wheel-type="hours"][data-value="10"][data-cycle="2"]');
+    const minute15 = page.locator('[data-time-wheel-type="minutes"][data-value="15"][data-cycle="2"]');
+    if (contextOptions.hasTouch) {
+      await hour10.tap();
+      await minute15.tap();
+    } else {
+      await hour10.click();
+      await minute15.click();
+    }
+    await page.waitForTimeout(250);
+
     const timeSave = page.locator('[data-time-save]');
     if (contextOptions.hasTouch) await timeSave.tap();
     else await timeSave.click();
     await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
     assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: parent X did not survive TimePicker save`);
+    assert.equal(await page.locator('[data-time-picker="from"] [data-time-value]').inputValue(), '10:15', `${name}: corrected time was not returned to parent X`);
+
     const rangeSubmit = page.locator('[data-shared-time-range-form] button[type="submit"]');
     if (contextOptions.hasTouch) await rangeSubmit.tap();
     else await rangeSubmit.click();
     await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
-    assert.equal(await page.locator('[data-test-time-result]').textContent(), '09:00-18:00', `${name}: time range did not save after nested TimePicker`);
+    assert.equal(await page.locator('[data-test-time-result]').textContent(), '10:15-18:00', `${name}: corrected time range did not save`);
 
     // X veil: tapping Header A while X is active must only dismiss the X.
     // The underlying A action must never fire from the same input.
@@ -172,7 +187,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (nested TimePicker X, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
+    console.log(`${name}: PASS (nested TimePicker X, actual time correction, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
