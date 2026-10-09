@@ -1,18 +1,32 @@
 import {
+  button,
+  datePicker,
   details,
   emptyState,
   entityCardStack,
+  escapeHtml,
+  field,
+  formValidationMessage,
+  initDatePickers,
   miniCard,
   miniCardRail,
+  modal,
+  mountModal,
   mountV2ZLayer,
+  openSharedProfileSettingsMenu,
   page,
+  select,
   shortDateTime,
+  v2ListEntries,
+  v2ListEntry,
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
+import { getWallets } from '../../finance/index.js';
 import {
   availablePeople,
   bindViewSettings,
+  formObject,
   loyaltyCardFields,
   loyaltyHeader,
   loyaltyVisualCard,
@@ -21,8 +35,12 @@ import {
   personLabel,
 } from '../shared.js';
 import {
+  fundPersonalAccount,
   loadPersonalAccount,
   loadPersonalAccounts,
+  settlePersonalAccountDebt,
+  updatePersonalAccountSettings,
+  withdrawPersonalAccount,
 } from './data.js';
 
 function personKey(person = {}) {
@@ -54,6 +72,17 @@ function movementSource(item = {}) {
   if (item?.sourceType === 'sale') return 'Продажа';
   if (item?.sourceType === 'order') return 'Заказ';
   return 'Операция';
+}
+
+function walletOptions() {
+  return [
+    { value: '', label: 'Выберите кошелёк' },
+    ...getWallets().map((wallet) => ({ value: String(wallet?.id || ''), label: String(wallet?.name || '') })),
+  ];
+}
+
+function selectedWallet(walletId = '') {
+  return getWallets().find((wallet) => String(wallet?.id || '') === String(walletId || '')) || null;
 }
 
 export function personalAccountCardFields({ person = null, title = '', balance = 0, debt = 0 } = {}) {
@@ -101,18 +130,21 @@ function historyRail(account = {}) {
   }));
 }
 
-function debtRail(account = {}) {
+function debtList(account = {}) {
   const items = Array.isArray(account?.debts) ? account.debts : [];
   if (!items.length) return emptyState('Задолженностей нет', 'Неоплаченные остатки появятся здесь отдельно от денег Личного счёта.');
-  return miniCardRail(items.map((item) => miniCard({
-    title: Number(item?.outstandingAmount || 0) > 0.009 ? 'Задолженность' : 'Погашено',
-    value: money(item?.outstandingAmount),
-    subtitle: shortDateTime(item?.occurredAt, '—'),
-    rows: [
-      { label: 'Начальная сумма', value: money(item?.originalAmount) },
-      { label: 'Состояние', value: Number(item?.outstandingAmount || 0) > 0.009 ? 'Открыта' : 'Закрыта' },
-    ],
-  })));
+  return v2ListEntries(items.map((item) => {
+    const outstanding = Math.max(0, Number(item?.outstandingAmount || 0));
+    return v2ListEntry({
+      title: outstanding > 0.009 ? 'Задолженность' : 'Погашено',
+      subtitle: shortDateTime(item?.occurredAt, '—'),
+      rightTop: money(outstanding),
+      rightBottom: outstanding > 0.009 ? 'Открыта' : 'Закрыта',
+      interactive: outstanding > 0.009,
+      data: outstanding > 0.009 ? `data-personal-account-debt="${escapeHtml(String(item?.id || ''))}"` : '',
+      aria: outstanding > 0.009 ? 'Погасить задолженность' : 'Погашенная задолженность',
+    });
+  }));
 }
 
 function accountInfo(person = {}, account = {}) {
@@ -125,18 +157,163 @@ function accountInfo(person = {}, account = {}) {
   ]);
 }
 
+function openSettingsX(root, person, account, onSaved) {
+  const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-settings-form>
+    ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
+    ${select({ label: 'Показывать конечному пользователю', name: 'visibleToEndUser', value: account?.visibleToEndUser === false ? 'no' : 'yes', options: [
+      { value: 'yes', label: 'Да' },
+      { value: 'no', label: 'Нет' },
+    ] })}
+    ${button('Сохранить', { type: 'submit' })}
+    <div class="form-error" data-personal-account-settings-error></div>
+  </form>`, { title: 'Настройки Личного счёта', variant: 'x', surface: 'app' }));
+  const form = layer?.querySelector?.('[data-personal-account-settings-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorNode = layer.querySelector('[data-personal-account-settings-error]');
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
+    const values = formObject(form);
+    try {
+      const saved = await updatePersonalAccountSettings(personKey(person), {
+        spendLimitPercent: Number(values.spendLimitPercent),
+        visibleToEndUser: values.visibleToEndUser !== 'no',
+      });
+      layer.v2Close?.();
+      await onSaved?.(saved);
+    } catch (error) {
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить настройки';
+    }
+  });
+  return layer;
+}
+
+function openMoneyX(root, person, account, mode, onSaved) {
+  const funding = mode === 'fund';
+  const title = funding ? 'Пополнить Личный счёт' : 'Вернуть деньги';
+  const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-money-form>
+    ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: '', required: true })}
+    ${select({ label: funding ? 'Кошелёк приёма денег' : 'Кошелёк возврата', name: 'walletId', value: '', options: walletOptions() })}
+    ${datePicker({ label: 'Дата операции', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
+    ${field({ label: funding ? 'Комментарий' : 'Причина', name: funding ? 'note' : 'reason', value: '' })}
+    ${button(funding ? 'Пополнить' : 'Вернуть', { type: 'submit' })}
+    <div class="form-error" data-personal-account-money-error></div>
+  </form>`, { title, variant: 'x', surface: 'app' }));
+  if (!layer) return null;
+  initDatePickers(layer);
+  const form = layer.querySelector('[data-personal-account-money-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorNode = layer.querySelector('[data-personal-account-money-error]');
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
+    const values = formObject(form);
+    const wallet = selectedWallet(values.walletId);
+    const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
+    if (!wallet || amount <= 0) {
+      if (errorNode) errorNode.textContent = 'Укажите сумму и кошелёк';
+      return;
+    }
+    if (!funding && amount > Number(account?.balance || 0) + 0.009) {
+      if (errorNode) errorNode.textContent = 'Сумма возврата превышает остаток Личного счёта';
+      return;
+    }
+    try {
+      const saved = funding
+        ? await fundPersonalAccount(personKey(person), { amount, walletId: wallet.id, walletName: wallet.name, note: values.note, occurredAt: values.occurredAt })
+        : await withdrawPersonalAccount(personKey(person), { amount, walletId: wallet.id, walletName: wallet.name, reason: values.reason, occurredAt: values.occurredAt });
+      layer.v2Close?.();
+      await onSaved?.(saved);
+    } catch (error) {
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось выполнить операцию';
+    }
+  });
+  return layer;
+}
+
+function openDebtSettleX(root, debt, onSaved) {
+  const outstanding = Math.max(0, Number(debt?.outstandingAmount || 0));
+  const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-debt-form>
+    ${field({ label: 'Задолженность', name: 'debtAmount', value: money(outstanding), disabled: true })}
+    ${field({ label: 'Сумма оплаты', name: 'amount', type: 'number', min: '0.01', max: String(outstanding), step: '0.01', inputmode: 'decimal', value: outstanding, required: true })}
+    ${select({ label: 'Кошелёк', name: 'walletId', value: '', options: walletOptions() })}
+    ${datePicker({ label: 'Дата оплаты', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
+    ${button('Погасить', { type: 'submit' })}
+    <div class="form-error" data-personal-account-debt-error></div>
+  </form>`, { title: 'Погасить задолженность', variant: 'x', surface: 'app' }));
+  if (!layer) return null;
+  initDatePickers(layer);
+  const form = layer.querySelector('[data-personal-account-debt-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorNode = layer.querySelector('[data-personal-account-debt-error]');
+    const validationError = formValidationMessage(form);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
+    const values = formObject(form);
+    const wallet = selectedWallet(values.walletId);
+    const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
+    if (!wallet || amount <= 0 || amount > outstanding + 0.009) {
+      if (errorNode) errorNode.textContent = 'Укажите корректную сумму и кошелёк';
+      return;
+    }
+    try {
+      const saved = await settlePersonalAccountDebt(debt?.id, {
+        amount,
+        walletId: wallet.id,
+        walletName: wallet.name,
+        occurredAt: values.occurredAt,
+      });
+      layer.v2Close?.();
+      await onSaved?.(saved);
+    } catch (error) {
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось погасить задолженность';
+    }
+  });
+  return layer;
+}
+
+function renderDetail(layer, root, person, account) {
+  layer.innerHTML = page([
+    loyaltyHeader(personLabel(person), { settings: true, settingsData: 'data-personal-account-actions' }),
+    accountInfo(person, account || {}),
+    v2Section('Задолженности', debtList(account || {})),
+    v2Section('История', historyRail(account || {})),
+  ]);
+  const refresh = async (saved = null) => {
+    const next = saved?.personKey ? saved : await loadPersonalAccount(personKey(person));
+    renderDetail(layer, root, person, next || {});
+  };
+  layer.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
+    const actions = [
+      { id: 'fund', label: 'Пополнить', onSelect: () => openMoneyX(root, person, account, 'fund', refresh) },
+      { id: 'withdraw', label: 'Вернуть деньги', onSelect: () => openMoneyX(root, person, account, 'withdraw', refresh) },
+      { id: 'settings', label: 'Настройки', onSelect: () => openSettingsX(root, person, account, refresh) },
+    ];
+    openSharedProfileSettingsMenu({ title: 'Личный счёт', actions });
+  });
+  layer.querySelectorAll('[data-personal-account-debt]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const debt = (Array.isArray(account?.debts) ? account.debts : []).find((item) => String(item?.id || '') === String(node.dataset.personalAccountDebt || ''));
+      if (debt) openDebtSettleX(root, debt, refresh);
+    });
+  });
+  notifyLoyaltyContext();
+}
+
 export async function openPersonalAccountForPerson(root, person = {}, snapshot = null) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'loyalty-personal-account-z' }), { stack: true });
   if (!layer) return null;
-  const key = personKey(person);
-  const account = snapshot || await loadPersonalAccount(key);
-  layer.innerHTML = page([
-    loyaltyHeader(personLabel(person)),
-    accountInfo(person, account || {}),
-    v2Section('Задолженности', debtRail(account || {})),
-    v2Section('История', historyRail(account || {})),
-  ]);
-  notifyLoyaltyContext();
+  const account = snapshot || await loadPersonalAccount(personKey(person));
+  renderDetail(layer, root, person, account || {});
   return layer;
 }
 
