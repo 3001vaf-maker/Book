@@ -99,6 +99,33 @@ export class LoyaltyController {
     return this.personalAccounts.withdraw(request.auth!.tenantId, personKey, body);
   }
 
+  @Post('personal-accounts/person/:personKey/pay')
+  payFromPersonalAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.pay(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/person/:personKey/finalize-debt')
+  finalizePersonalAccountDebt(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.finalizeDebt(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/payment/:operationId/refund')
+  refundPersonalAccountPayment(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.refundPayment(request.auth!.tenantId, operationId, body);
+  }
+
   @Post('personal-accounts/debts/:debtId/settle')
   settlePersonalAccountDebt(
     @Req() request: AuthenticatedRequest,
