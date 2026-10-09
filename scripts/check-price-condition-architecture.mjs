@@ -78,6 +78,17 @@ if (!paymentUi.includes("label: 'Условие'") || !paymentUi.includes('disab
   errors.push('automatic price condition must be read-only in payment UI');
 }
 
+const browserRuntime = readFileSync('tests/professional-core-runtime-browser.html', 'utf8');
+if (browserRuntime.includes('data-payment-discount-percent') || browserRuntime.includes('data-payment-discount-money')) {
+  errors.push('browser runtime regression must not depend on retired payment discount controls');
+}
+if (!browserRuntime.includes('data-payment-correction-percent') || !browserRuntime.includes('data-payment-correction-money')) {
+  errors.push('browser runtime regression must cover manual price correction controls');
+}
+if (!browserRuntime.includes('Payment Z3 base price must be read-only')) {
+  errors.push('browser runtime regression must assert that base price is read-only');
+}
+
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);
