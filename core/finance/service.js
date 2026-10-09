@@ -38,6 +38,8 @@ function operationProjection(operation = null) {
     person: data?.person && typeof data.person === 'object' ? { ...data.person } : null,
     allocations: Array.isArray(data?.allocations) ? data.allocations.map((item) => ({ ...item })) : [],
     depositAllocations: Array.isArray(data?.depositAllocations) ? data.depositAllocations.map((item) => ({ ...item })) : [],
+    personalAccountAmount: Math.max(0, financialNumber(data?.personalAccountAmount)),
+    personalAccountRestored: Math.max(0, financialNumber(data?.personalAccountRestored)),
     total: Math.max(0, financialNumber(data?.total)),
     cashTotal: Math.max(0, financialNumber(data?.cashTotal)),
     serviceAmount: Math.max(0, financialNumber(data?.serviceAmount)),
@@ -143,6 +145,8 @@ export async function recordPaymentIncome({
   settlement = null,
   allocations = [],
   depositAllocations = [],
+  personalAccountAmount = 0,
+  finalizeDebt = false,
   maxAmount = null,
   serviceAmount = null,
   tips = 0,
@@ -155,17 +159,19 @@ export async function recordPaymentIncome({
   const preparedDeposits = (Array.isArray(depositAllocations) ? depositAllocations : [])
     .map((item) => ({ depositId: String(item?.depositId || item?.id || ''), name: String(item?.name || item?.programName || ''), amount: Math.max(0, financialNumber(item?.amount)) }))
     .filter((item) => item.depositId && item.amount > 0);
+  const personalAccountTotal = Math.max(0, financialNumber(personalAccountAmount));
   const cashAllocated = preparedAllocations.reduce((sum, item) => sum + item.amount, 0);
   const depositAllocated = preparedDeposits.reduce((sum, item) => sum + item.amount, 0);
   const tipsTotal = Math.max(0, financialNumber(tips));
-  const applied = Math.max(0, financialNumber(serviceAmount == null ? cashAllocated - tipsTotal + depositAllocated : serviceAmount));
-  const received = cashAllocated + depositAllocated;
-  if (!preparedAllocations.length && !preparedDeposits.length) return null;
+  const applied = Math.max(0, financialNumber(serviceAmount == null ? cashAllocated - tipsTotal + depositAllocated + personalAccountTotal : serviceAmount));
+  const received = cashAllocated + depositAllocated + personalAccountTotal;
+  if (!preparedAllocations.length && !preparedDeposits.length && personalAccountTotal <= 0) return null;
   if (received <= 0 || applied < 0 || (applied <= 0 && tipsTotal <= 0)) return null;
   if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(received - applied - tipsTotal) > 0.009) return null;
 
-  const before = new Set((Array.isArray((await import('./data.js')).readFinanceState?.()?.operations) ? (await import('./data.js')).readFinanceState().operations : []).map((item) => String(item?.operationId || '')));
+  const financeData = await import('./data.js');
+  const before = new Set((Array.isArray(financeData.readFinanceState?.()?.operations) ? financeData.readFinanceState().operations : []).map((item) => String(item?.operationId || '')));
   const response = await apiRequest('/finance/operations/payment', {
     method: 'POST',
     body: JSON.stringify({
@@ -175,19 +181,32 @@ export async function recordPaymentIncome({
       settlement,
       allocations: preparedAllocations,
       depositAllocations: preparedDeposits,
+      personalAccountAmount: personalAccountTotal,
+      finalizeDebt: finalizeDebt === true,
       serviceAmount: applied,
       tips: tipsTotal,
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
-  const state = await applyServerState(response, 'Не удалось провести оплату');
+  const envelope = await responseJson(response, 'Не удалось провести оплату');
+  const state = hydrateFinanceFromServer(envelope?.finance && typeof envelope.finance === 'object' ? envelope.finance : envelope);
   const operation = newestOperation(state, (item) => String(item?.kind || '') === 'payment'
     && !before.has(String(item?.operationId || ''))
     && sourceMatch(item, source))
     || newestOperation(state, (item) => String(item?.kind || '') === 'payment' && sourceMatch(item, source));
   const payment = operationProjection(operation);
   if (!payment) return null;
-  notifyFinanceChanged({ action: 'payment', paymentId: payment.id, total: payment.total, serviceAmount: payment.serviceAmount, tips: payment.tips, source: payment.source });
+  payment.due = Math.max(0, financialNumber(envelope?.payment?.due));
+  payment.paymentState = String(envelope?.payment?.state || '');
+  notifyFinanceChanged({
+    action: 'payment',
+    paymentId: payment.id,
+    total: payment.total,
+    serviceAmount: payment.serviceAmount,
+    personalAccountAmount: payment.personalAccountAmount,
+    due: payment.due,
+    source: payment.source,
+  });
   return payment;
 }
 
