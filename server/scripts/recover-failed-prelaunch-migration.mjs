@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const prelaunchMigration = '20260922075500_prelaunch_hard_delete_clean_start';
 const firstRunCleanupMigration = '20260930143000_remove_first_run_runtime';
+const depositBenefitMigration = '20261008214500_deposit_benefit_balances';
+const pricePercentGuardMigration = '20261009014500_loyalty_price_percent_guard';
 
 async function tableExists(name) {
   const rows = await prisma.$queryRawUnsafe(
@@ -78,29 +80,29 @@ async function main() {
     }
 
     const state = {
-    liveRequestedAt: await columnExists('TenantAccess', 'liveRequestedAt'),
-    liveRequestedByPlatformAccountId: await columnExists('TenantAccess', 'liveRequestedByPlatformAccountId'),
-    liveApprovedAt: await columnExists('TenantAccess', 'liveApprovedAt'),
-    liveApprovedByAdminId: await columnExists('TenantAccess', 'liveApprovedByAdminId'),
-    platformConsentTrigger: await triggerExists('PlatformConsentEvent_append_only'),
-    platformActivityTrigger: await triggerExists('PlatformActivityEvent_append_only'),
-    platformConsentTenantFk: await constraintExists('PlatformConsentEvent_tenantId_fkey'),
-    platformConsentAccountFk: await constraintExists('PlatformConsentEvent_platformAccountId_fkey'),
-    workspaceTenantFk: await constraintExists('WorkspaceState_tenantId_fkey'),
-    workspaceAccountFk: await constraintExists('WorkspaceState_platformAccountId_fkey'),
-  };
+      liveRequestedAt: await columnExists('TenantAccess', 'liveRequestedAt'),
+      liveRequestedByPlatformAccountId: await columnExists('TenantAccess', 'liveRequestedByPlatformAccountId'),
+      liveApprovedAt: await columnExists('TenantAccess', 'liveApprovedAt'),
+      liveApprovedByAdminId: await columnExists('TenantAccess', 'liveApprovedByAdminId'),
+      platformConsentTrigger: await triggerExists('PlatformConsentEvent_append_only'),
+      platformActivityTrigger: await triggerExists('PlatformActivityEvent_append_only'),
+      platformConsentTenantFk: await constraintExists('PlatformConsentEvent_tenantId_fkey'),
+      platformConsentAccountFk: await constraintExists('PlatformConsentEvent_platformAccountId_fkey'),
+      workspaceTenantFk: await constraintExists('WorkspaceState_tenantId_fkey'),
+      workspaceAccountFk: await constraintExists('WorkspaceState_platformAccountId_fkey'),
+    };
 
     const expectedFullyRolledBack =
-    !state.liveRequestedAt
-    && !state.liveRequestedByPlatformAccountId
-    && !state.liveApprovedAt
-    && !state.liveApprovedByAdminId
-    && state.platformConsentTrigger
-    && state.platformActivityTrigger
-    && !state.platformConsentTenantFk
-    && !state.platformConsentAccountFk
-    && !state.workspaceTenantFk
-    && !state.workspaceAccountFk;
+      !state.liveRequestedAt
+      && !state.liveRequestedByPlatformAccountId
+      && !state.liveApprovedAt
+      && !state.liveApprovedByAdminId
+      && state.platformConsentTrigger
+      && state.platformActivityTrigger
+      && !state.platformConsentTenantFk
+      && !state.platformConsentAccountFk
+      && !state.workspaceTenantFk
+      && !state.workspaceAccountFk;
 
     if (!expectedFullyRolledBack) {
       console.error('[prelaunch-recovery] database is not in the expected pre-07:55 state');
@@ -134,6 +136,24 @@ async function main() {
     }
     console.warn('[prelaunch-recovery] failed first-run cleanup is fully rolled back and may be safely retried');
     return 43;
+  }
+
+  const failedDepositBenefit = await failedMigration(depositBenefitMigration);
+  if (failedDepositBenefit) {
+    console.warn('[prelaunch-recovery] failed Deposit benefit migration detected; migration is retry-safe and must be resolved as rolled back before retry');
+    if (String(failedDepositBenefit.logs || '').trim()) {
+      console.warn('[prelaunch-recovery] stored Deposit migration error:', String(failedDepositBenefit.logs).slice(0, 2000));
+    }
+    return 44;
+  }
+
+  const failedPriceGuard = await failedMigration(pricePercentGuardMigration);
+  if (failedPriceGuard) {
+    console.warn('[prelaunch-recovery] failed price-percent guard migration detected; migration is retry-safe and must be resolved as rolled back before retry');
+    if (String(failedPriceGuard.logs || '').trim()) {
+      console.warn('[prelaunch-recovery] stored price guard migration error:', String(failedPriceGuard.logs).slice(0, 2000));
+    }
+    return 45;
   }
 
   console.log('[prelaunch-recovery] no active failed recoverable migration');

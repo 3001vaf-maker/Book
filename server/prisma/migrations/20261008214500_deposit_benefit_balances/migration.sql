@@ -78,7 +78,15 @@ AS $$
             ELSE 0::numeric
         END
     ), 0::numeric)
-    FROM jsonb_array_elements(COALESCE(value->'depositAllocations', '[]'::jsonb)) a
+    FROM jsonb_array_elements(
+        CASE
+            WHEN jsonb_typeof(value->'depositAllocations') = 'array'
+                THEN value->'depositAllocations'
+            WHEN jsonb_typeof(value->'depositAllocations') = 'object'
+                THEN jsonb_build_array(value->'depositAllocations')
+            ELSE '[]'::jsonb
+        END
+    ) a
     WHERE COALESCE(a->>'depositId', a->>'sourceId', a->>'id', '') = p_deposit_id;
 $$;
 
