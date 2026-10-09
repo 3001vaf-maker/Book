@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const timetable = readFileSync(new URL('../timetable/timetable.js', import.meta.url), 'utf8');
 const journal = readFileSync(new URL('../journal/journal.js', import.meta.url), 'utf8');
 const journalDay = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
+const journalMonth = readFileSync(new URL('../journal/месяц.js', import.meta.url), 'utf8');
 
 assert.match(
   timetable,
@@ -70,6 +71,36 @@ assert.match(
   journal,
   /renderJournalMonth\(viewRoot,[\s\S]*?onDateSelect:/,
   'Journal Month must remain navigation into Day rather than schedule editing',
+);
+assert.match(
+  journal,
+  /renderJournalMonth\(viewRoot,\s*\{[\s\S]*?month:\s*selectedDate,[\s\S]*?onMonthChange:\s*\(nextMonth\)\s*=>\s*\{[\s\S]*?selectedDate\s*=\s*new Date\(year,\s*month,\s*day\);[\s\S]*?setWorkplaceContext/,
+  'Journal Month must preserve the month being viewed instead of resetting to the current month',
+);
+assert.match(
+  journal,
+  /disposeActiveView\(\);[\s\S]*?disposeActiveView\s*=\s*\(\)\s*=>\s*\{\};/,
+  'Journal must dispose the previous view before rebuilding it',
+);
+assert.match(
+  journalMonth,
+  /initCalendar\(calendarRoot,\s*\{[\s\S]*?month,[\s\S]*?onMonthChange,/,
+  'Journal Month must let the shared calendar keep the displayed month without recreating the whole calendar',
+);
+assert.match(
+  journalMonth,
+  /getRecords\(\)/,
+  'Journal Month must build one record snapshot for the calendar render',
+);
+assert.doesNotMatch(
+  journalMonth,
+  /getRecordsForDay/,
+  'Journal Month must not rebuild all record state separately for every calendar day',
+);
+assert.doesNotMatch(
+  journalMonth,
+  /onMonthChange:\s*\(nextMonth\)\s*=>\s*render\(nextMonth\)/,
+  'Journal Month must not render twice for a single month navigation click',
 );
 
 console.log('working-time edit regression tests: OK');

@@ -2,9 +2,8 @@ import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { minutesBetween } from '../core/time/index.js';
-import { getWorkplaces, getWorkingDays, getWorkingDates, getAllWorkingDates, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
-import { getRecordsForDay } from '../core/record/index.js';
-import { recordVisualState } from '../core/record/index.js';
+import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
+import { getRecords, recordVisualState } from '../core/record/index.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
@@ -21,9 +20,22 @@ function dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMo
   return time ? Math.max(0, minutesBetween(time.from, time.to)) : 0;
 }
 
-function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces }) {
-  const records = getRecordsForDay(dateKey, allMode ? '' : workplaceId)
-    .filter((record) => record?.status !== 'cancelled');
+function recordsByDate(workplaceId, allMode) {
+  const index = new Map();
+  getRecords().forEach((record) => {
+    if (record?.status === 'cancelled') return;
+    if (!allMode && String(record?.workplaceId || '') !== String(workplaceId || '')) return;
+    const key = String(record?.date || '').slice(0, 10);
+    if (!key) return;
+    const bucket = index.get(key) || [];
+    bucket.push(record);
+    index.set(key, bucket);
+  });
+  return index;
+}
+
+function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, recordIndex }) {
+  const records = recordIndex.get(dateKey) || [];
   const capacity = dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode);
   const minutes = { paid: 0, active: 0, noShow: 0 };
 
@@ -69,36 +81,44 @@ function dateContent(data) {
   return `${fill}${count}`;
 }
 
-export function renderJournalMonth(root, { workplaceId = '', onDateSelect = () => {}, navigationRoot = null } = {}) {
-  let disposeCalendarHeaderHost = () => {};
+function workingDatesForJournal(workingDays, workplaceId, allMode) {
+  return [...new Set((Array.isArray(workingDays) ? workingDays : [])
+    .filter((day) => allMode || String(day?.workplaceId || '') === String(workplaceId || ''))
+    .map((day) => String(day?.date || ''))
+    .filter(Boolean))];
+}
 
-  const render = (month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)) => {
-    disposeCalendarHeaderHost();
-    root.innerHTML = '<div data-journal-month-calendar></div>';
-    const workingDays = getWorkingDays();
-    const workplaces = getWorkplaces();
-    const allMode = workplaceId === ALL_WORKPLACES_ID;
-    const calendarRoot = root.querySelector('[data-journal-month-calendar]');
-    initCalendar(calendarRoot, {
-      month,
-      workingDates: allMode ? getAllWorkingDates(workingDays, month) : getWorkingDates(workingDays, workplaceId, month),
-      renderDateContent: ({ dateKey, isCurrentMonth }) => {
-        if (!isCurrentMonth) return '';
-        return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces }));
-      },
-      resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
-        ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
-        : [],
-      onDateSelect: (dateKey) => {
-        const [year, monthNumber, day] = String(dateKey).split('-').map(Number);
-        if (!year || !monthNumber || !day) return;
-        onDateSelect(new Date(year, monthNumber - 1, day));
-      },
-      onMonthChange: (nextMonth) => render(nextMonth),
-    });
-    disposeCalendarHeaderHost = bindCalendarHeaderHost(calendarRoot, navigationRoot);
-  };
+export function renderJournalMonth(root, {
+  month = new Date(),
+  workplaceId = '',
+  onDateSelect = () => {},
+  onMonthChange = () => {},
+  navigationRoot = null,
+} = {}) {
+  root.innerHTML = '<div data-journal-month-calendar></div>';
+  const workingDays = getWorkingDays();
+  const workplaces = getWorkplaces();
+  const allMode = workplaceId === ALL_WORKPLACES_ID;
+  const recordIndex = recordsByDate(workplaceId, allMode);
+  const calendarRoot = root.querySelector('[data-journal-month-calendar]');
 
-  render();
-  return () => disposeCalendarHeaderHost();
+  initCalendar(calendarRoot, {
+    month,
+    workingDates: workingDatesForJournal(workingDays, workplaceId, allMode),
+    renderDateContent: ({ dateKey, isCurrentMonth }) => {
+      if (!isCurrentMonth) return '';
+      return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, recordIndex }));
+    },
+    resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
+      ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
+      : [],
+    onDateSelect: (dateKey) => {
+      const [year, monthNumber, day] = String(dateKey).split('-').map(Number);
+      if (!year || !monthNumber || !day) return;
+      onDateSelect(new Date(year, monthNumber - 1, day));
+    },
+    onMonthChange,
+  });
+
+  return bindCalendarHeaderHost(calendarRoot, navigationRoot);
 }
