@@ -226,6 +226,18 @@ END;
 $$;
 
 DROP FUNCTION backfill_deposit_allocation_components(text, text);
+
+-- The one-percent-source policy is a domain resolver rule, not a permanent database invariant.
+-- Retire the old PostgreSQL guards before removing their Deposit SQL helper dependencies.
+DROP TRIGGER IF EXISTS "PersonSinglePricePercentGuard" ON "Person";
+DROP TRIGGER IF EXISTS "DepositSinglePricePercentGuard" ON "LoyaltyDepositInstance";
+DROP TRIGGER IF EXISTS "FinancePaymentSinglePricePercentGuard" ON "FinanceOperation";
+DROP FUNCTION IF EXISTS loyalty_person_price_percent_guard();
+DROP FUNCTION IF EXISTS loyalty_deposit_price_percent_guard();
+DROP FUNCTION IF EXISTS loyalty_payment_price_percent_guard();
+DROP FUNCTION IF EXISTS loyalty_active_program_price_percent_count(text, text, text);
+DROP FUNCTION IF EXISTS loyalty_person_discount_percent(jsonb);
+
 DROP TRIGGER IF EXISTS "LoyaltyDepositFinanceSync" ON "FinanceOperation";
 DROP FUNCTION IF EXISTS loyalty_deposit_finance_sync();
 DROP FUNCTION IF EXISTS loyalty_deposit_operation_ids("FinanceOperation");
