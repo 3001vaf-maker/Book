@@ -44,7 +44,6 @@ jobs:
               raise SystemExit('Server duplicate calculator missing before cleanup')
           duplicate.unlink()
 
-          # Guard the architectural invariant: one calculator source only.
           check = Path('scripts/check-finance-architecture.mjs')
           c = check.read_text()
           marker = "const SERVER_SETTLEMENT_DUPLICATE = 'server/src/finance/settlement-rules.ts';"
@@ -71,3 +70,5 @@ jobs:
           git diff --cached --check
           git commit -m 'Use one canonical Settlement calculator'
           git push origin HEAD:staging
+
+# trigger
