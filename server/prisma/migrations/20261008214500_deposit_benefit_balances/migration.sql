@@ -154,7 +154,6 @@ BEGIN
         ORDER BY "occurredAt" ASC, "createdAt" ASC
     LOOP
         IF operation_row."kind" = 'deposit-withdrawal' THEN
-            -- A real refund closes the instance. Promotional value cannot survive a cash refund.
             principal := GREATEST(0, principal - loyalty_deposit_amount(operation_row."data"));
             benefit := 0;
             status_value := 'closed';
@@ -167,7 +166,6 @@ BEGIN
                 CONTINUE;
             END IF;
 
-            -- Confirmed order: real money is spent first, promotional value second.
             principal_used := LEAST(principal, allocation_amount);
             principal := GREATEST(0, principal - principal_used);
             benefit_used := LEAST(benefit, GREATEST(0, allocation_amount - principal_used));
@@ -217,7 +215,7 @@ BEGIN
         END IF;
     END LOOP;
 
-    IF status_value = 'active' AND NOT loyalty_deposit_terms_active(terms_value, CURRENT_TIMESTAMP) THEN
+    IF status_value = 'active' AND NOT loyalty_deposit_terms_active(terms_value, CURRENT_TIMESTAMP::timestamp) THEN
         principal := 0;
         benefit := 0;
         status_value := 'expired';
@@ -265,9 +263,6 @@ BEGIN
         "updatedAt" = CURRENT_TIMESTAMP;
 END;
 $$;
-
--- Existing trigger from the previous migration calls loyalty_deposit_recalculate for
--- funding/withdrawal/payment/refund INSERT/UPDATE/DELETE, so replacing the function is enough.
 
 DO $$
 DECLARE
