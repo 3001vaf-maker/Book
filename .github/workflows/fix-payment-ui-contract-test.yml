@@ -29,6 +29,7 @@ jobs:
             "assert.match(html, /Ручная коррекция ₽/);": "assert.match(html, /Ручная коррекция цены, ₽/);",
             "], { discountPercent: 20 });": "], { pricePercent: 20 });",
             "assert.equal(correctedThenAutomatic.discountTotal, 1400);": "assert.equal(correctedThenAutomatic.correctionTotal + correctedThenAutomatic.pricePercentTotal, 1400);",
+            "assert.match(paymentSource, /const discountOptions = \\[/);": "assert.match(paymentSource, /const percentOptions = \\[/);",
             "assert.match(paymentSource, /label: 'Ручная коррекция %'/);": "assert.match(paymentSource, /label: 'Ручная коррекция цены, %'/);",
             "assert.match(paymentSource, /label: 'Ручная коррекция ₽'/);": "assert.match(paymentSource, /label: 'Ручная коррекция цены, ₽'/);",
           }
@@ -36,7 +37,7 @@ jobs:
               if old not in s:
                   raise SystemExit(f'Expected test contract not found: {old}')
               s = s.replace(old, new)
-          if 'discountPercent: 20' in s or 'discountTotal' in s or 'Ручная коррекция %' in s or 'Ручная коррекция ₽' in s:
+          if 'discountPercent: 20' in s or 'discountTotal' in s or 'discountOptions' in s or 'Ручная коррекция %' in s or 'Ручная коррекция ₽' in s:
               raise SystemExit('Legacy payment-test contract still remains')
           p.write_text(s)
           PY
