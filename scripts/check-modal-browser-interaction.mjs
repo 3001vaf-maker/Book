@@ -21,7 +21,7 @@ for (const [name, engine, contextOptions] of [
       await page.goto(`${base}/tests/modal-hit-targets-browser.html${suffix}`);
       await page.locator('html[data-modal-test-ready="true"]').waitFor();
       await page.locator('[data-v2-app]').waitFor();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(300); // Shared entrance animation must settle before geometry assertions.
     };
     const targetPoints = async (selector) => page.locator(selector).evaluate((node) => {
       const r = node.getBoundingClientRect();
@@ -71,14 +71,13 @@ for (const [name, engine, contextOptions] of [
     await activate(points[0]);
     await page.locator('[data-service-workplace="test-space"]').waitFor();
     await page.waitForTimeout(300);
-    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: distinct child X did not stack over settings X`);
+    // Profile settings intentionally hands off to the next X by explicitly closing itself.
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: settings handoff left an extra modal`);
     const checkbox = '[data-service-workplace="test-space"]';
     const checkboxPoints = await targetPoints(checkbox);
     assert.ok(checkboxPoints.every((point) => point.hit), `${name}: workplace checkbox obscured`);
     await activate(checkboxPoints[1]);
     assert.equal(await page.locator('[data-test-selection]').textContent(), '1', `${name}: selection did not update`);
-    await closeTopSheet();
-    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: parent X disappeared with child X`);
     await closeTopSheet();
     assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: stage remained locked`);
 
@@ -88,7 +87,6 @@ for (const [name, engine, contextOptions] of [
     await activate((await targetPoints(menuSelector))[1]);
     await page.waitForTimeout(300);
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
-    await closeTopSheet();
     await closeTopSheet();
 
     // Actual time correction path: parent X must survive the nested TimePicker X.
@@ -113,7 +111,8 @@ for (const [name, engine, contextOptions] of [
     await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
     assert.equal(await page.locator('[data-test-time-result]').textContent(), '09:00-18:00', `${name}: time range did not save after nested TimePicker`);
 
-    // X veil: tapping Header A while X is active must only dismiss the top X.
+    // X veil: tapping Header A while X is active must only dismiss the X.
+    // The underlying A action must never fire from the same input.
     if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
     else await page.locator('[data-test-settings]').click();
     await page.locator('[data-modal]').waitFor();
@@ -134,7 +133,7 @@ for (const [name, engine, contextOptions] of [
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
 
-    // Journal Shared Select is a distinct child X and must preserve its parent X.
+    // Journal selector stacks while choosing, then its committed change explicitly closes the owning X.
     for (let cycle = 0; cycle < 3; cycle += 1) {
       const journalTrigger = page.locator('[data-test-journal-workplace]');
       if (contextOptions.hasTouch) await journalTrigger.tap();
@@ -147,16 +146,14 @@ for (const [name, engine, contextOptions] of [
       if (contextOptions.hasTouch) await journalSelect.tap();
       else await journalSelect.click();
       await page.locator('[data-ui-selector]').waitFor();
-      assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal child X did not stack over parent X`);
+      assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal selector did not stack while parent input remained active`);
 
       const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
       const option = page.locator(`[data-ui-select-option][data-value="${targetValue}"]`);
       if (contextOptions.hasTouch) await option.tap();
       else await option.click();
 
-      await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
-      assert.equal(await page.locator('[data-journal-workplace-select]').count(), 1, `${name}: Journal parent X disappeared after selection`);
-      await closeTopSheet();
+      await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
       assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: Journal stage stayed inert after workplace switch`);
       assert.equal(await page.locator('[data-test-journal-workplace]').isEnabled(), true, `${name}: Journal stopped responding after workplace switch`);
     }
@@ -175,7 +172,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (stacked distinct X, nested TimePicker, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
+    console.log(`${name}: PASS (nested TimePicker X, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
