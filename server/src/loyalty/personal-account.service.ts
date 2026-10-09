@@ -61,6 +61,18 @@ export class PersonalAccountService {
     return this.finance.withdraw(tenantId, { ...objectValue(body), personKey });
   }
 
+  pay(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.pay(tenantId, { ...objectValue(body), personKey });
+  }
+
+  refundPayment(tenantId: string, paymentOperationId: string, body: unknown) {
+    return this.finance.refundPayment(tenantId, paymentOperationId, body);
+  }
+
+  finalizeDebt(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.finalizeDebt(tenantId, { ...objectValue(body), personKey });
+  }
+
   settleDebt(tenantId: string, debtId: string, body: unknown) {
     return this.finance.settleDebt(tenantId, debtId, body);
   }
