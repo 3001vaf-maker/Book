@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DepositService } from './deposit.service';
+import { PersonalAccountService } from './personal-account.service';
 
 type AuthenticatedRequest = Request & {
   auth?: { platformAccountId: string; tenantId: string; role: string };
@@ -10,7 +11,10 @@ type AuthenticatedRequest = Request & {
 @Controller('loyalty')
 @UseGuards(JwtAuthGuard)
 export class LoyaltyController {
-  constructor(private readonly deposits: DepositService) {}
+  constructor(
+    private readonly deposits: DepositService,
+    private readonly personalAccounts: PersonalAccountService,
+  ) {}
 
   @Get('deposits')
   listDeposits(@Req() request: AuthenticatedRequest) {
@@ -53,5 +57,81 @@ export class LoyaltyController {
     @Param('depositId') depositId: string,
   ) {
     return this.deposits.hardDelete(request.auth!.tenantId, depositId);
+  }
+
+  @Get('personal-accounts')
+  listPersonalAccounts(@Req() request: AuthenticatedRequest) {
+    return this.personalAccounts.list(request.auth!.tenantId);
+  }
+
+  @Get('personal-accounts/person/:personKey')
+  getPersonalAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+  ) {
+    return this.personalAccounts.get(request.auth!.tenantId, personKey);
+  }
+
+  @Put('personal-accounts/person/:personKey')
+  updatePersonalAccountSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.updateSettings(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/person/:personKey/fund')
+  fundPersonalAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.fund(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/person/:personKey/withdraw')
+  withdrawPersonalAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.withdraw(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/person/:personKey/pay')
+  payFromPersonalAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.pay(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/person/:personKey/finalize-debt')
+  finalizePersonalAccountDebt(
+    @Req() request: AuthenticatedRequest,
+    @Param('personKey') personKey: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.finalizeDebt(request.auth!.tenantId, personKey, body);
+  }
+
+  @Post('personal-accounts/payment/:operationId/refund')
+  refundPersonalAccountPayment(
+    @Req() request: AuthenticatedRequest,
+    @Param('operationId') operationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.refundPayment(request.auth!.tenantId, operationId, body);
+  }
+
+  @Post('personal-accounts/debts/:debtId/settle')
+  settlePersonalAccountDebt(
+    @Req() request: AuthenticatedRequest,
+    @Param('debtId') debtId: string,
+    @Body() body: unknown,
+  ) {
+    return this.personalAccounts.settleDebt(request.auth!.tenantId, debtId, body);
   }
 }

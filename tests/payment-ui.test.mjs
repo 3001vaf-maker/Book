@@ -84,11 +84,14 @@ assert.equal(correctedWithoutProgram.planTotal, 4500);
 const methodsHtml = paymentMethods({
   wallets: [{ id: 'cash', name: 'Наличные' }, { id: 'card', name: 'СберБанк' }],
   deposits: [{ depositId: 'dep-1', programName: 'Депозит 10%', balance: 3500 }],
+  personalAccount: { personKey: 'person-1', balance: 2400, availableAmount: 1800, spendLimitPercent: 50 },
   total: 7000,
 });
 assert.match(methodsHtml, /К оплате/);
 assert.match(methodsHtml, /7 000 ₽/);
 assert.match(methodsHtml, /Депозит 10% · остаток 3 500 ₽/);
+assert.match(methodsHtml, /Личный счёт · доступно 1 800 ₽/);
+assert.match(methodsHtml, /data-payment-personal-account/);
 assert.match(methodsHtml, /data-payment-allocation-row="0"/);
 assert.match(methodsHtml, /data-payment-allocation-row="1"/);
 assert.match(methodsHtml, /data-payment-allocation-amount="0"/);
@@ -107,16 +110,27 @@ assert.equal(depositOnly.tips, 0);
 assert.equal(depositOnly.valid, true);
 
 const mixed = paymentAllocationState([
-  { walletId: 'cash', walletName: 'Наличные', amount: 2500 },
+  { walletId: 'cash', walletName: 'Наличные', amount: 1500 },
 ], 5000, [
-  { depositId: 'dep-1', name: 'Депозит', balance: 3500, amount: 3000 },
-]);
+  { depositId: 'dep-1', name: 'Депозит', balance: 3500, amount: 2500 },
+], {
+  amount: 1500,
+  availableAmount: 1800,
+});
 assert.equal(mixed.applied, 5000);
 assert.equal(mixed.remaining, 0);
 assert.equal(mixed.tips, 500);
-assert.equal(mixed.cashReceived, 2500);
-assert.equal(mixed.depositReceived, 3000);
+assert.equal(mixed.cashReceived, 1500);
+assert.equal(mixed.depositReceived, 2500);
+assert.equal(mixed.personalAccountAmount, 1500);
+assert.equal(mixed.personalAccountReceived, 1500);
 assert.equal(mixed.valid, true);
+
+const personalAccountOverflow = paymentAllocationState([], 2000, [], {
+  amount: 1900,
+  availableAmount: 1800,
+});
+assert.equal(personalAccountOverflow.valid, false);
 
 const depositOverflow = paymentAllocationState([], 2000, [
   { depositId: 'dep-1', name: 'Депозит', balance: 3500, amount: 2500 },
@@ -166,11 +180,15 @@ assert.match(paymentSource, /label: 'Ручная коррекция цены, %
 assert.match(paymentSource, /label: 'Ручная коррекция цены, ₽'/);
 assert.match(methodsSource, /const due = Math\.max\(0, numberValue\(total\)\)/);
 assert.match(methodsSource, /const depositReceived = deposits\.reduce/);
+assert.match(methodsSource, /const personalAccountAmount = Math\.max/);
+assert.match(methodsSource, /const nonCashReceived = depositReceived \+ personalAccountAmount/);
 assert.match(methodsSource, /const serviceFromCash = Math\.min/);
-assert.match(methodsSource, /const applied = Math\.min\(due, depositReceived \+ serviceFromCash\)/);
+assert.match(methodsSource, /const applied = Math\.min\(due, nonCashReceived \+ serviceFromCash\)/);
 assert.match(methodsSource, /const tips = Math\.max\(0, cashReceived - serviceFromCash\)/);
 assert.match(methodsSource, /const remaining = Math\.max\(0, due - applied\)/);
 assert.match(methodsSource, /return \{\s*state,\s*sync,\s*initial\s*\};/s);
+assert.match(methodsSource, /Личный счёт · доступно/);
+assert.match(methodsSource, /type === 'personal-account'/);
 
 assert.match(paymentSource, /miniCard/);
 assert.match(paymentSource, /v2ZBodySections/);
@@ -204,7 +222,12 @@ assert.match(recordPaymentSource, /const canPay = state\.remaining > 0\.009 \|\|
 assert.match(recordPaymentSource, /data-record-payment-chat/);
 assert.match(recordPaymentSource, /personKeys:/);
 assert.match(recordPaymentSource, /listPersonDeposits/);
+assert.match(recordPaymentSource, /loadPersonalAccount/);
+assert.match(recordPaymentSource, /personalAccountForRecord/);
+assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), deposits, personalAccount/);
 assert.match(recordPaymentSource, /depositAllocations:\s*allocationState\.depositAllocations/);
+assert.match(recordPaymentSource, /personalAccountAmount:\s*allocationState\.personalAccountAmount/);
+assert.match(recordPaymentSource, /finalizeDebt:\s*allocationState\.remaining > 0\.009/);
 
 for (const action of [
   "id: 'correct-payment'",
@@ -230,7 +253,6 @@ assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryCon
 
 assert.match(recordPaymentSource, /blankPaymentContext\(current\)/);
 assert.match(recordPaymentSource, /blankPaymentContext\(record, 'Корректировка оплаты'\)/);
-assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), deposits/);
 assert.match(recordPaymentSource, /serviceAmount:\s*allocationState\.applied/);
 assert.match(recordPaymentSource, /tips:\s*allocationState\.tips/);
 assert.match(recordPaymentSource, /setRecordPrimaryAction\(layer, \{\s*label: 'Оплатить'/s);

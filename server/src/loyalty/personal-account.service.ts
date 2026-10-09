@@ -1,0 +1,105 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PersonalAccountFinanceService } from '../finance/personal-account-finance.service';
+import { PrismaService } from '../prisma.service';
+import {
+  listPersonalAccountsWithActivity,
+  personalAccountSnapshot,
+  updatePersonalAccountSettingsWith,
+} from './personal-account-state';
+
+function objectValue(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function isRetryableTransactionError(error: unknown) {
+  const code = text(objectValue(error).code);
+  return code === 'P2034' || code === '40001';
+}
+
+@Injectable()
+export class PersonalAccountService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly finance: PersonalAccountFinanceService,
+  ) {}
+
+  private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableTransactionError(error) || attempt === 2) throw error;
+      }
+    }
+    throw lastError;
+  }
+
+  list(tenantId: string) {
+    return listPersonalAccountsWithActivity(this.prisma, tenantId);
+  }
+
+  get(tenantId: string, personKey: string) {
+    return personalAccountSnapshot(this.prisma, tenantId, personKey);
+  }
+
+  updateSettings(tenantId: string, personKey: string, body: unknown) {
+    return this.serializable((tx) => updatePersonalAccountSettingsWith(tx, tenantId, personKey, body));
+  }
+
+  fund(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.fund(tenantId, { ...objectValue(body), personKey });
+  }
+
+  withdraw(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.withdraw(tenantId, { ...objectValue(body), personKey });
+  }
+
+  pay(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.pay(tenantId, { ...objectValue(body), personKey });
+  }
+
+  refundPayment(tenantId: string, paymentOperationId: string, body: unknown) {
+    return this.finance.refundPayment(tenantId, paymentOperationId, body);
+  }
+
+  finalizeDebt(tenantId: string, personKey: string, body: unknown) {
+    return this.finance.finalizeDebt(tenantId, { ...objectValue(body), personKey });
+  }
+
+  settleDebt(tenantId: string, debtId: string, body: unknown) {
+    return this.finance.settleDebt(tenantId, debtId, body);
+  }
+
+  async endUserView(tenantId: string, personKey: string) {
+    const snapshot = await personalAccountSnapshot(this.prisma, tenantId, personKey);
+    if (!snapshot.visibleToEndUser) return null;
+    return {
+      balance: snapshot.balance,
+      debtTotal: snapshot.debtTotal,
+      spendLimitPercent: snapshot.spendLimitPercent,
+      movements: Array.isArray(snapshot.movements) ? snapshot.movements.map((movement: Record<string, any>) => ({
+        id: movement.id,
+        kind: movement.kind,
+        direction: movement.direction,
+        amount: movement.amount,
+        occurredAt: movement.occurredAt,
+        balanceAfter: movement.balanceAfter,
+      })) : [],
+      debts: Array.isArray(snapshot.debts) ? snapshot.debts.map((debt: Record<string, any>) => ({
+        id: debt.id,
+        originalAmount: debt.originalAmount,
+        outstandingAmount: debt.outstandingAmount,
+        occurredAt: debt.occurredAt,
+        closedAt: debt.closedAt,
+        status: debt.status,
+      })) : [],
+    };
+  }
+}

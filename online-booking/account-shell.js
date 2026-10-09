@@ -17,6 +17,7 @@ import { projectRecordStatuses } from '../core/record/index.js';
 import { disableWebPush, enableWebPush, getWebPushState } from '../core/notifications/web-push.js';
 import {
   button,
+  details,
   emptyState,
   entityCardStack,
   entityVisualCard,
@@ -33,6 +34,7 @@ import {
   modal,
   openNotice,
   page,
+  shortDateTime,
   v2RailCard,
   v2Section,
   v2Shell,
@@ -59,6 +61,8 @@ import {
   investmentRoleLabel,
   normalizeInvestmentTerms,
 } from '../core/finance/index.js';
+import { personalAccountVisualCard } from '../core/loyalty/personal-account/index.js';
+import { getGlobalPersonalAccounts } from './personal-account-data.js';
 
 function money(value) {
   const number = Number(value || 0);
@@ -1217,6 +1221,90 @@ function contactWorkplaceRail(relationship, records = []) {
   })).join(''), { className: 'v2-profile-workplaces' });
 }
 
+function contactPersonalAccountCard(relationship, account) {
+  return personalAccountVisualCard({
+    title: relationshipTitle(relationship),
+    balance: Math.max(0, Number(account?.balance || 0)),
+    data: 'data-global-contact-personal-account',
+    aria: 'Открыть Личный счёт',
+  });
+}
+
+function contactPersonalAccountHistory(account = {}) {
+  const labels = {
+    funding: 'Пополнение',
+    withdrawal: 'Возврат',
+    payment: 'Оплата',
+    'payment-refund': 'Возврат оплаты',
+    refund: 'Возврат оплаты',
+  };
+  const rows = (Array.isArray(account?.movements) ? account.movements : [])
+    .slice()
+    .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')))
+    .map((movement) => {
+      const direction = String(movement?.direction || '').toUpperCase();
+      return v2ListEntry({
+        title: labels[String(movement?.kind || '')] || 'Операция',
+        subtitle: shortDateTime(movement?.occurredAt, '—'),
+        rightTop: `${direction === 'IN' ? '+' : '−'}${money(movement?.amount)}`,
+        rightBottom: `Остаток ${money(movement?.balanceAfter)}`,
+      });
+    });
+  return rows.length
+    ? v2ListEntries(rows)
+    : emptyState('Истории пока нет', 'Движения Личного счёта появятся здесь.');
+}
+
+function contactPersonalAccountDebts(account = {}) {
+  const rows = (Array.isArray(account?.debts) ? account.debts : [])
+    .slice()
+    .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')))
+    .map((debt) => {
+      const open = String(debt?.status || '') !== 'closed' && Number(debt?.outstandingAmount || 0) > 0.009;
+      return v2ListEntry({
+        title: open ? 'Задолженность' : 'Задолженность погашена',
+        subtitle: shortDateTime(debt?.occurredAt, '—'),
+        rightTop: money(open ? debt?.outstandingAmount : debt?.originalAmount),
+        rightBottom: open ? 'К оплате' : 'Погашено',
+      });
+    });
+  return rows.length ? v2ListEntries(rows) : '';
+}
+
+function openGlobalContactPersonalAccountLayer(root, state, handlers, relationship, account, restoreHeader) {
+  const tenantId = String(relationship?.tenantId || '');
+  const profile = relationship?.context?.profile || {};
+  const title = relationshipTitle(relationship);
+  const limit = Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100)));
+  const debts = contactPersonalAccountDebts(account);
+  const body = page([
+    details([
+      { label: 'Личный счёт', value: money(account?.balance) },
+      { label: 'Задолженность', value: money(account?.debtTotal) },
+      { label: 'Оплата Личным счётом', value: limit >= 100 ? 'Без ограничений' : `До ${limit}%` },
+    ]),
+    v2Section('История', contactPersonalAccountHistory(account)),
+    debts ? v2Section('Задолженность', debts) : '',
+  ]);
+  const layer = mountV2ZLayer(root, v2ZLayer(body, { className: 'account-contact-personal-account-z' }), {
+    stack: true,
+    onClose: () => restoreHeader?.(),
+  });
+  if (!layer) return null;
+  setGlobalAccountHeader(root, v2Header({
+    a: { kind: 'avatar', label: title, image: String(profile.photo || ''), disabled: true },
+    b: 'Личный счёт',
+    d: { kind: 'chat', data: 'data-global-personal-account-chat', aria: 'Чат' },
+  }));
+  root.querySelector('[data-global-personal-account-chat]')?.addEventListener('click', () => {
+    state.accountSelectedChatTenantId = tenantId;
+    state.accountTab = 'messages';
+    state.accountDeckOpen = false;
+    void handlers.render();
+  });
+  return layer;
+}
+
 function contactHistoryMiniCard(state, request, index, dataName = 'data-global-contact-history') {
   const procedures = requestProcedures(request).map((item) => String(item?.name || '').trim()).filter(Boolean);
   const pricing = requestPricing(request);
@@ -1329,12 +1417,18 @@ async function renderGlobalContactDetail(root, state, handlers) {
 
   const tenantId = String(relationship.tenantId || '');
   const records = globalContactRecords(state, tenantId);
+  const personalAccounts = await getGlobalPersonalAccounts().catch(() => []);
+  const personalAccount = personalAccounts.find((item) => String(item?.tenantId || '') === tenantId) || null;
   await renderGlobalContacts(root, state, handlers);
 
   const workplaces = contactWorkplaceRail(relationship, records);
+  const programs = personalAccount
+    ? v2HorizontalRail(contactPersonalAccountCard(relationship, personalAccount))
+    : '';
   const history = contactHistoryRail(state, records);
   const body = [
     workplaces ? v2Section('Рабочие пространства', workplaces) : '',
+    programs ? v2Section('Программы', programs) : '',
     history ? v2Section('История', history) : '',
   ].filter(Boolean).join('') || emptyState('Профиль пока пустой', 'Данные взаимодействия появятся здесь.');
 
@@ -1361,6 +1455,11 @@ async function renderGlobalContactDetail(root, state, handlers) {
     if (!workplace) return;
     openGlobalContactWorkplaceLayer(root, state, handlers, relationship, workplace, records, showContactHeader);
   }));
+
+  layer.querySelector('[data-global-contact-personal-account]')?.addEventListener('click', () => {
+    if (!personalAccount) return;
+    openGlobalContactPersonalAccountLayer(root, state, handlers, relationship, personalAccount, showContactHeader);
+  });
 
   const historyRows = records.slice().sort((a, b) => requestMoment(b).localeCompare(requestMoment(a)));
   layer.querySelectorAll('[data-global-contact-history]').forEach((node) => node.addEventListener('click', () => {
