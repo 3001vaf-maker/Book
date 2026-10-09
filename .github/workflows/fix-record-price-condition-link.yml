@@ -1,0 +1,56 @@
+name: One-time record price-condition cleanup
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/fix-record-price-condition-link.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Remove retired Record discount resolver link
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('journal/record.js')
+          s = p.read_text()
+          if 'recordSettlementDiscountPercent' not in s:
+              raise SystemExit('retired resolver link not found')
+          s = s.replace('recordSettlementDiscountPercent', 'recordSettlementPricePercent')
+          old = 'discountPercent: recordSettlementPricePercent(currentPerson),'
+          new = 'pricePercent: recordSettlementPricePercent(currentPerson),'
+          if old not in s:
+              raise SystemExit('retired Settlement option not found')
+          s = s.replace(old, new, 1)
+          if 'recordSettlementDiscountPercent' in s:
+              raise SystemExit('retired resolver link remains')
+          p.write_text(s)
+          PY
+          grep -R --line-number --fixed-strings 'recordSettlementDiscountPercent' . --exclude-dir=.git && exit 1 || true
+      - name: Verify browser-facing syntax and architecture
+        run: |
+          node --check journal/record.js
+          node scripts/check-finance-architecture.mjs
+          node scripts/check-record-ownership.mjs
+      - name: Commit cleanup and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/fix-record-price-condition-link.yml
+          git config user.name '3001vaf-maker'
+          git config user.email '30.01vaf@gmail.com'
+          git add journal/record.js
+          git add -u .github/workflows/fix-record-price-condition-link.yml
+          git diff --cached --check
+          git commit -m 'Remove retired Record discount resolver link'
+          git push origin HEAD:staging
