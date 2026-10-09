@@ -71,6 +71,13 @@ if (depositUi.includes("String(deposit?.benefitMode || 'none') !== 'none' || ben
 }
 
 const paymentUi = readFileSync('ui/payment/index.js', 'utf8');
+if (
+  paymentUi.includes('data-payment-discount-percent')
+  || paymentUi.includes('data-payment-discount-money')
+  || paymentUi.includes('removeDiscount')
+) {
+  errors.push('payment UI must not restore retired manual discount controls');
+}
 if (!paymentUi.includes('Ручная коррекция цены, %') || !paymentUi.includes('Ручная коррекция цены, ₽')) {
   errors.push('payment UI must expose manual price correction explicitly');
 }
@@ -79,8 +86,8 @@ if (!paymentUi.includes("label: 'Условие'") || !paymentUi.includes('disab
 }
 
 const browserRuntime = readFileSync('tests/professional-core-runtime-browser.html', 'utf8');
-if (browserRuntime.includes('data-payment-discount-percent') || browserRuntime.includes('data-payment-discount-money')) {
-  errors.push('browser runtime regression must not depend on retired payment discount controls');
+if (!browserRuntime.includes('Payment Z3 must not expose retired discount controls')) {
+  errors.push('browser runtime regression must assert that retired payment discount controls stay absent');
 }
 if (!browserRuntime.includes('data-payment-correction-percent') || !browserRuntime.includes('data-payment-correction-money')) {
   errors.push('browser runtime regression must cover manual price correction controls');
