@@ -1009,16 +1009,16 @@ function openAccountInvestmentProposal(state, handlers, row) {
   return layer;
 }
 
-function openAccountInvestmentDetail(root, state, handlers, row) {
+function openAccountInvestmentDetail(root, state, handlers, row, restoreHeader = null) {
   const investment = row.investment;
-  const restoreHeader = () => setGlobalAccountHeader(root, globalHomeHeader(state));
+  const restore = typeof restoreHeader === 'function' ? restoreHeader : () => {};
   const layer = mountV2ZLayer(root, v2ZLayer(page([
     v2Section('Расчёт', accountInvestmentSummary(investment)),
     v2Section('История', accountInvestmentHistory(investment)),
     v2Section('Условия', accountInvestmentTermsRows(row)),
   ]), { className: 'account-investment-z' }), {
     stack: true,
-    onClose: restoreHeader,
+    onClose: restore,
   });
   if (!layer) return null;
   setGlobalAccountHeader(root, v2Header({
@@ -1034,15 +1034,15 @@ function openAccountInvestmentDetail(root, state, handlers, row) {
   return layer;
 }
 
-function bindAccountInvestments(root, state, handlers, accepted, pending) {
-  root.querySelectorAll('[data-account-investment]').forEach((node) => {
+function bindAccountInvestments(scope, root, state, handlers, accepted, pending, restoreHeader = null) {
+  scope.querySelectorAll('[data-account-investment]').forEach((node) => {
     node.addEventListener('click', () => {
       const key = String(node.dataset.accountInvestment || '');
       const row = accepted.find((item) => `${item.tenantId}:${item.investment.id}` === key);
-      if (row) openAccountInvestmentDetail(root, state, handlers, row);
+      if (row) openAccountInvestmentDetail(root, state, handlers, row, restoreHeader);
     });
   });
-  root.querySelectorAll('[data-account-investment-proposal]').forEach((node) => {
+  scope.querySelectorAll('[data-account-investment-proposal]').forEach((node) => {
     node.addEventListener('click', () => {
       const key = String(node.dataset.accountInvestmentProposal || '');
       const row = pending.find((item) => `${item.tenantId}:${item.investment.id}` === key);
@@ -1556,7 +1556,7 @@ async function renderGlobalContactDetail(root, state, handlers) {
     openGlobalContactDepositLayer(root, state, handlers, relationship, deposit, showContactHeader);
   }));
 
-  bindAccountInvestments(layer, state, handlers, acceptedInvestments, pendingInvestments);
+  bindAccountInvestments(layer, root, state, handlers, acceptedInvestments, pendingInvestments, showContactHeader);
 }
 
 async function renderGlobalHistory(root, state, handlers) {
