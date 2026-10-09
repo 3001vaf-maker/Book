@@ -39,6 +39,7 @@ export function openSharedProfileSettingsMenu({
     variant: 'x',
     title,
     className: 'modal--profile-settings-sheet',
+    xRole: 'action',
   }));
   if (!layer) return null;
 
@@ -100,6 +101,7 @@ export async function openSharedPhotoAction({
     variant: 'x',
     title,
     className: 'modal--photo-sheet',
+    xRole: 'action',
   }));
   if (!layer) return null;
 
@@ -137,6 +139,7 @@ export function openSharedPasswordAction({
     variant: 'x',
     title,
     className: 'modal--password-sheet',
+    xRole: 'editor',
   }));
   if (!layer) return null;
 
