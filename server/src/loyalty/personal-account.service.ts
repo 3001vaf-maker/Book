@@ -79,6 +79,27 @@ export class PersonalAccountService {
 
   async endUserView(tenantId: string, personKey: string) {
     const snapshot = await personalAccountSnapshot(this.prisma, tenantId, personKey);
-    return snapshot.visibleToEndUser ? snapshot : null;
+    if (!snapshot.visibleToEndUser) return null;
+    return {
+      balance: snapshot.balance,
+      debtTotal: snapshot.debtTotal,
+      spendLimitPercent: snapshot.spendLimitPercent,
+      movements: Array.isArray(snapshot.movements) ? snapshot.movements.map((movement: Record<string, any>) => ({
+        id: movement.id,
+        kind: movement.kind,
+        direction: movement.direction,
+        amount: movement.amount,
+        occurredAt: movement.occurredAt,
+        balanceAfter: movement.balanceAfter,
+      })) : [],
+      debts: Array.isArray(snapshot.debts) ? snapshot.debts.map((debt: Record<string, any>) => ({
+        id: debt.id,
+        originalAmount: debt.originalAmount,
+        outstandingAmount: debt.outstandingAmount,
+        occurredAt: debt.occurredAt,
+        closedAt: debt.closedAt,
+        status: debt.status,
+      })) : [],
+    };
   }
 }
