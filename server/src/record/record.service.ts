@@ -71,7 +71,6 @@ function normalizeGroup(value: unknown, fallbackPerson: unknown, allowedCapacity
       name: text(person.name),
       surname: text(person.surname),
       phone: text(person.phone),
-      discountPercent: Math.max(0, Math.min(100, Number(person.discountPercent) || 0)),
     });
   };
   arrayValue(source.participants).forEach(push);

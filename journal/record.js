@@ -31,7 +31,6 @@ function recordPersonSnapshot(person = {}) {
     name: String(person?.name || ''),
     surname: String(person?.surname || ''),
     phone: String(person?.phone || person?.phones?.[0] || ''),
-    discountPercent: Number(person?.discountPercent) || 0,
   };
 }
 

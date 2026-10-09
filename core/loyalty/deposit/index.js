@@ -222,7 +222,7 @@ function depositInfo(deposit = {}) {
     { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
     { label: 'Условие выгоды', value: terms?.benefit || 'Без дополнительной выгоды' },
   ];
-  if (String(deposit?.benefitMode || 'none') !== 'none' || benefitBalance > 0.009) {
+  if (String(deposit?.benefitMode || 'none') === 'accrual' || benefitBalance > 0.009) {
     rows.push({ label: 'Выгода в остатке', value: money(benefitBalance) });
   }
   if (deposit?.canRefund || refundableAmount > 0.009) {
