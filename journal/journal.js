@@ -46,6 +46,7 @@ export function renderJournal(root, options = {}) {
   const context = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
   let selectedWorkplaceId = context.workplaceId;
   let selectedDate = context.date;
+  let disposeActiveView = () => {};
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
 
@@ -199,6 +200,9 @@ export function renderJournal(root, options = {}) {
 
   const renderView = () => {
     if (!root.isConnected) return;
+    disposeActiveView();
+    disposeActiveView = () => {};
+
     const primaryNavigation = viewNavigation({ views: availableViews, activeView });
     const secondaryNavigation = activeView === 'list'
       ? viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })
@@ -232,9 +236,17 @@ export function renderJournal(root, options = {}) {
         },
       });
     } else if (activeView === 'month') {
-      renderJournalMonth(viewRoot, {
+      disposeActiveView = renderJournalMonth(viewRoot, {
+        month: selectedDate,
         workplaceId: selectedWorkplaceId,
         navigationRoot: periodNavigationRoot,
+        onMonthChange: (nextMonth) => {
+          const year = nextMonth.getFullYear();
+          const month = nextMonth.getMonth();
+          const day = Math.min(selectedDate.getDate(), new Date(year, month + 1, 0).getDate());
+          selectedDate = new Date(year, month, day);
+          setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+        },
         onDateSelect: (nextDate) => {
           selectedDate = nextDate;
           setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
@@ -242,7 +254,7 @@ export function renderJournal(root, options = {}) {
           options.onViewChange?.(activeView);
           renderView();
         },
-      });
+      }) || (() => {});
     } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
 
     root.querySelector('[data-journal-settings]')?.addEventListener('click', openJournalSettings);
@@ -287,6 +299,7 @@ export function renderJournal(root, options = {}) {
   renderView();
 
   return () => {
+    disposeActiveView();
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
     clearV2ZHeaderRows(root);
   };
