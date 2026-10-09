@@ -56,7 +56,7 @@ const record = createRecord({
 });
 assert.ok(record);
 assert.equal(record.finance.serviceTotal, 5000);
-assert.equal(record.finance.discountPercent, 20);
+assert.equal(record.finance.pricePercent, 20);
 assert.equal(record.finance.planTotal, 4000);
 
 // Source price correction belongs to Record; amount due is recalculated as a Finance projection.
@@ -77,8 +77,8 @@ assert.equal(moved.finance.planTotal, 6400);
 
 // A server payment snapshot makes paid fact visible without storing money in Record.
 const correctedSettlement = calculateSettlement([
-  { sourceType: 'procedure', sourceId: 'procedure-1', name: 'Стрижка', price: 8000, discountPercent: 20 },
-]);
+  { sourceType: 'procedure', sourceId: 'procedure-1', name: 'Стрижка', price: 8000 },
+], { pricePercent: 20 });
 const payment = paymentFixture({
   id: 'payment-1',
   recordId: record.id,
@@ -110,8 +110,8 @@ const noDiscount = createRecord({
 assert.equal(noDiscount.finance.planTotal, 8000);
 
 const paymentStageSettlement = calculateSettlement([
-  { sourceType: 'procedure', sourceId: 'procedure-2', name: 'Окрашивание', price: 8000, discountPercent: 20 },
-]);
+  { sourceType: 'procedure', sourceId: 'procedure-2', name: 'Окрашивание', price: 8000 },
+], { pricePercent: 20 });
 const rejectedByRecord = updateRecord(noDiscount.id, { finance: paymentStageSettlement });
 assert.equal(rejectedByRecord.finance.planTotal, 8000);
 
@@ -119,7 +119,7 @@ hydrateFinanceFromServer(canonicalFinanceState({
   settlements: [settlementRow(noDiscount.id, paymentStageSettlement)],
 }));
 assert.equal(getRecord(noDiscount.id).finance.planTotal, 6400);
-assert.equal(getRecord(noDiscount.id).finance.discountPercent, 20);
+assert.equal(getRecord(noDiscount.id).finance.pricePercent, 20);
 
 const stagePayment = paymentFixture({
   id: 'payment-stage',
@@ -168,8 +168,8 @@ hydrateRecordStateFromServer({
   recordEvents: [],
 });
 const restoredSettlement = calculateSettlement([
-  { sourceType: 'procedure', sourceId: 'procedure-restored', name: 'Услуга', price: 8000, discountPercent: 20 },
-]);
+  { sourceType: 'procedure', sourceId: 'procedure-restored', name: 'Услуга', price: 8000 },
+], { pricePercent: 20 });
 const restoredPayment = paymentFixture({
   id: 'payment-restored',
   recordId: 'restored-record',
@@ -182,7 +182,7 @@ hydrateFinanceFromServer(canonicalFinanceState({
   payments: [restoredPayment],
 }));
 const restored = getRecord('restored-record');
-assert.equal(restored.finance.discountPercent, 20);
+assert.equal(restored.finance.pricePercent, 20);
 assert.equal(restored.finance.planTotal, 6400);
 assert.equal(restored.finance.factTotal, 6400);
 
