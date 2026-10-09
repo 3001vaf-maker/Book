@@ -211,8 +211,15 @@ const contactDetailBlock = accountShell.slice(
   accountShell.indexOf('async function renderGlobalHistory'),
 );
 assert.match(contactDetailBlock, /mountV2ZLayer\(root, v2ZLayer\([\s\S]*stack:\s*true/, 'Contact profile must open as stacked Z over Contacts Z1');
-assert.match(contactDetailBlock, /v2Section\('Рабочие пространства'/);
-assert.match(contactDetailBlock, /v2Section\('История'/);
+assert.match(contactDetailBlock, /v2Section\('Пространства'/);
+const contactProfileBlock = accountShell.slice(
+  accountShell.indexOf('async function renderGlobalContactDetail'),
+  accountShell.indexOf('async function renderGlobalHistory'),
+);
+assert.doesNotMatch(contactProfileBlock, /v2Section\('История'/);
+assert.match(contactProfileBlock, /v2Section\('Программы'/);
+assert.match(contactProfileBlock, /v2Section\('Инвестиции \/ займы'/);
+assert.match(contactProfileBlock, /entityCardRail\(programCards\)/);
 assert.match(contactDetailBlock, /workplaceCardAppearance\(workplace\)/);
 assert.match(contactDetailBlock, /workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/);
 assert.match(contactDetailBlock, /miniCardRail\(/);
@@ -245,6 +252,8 @@ const globalHomeBlock = accountShell.slice(
   accountShell.indexOf('function contactsBody'),
 );
 assert.doesNotMatch(globalHomeBlock, /relationshipCard\(/);
+assert.doesNotMatch(globalHomeBlock, /v2Section\('Инвестиции'/);
+assert.doesNotMatch(globalHomeBlock, /v2Section\('Предложения инвестиций'/);
 assert.doesNotMatch(accountShell, /accountBottomNavigation/);
 assert.doesNotMatch(accountShell, /bindBottomNavigation/);
 assert.match(accountShell, /mountChatThread\(/);
