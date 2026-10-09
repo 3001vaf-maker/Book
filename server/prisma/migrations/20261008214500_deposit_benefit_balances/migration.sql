@@ -217,7 +217,7 @@ BEGIN
         END IF;
     END LOOP;
 
-    IF status_value = 'active' AND NOT loyalty_deposit_terms_active(terms_value, CURRENT_TIMESTAMP) THEN
+    IF status_value = 'active' AND NOT loyalty_deposit_terms_active(terms_value, CURRENT_TIMESTAMP::timestamp) THEN
         principal := 0;
         benefit := 0;
         status_value := 'expired';
