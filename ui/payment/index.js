@@ -117,11 +117,13 @@ export function paymentForm({
 export function paymentMethods({
   wallets = [],
   deposits = [],
+  personalAccount = null,
   total = 0,
   showAction = true,
   showTotal = true,
   initialAllocations = [],
   initialDepositAllocations = [],
+  initialPersonalAccountAmount = 0,
 } = {}) {
   const walletData = escapeHtml(JSON.stringify(Array.isArray(wallets) ? wallets.map((wallet) => ({ id: String(wallet?.id || ''), name: String(wallet?.name || '') })) : []));
   const depositData = escapeHtml(JSON.stringify(Array.isArray(deposits) ? deposits.map((deposit) => ({
@@ -129,14 +131,22 @@ export function paymentMethods({
     programName: String(deposit?.programName || deposit?.name || 'Депозит'),
     balance: Math.max(0, numberValue(deposit?.balance)),
   })) : []));
-  return `<div data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}" data-payment-deposits="${depositData}">${paymentMethodsMarkup({
+  const accountData = escapeHtml(JSON.stringify(personalAccount && typeof personalAccount === 'object' ? {
+    personKey: String(personalAccount?.personKey || ''),
+    balance: Math.max(0, numberValue(personalAccount?.balance)),
+    availableAmount: Math.max(0, numberValue(personalAccount?.availableAmount ?? personalAccount?.balance)),
+    spendLimitPercent: Math.max(0, Math.min(100, numberValue(personalAccount?.spendLimitPercent ?? 100))),
+  } : null));
+  return `<div data-payment-methods data-payment-total="${escapeHtml(moneyText(total))}" data-payment-wallets="${walletData}" data-payment-deposits="${depositData}" data-payment-personal-account="${accountData}">${paymentMethodsMarkup({
     wallets,
     deposits,
+    personalAccount,
     total,
     showAction,
     showTotal,
     initialAllocations,
     initialDepositAllocations,
+    initialPersonalAccountAmount,
   })}</div>`;
 }
 
@@ -300,7 +310,9 @@ export function initPaymentMethods(root, { onPay = () => {}, onChange = () => {}
   const total = Math.max(0, numberValue(root.dataset.paymentTotal));
   let wallets = [];
   let deposits = [];
+  let personalAccount = null;
   try { wallets = JSON.parse(root.dataset.paymentWallets || '[]'); } catch { wallets = []; }
   try { deposits = JSON.parse(root.dataset.paymentDeposits || '[]'); } catch { deposits = []; }
-  return initPaymentMethodsAllocation(root, { wallets, deposits, total, onPay, onChange });
+  try { personalAccount = JSON.parse(root.dataset.paymentPersonalAccount || 'null'); } catch { personalAccount = null; }
+  return initPaymentMethodsAllocation(root, { wallets, deposits, personalAccount, total, onPay, onChange });
 }
