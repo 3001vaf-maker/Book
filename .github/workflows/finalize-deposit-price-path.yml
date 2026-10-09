@@ -1,0 +1,92 @@
+name: Finalize deposit price path
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/finalize-deposit-price-path.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Remove retired percent snapshots and fix deposit benefit display
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old in text:
+                  text = text.replace(old, new, 1)
+                  p.write_text(text)
+                  return
+              if new and new in text:
+                  return
+              if not new and old not in text:
+                  return
+              raise SystemExit(f'Expected pattern not found in {path}')
+
+          replace_once(
+              'journal/record.js',
+              "    discountPercent: Number(person?.discountPercent) || 0,\n",
+              ''
+          )
+          replace_once(
+              'server/src/record/record.service.ts',
+              "      discountPercent: Math.max(0, Math.min(100, Number(person.discountPercent) || 0)),\n",
+              ''
+          )
+          replace_once(
+              'core/loyalty/deposit/index.js',
+              "  if (String(deposit?.benefitMode || 'none') !== 'none' || benefitBalance > 0.009) {\n",
+              "  if (String(deposit?.benefitMode || 'none') === 'accrual' || benefitBalance > 0.009) {\n"
+          )
+          PY
+      - name: Install root dependencies
+        run: npm ci
+      - name: Check architecture
+        run: npm run check
+      - name: Run tests
+        run: npm test
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Generate Prisma client
+        working-directory: server
+        run: npm run prisma:generate
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Commit cleanup
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes needed'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add journal/record.js server/src/record/record.service.ts core/loyalty/deposit/index.js
+            git commit -m 'Remove retired price-percent snapshots'
+            git push origin HEAD:staging
+          fi
+      - name: Remove temporary workflow
+        run: |
+          git fetch origin staging
+          git reset --hard origin/staging
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/finalize-deposit-price-path.yml
+          git commit -m 'Remove temporary deposit cleanup workflow'
+          git push origin HEAD:staging
