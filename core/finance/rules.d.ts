@@ -10,7 +10,7 @@ export type SettlementSource = {
   correctionMode?: SettlementCorrectionMode | string;
   correctionPercent?: number | string;
   correctionMoney?: number | string;
-  pricePercent?: number | string;
+  pricePercent?: number | string | null;
   [key: string]: unknown;
 };
 
