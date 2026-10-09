@@ -43,12 +43,17 @@ const depositData = source('core/loyalty/deposit/data.js');
 const depositUI = source('core/loyalty/deposit/index.js');
 const core = source('core.js');
 const depositService = source('server/src/loyalty/deposit.service.ts');
+const depositState = source('server/src/loyalty/deposit-state.ts');
+const priceCondition = source('server/src/loyalty/price-condition.ts');
+const auxiliaryState = source('server/src/auxiliary-state/auxiliary-state.service.ts');
+const financeService = source('server/src/finance/finance.service.ts');
+const prismaSchema = source('server/prisma/schema.prisma');
 const loyaltyController = source('server/src/loyalty/loyalty.controller.ts');
 const loyaltyModule = source('server/src/loyalty/loyalty.module.ts');
 const appModule = source('server/src/app.module.ts');
 const financeController = source('server/src/finance/finance.controller.ts');
 const accountDeposit = source('server/src/online-booking/account-deposit.controller.ts');
-const migration = source('server/prisma/migrations/20261008130500_loyalty_deposit_instance/migration.sql');
+const ownershipMigration = source('server/prisma/migrations/20261009121500_make_deposit_state_server_owned/migration.sql');
 
 for (const token of [
   'Сущность владеет своим состоянием',
@@ -115,9 +120,7 @@ for (const item of expectedNavigation) {
   previousIndex = Math.max(previousIndex, index);
 }
 
-if (!/id:\s*['"]loyalty['"][^\n]*label:\s*['"]Лояльность['"]/.test(core)) {
-  errors.push('core.js must expose top-level F Loyalty');
-}
+if (!/id:\s*['"]loyalty['"][^\n]*label:\s*['"]Лояльность['"]/.test(core)) errors.push('core.js must expose top-level F Loyalty');
 if (!/renderLoyaltySection/.test(core)) errors.push('core.js must route Loyalty through its owner renderer');
 
 const ownerModules = [
@@ -130,14 +133,10 @@ const ownerModules = [
 for (const [name] of ownerModules) {
   if (!loyaltyRoot.includes(`./${name}/index.js`)) errors.push(`core/loyalty/index.js must route ${name} through its dedicated owner module`);
 }
-if (/data-loyalty-stage-action|previewCards|Интерфейс готов|визуальный mock/i.test(loyaltyRoot)) {
-  errors.push('core/loyalty/index.js must not contain placeholder E implementations');
-}
+if (/data-loyalty-stage-action|previewCards|Интерфейс готов|визуальный mock/i.test(loyaltyRoot)) errors.push('core/loyalty/index.js must not contain placeholder E implementations');
 
 if (!/export async function renderPersonalAccount/.test(personalAccountUI)) errors.push('Personal Account UI owner is missing');
-if (/label:\s*['"]\+['"]|data-(?:personal-account|loyalty)-create|data-loyalty-stage-action/.test(personalAccountUI)) {
-  errors.push('Personal Account must not expose manual open/create action');
-}
+if (/label:\s*['"]\+['"]|data-(?:personal-account|loyalty)-create|data-loyalty-stage-action/.test(personalAccountUI)) errors.push('Personal Account must not expose manual open/create action');
 if (/бонус/i.test(personalAccountUI)) errors.push('Personal Account UI must not expose a bonus balance');
 if (!/Денежный остаток/.test(personalAccountUI)) errors.push('Personal Account UI must expose money-only balance');
 
@@ -157,9 +156,7 @@ for (const token of ['entityCardStack', 'entityVisualCard', 'openEntityCardAppea
   if (!depositUI.includes(token)) errors.push(`Deposit must reuse shared ${token}`);
 }
 
-if (/\/finance\/deposits/.test(depositData)) {
-  errors.push('Deposit browser data must not use /finance/deposits as its canonical API');
-}
+if (/\/finance\/deposits/.test(depositData)) errors.push('Deposit browser data must not use /finance/deposits as its canonical API');
 for (const route of ['/loyalty/deposits', '/loyalty/deposits/person/']) {
   if (!depositData.includes(route)) errors.push(`Deposit browser data missing canonical route ${route}`);
 }
@@ -171,35 +168,30 @@ for (const [label, sourceText] of [['Deposit', depositUI], ['Certificate', certi
   if (/\b(?:alert|confirm|prompt)\s*\(/.test(sourceText)) errors.push(`${label} UI must not use browser dialogs`);
 }
 
-for (const token of ['CREATE TABLE "LoyaltyDepositInstance"', '"balance" DECIMAL(14,2)', 'loyalty_deposit_recalculate', 'LoyaltyDepositFinanceSync', 'Backfill every Deposit']) {
-  if (!migration.includes(token)) errors.push(`Deposit migration missing canonical state guard: ${token}`);
+for (const token of ['model LoyaltyDepositProgram', 'model LoyaltyDepositInstance', 'principalBalance', 'benefitBalance']) {
+  if (!prismaSchema.includes(token)) errors.push(`Prisma schema missing canonical Deposit model token: ${token}`);
+}
+for (const token of ['DROP TRIGGER IF EXISTS "LoyaltyDepositFinanceSync"', 'DROP FUNCTION IF EXISTS loyalty_deposit_recalculate', 'LoyaltyDepositProgram']) {
+  if (!ownershipMigration.includes(token)) errors.push(`Deposit ownership migration missing retirement token: ${token}`);
 }
 
-if (!/FROM "LoyaltyDepositInstance"/.test(depositService)) {
-  errors.push('DepositService must read canonical DepositInstance state');
+if (!/loyaltyDepositInstance\.(?:findMany|findUnique)/.test(depositService)) errors.push('DepositService must read canonical Prisma DepositInstance state');
+if (/\$queryRaw|\$executeRaw|loyalty_deposit_recalculate/.test(depositService)) errors.push('DepositService must not use raw SQL or Finance replay for canonical state');
+if (!/this\.finance\.recordDepositFunding/.test(depositService) || !/this\.finance\.recordDepositWithdrawal/.test(depositService)) errors.push('DepositService must delegate physical money facts to Finance');
+if (!/loyaltyDepositProgram/.test(auxiliaryState)) errors.push('Deposit programs must persist through canonical LoyaltyDepositProgram state');
+if (!/consumeDepositAllocations/.test(depositState) || !/principalAmount/.test(depositState) || !/benefitAmount/.test(depositState)) errors.push('Deposit state owner must mutate and preserve exact principal/benefit allocation components');
+if (!/resolvePersonPriceCondition/.test(priceCondition) || /loyalty_deposit_benefit_/.test(priceCondition)) errors.push('Server price condition must use canonical resolver without SQL helper bridge');
+for (const token of ['resolvePersonPricePercent', 'canonicalSettlementInput', 'calculateCanonicalSettlement', 'consumeDepositAllocations', 'restoreDepositAllocations']) {
+  if (!financeService.includes(token)) errors.push(`Finance server missing authoritative pricing/deposit step: ${token}`);
 }
-if (/depositDtoFromOperations|\.filter\([^\n]*deposit-funding/.test(depositService)) {
-  errors.push('DepositService must not reconstruct DepositInstance identity from Finance operations');
-}
-if (!/this\.finance\.recordDepositFunding/.test(depositService) || !/this\.finance\.recordDepositWithdrawal/.test(depositService)) {
-  errors.push('DepositService must delegate physical money facts to Finance');
-}
-if (!/@Controller\(['"]loyalty['"]\)/.test(loyaltyController) || !/deposits\/fund/.test(loyaltyController)) {
-  errors.push('LoyaltyController must own the canonical Deposit HTTP surface');
-}
-if (!/FinanceModule/.test(loyaltyModule) || !/DepositService/.test(loyaltyModule)) {
-  errors.push('LoyaltyModule must own DepositService and consume Finance as an integration');
-}
+if (/\$queryRaw[^]*LoyaltyDepositInstance|loyalty_deposit_recalculate|loyalty_deposit_finance_sync/.test(financeService)) errors.push('Finance runtime must not reconstruct Deposit state from Finance operations');
+
+if (!/@Controller\(['"]loyalty['"]\)/.test(loyaltyController) || !/deposits\/fund/.test(loyaltyController)) errors.push('LoyaltyController must own the canonical Deposit HTTP surface');
+if (!/FinanceModule/.test(loyaltyModule) || !/DepositService/.test(loyaltyModule)) errors.push('LoyaltyModule must own DepositService and consume Finance as an integration');
 if (!/LoyaltyModule/.test(appModule)) errors.push('AppModule must register LoyaltyModule');
-if (/@(?:Get|Post)\(['"]deposits(?:\/|['"])/.test(financeController)) {
-  errors.push('FinanceController must not expose Deposit entity routes; the HTTP owner is LoyaltyController');
-}
-if (/FinanceService/.test(accountDeposit) || /finance\.listDeposits/.test(accountDeposit)) {
-  errors.push('End-user Deposit API must read from Loyalty owner, not Finance');
-}
-if (!/DepositService/.test(accountDeposit) || !/this\.deposits\.list/.test(accountDeposit)) {
-  errors.push('End-user Deposit API must use DepositService');
-}
+if (/@(?:Get|Post)\(['"]deposits(?:\/|['"])/.test(financeController)) errors.push('FinanceController must not expose Deposit entity routes; the HTTP owner is LoyaltyController');
+if (/FinanceService/.test(accountDeposit) || /finance\.listDeposits/.test(accountDeposit)) errors.push('End-user Deposit API must read from Loyalty owner, not Finance');
+if (!/DepositService/.test(accountDeposit) || !/this\.deposits\.list/.test(accountDeposit)) errors.push('End-user Deposit API must use DepositService');
 
 if (errors.length) {
   console.error('Loyalty architecture check failed:');
