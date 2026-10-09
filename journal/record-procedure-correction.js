@@ -63,7 +63,9 @@ function availableProcedures(workplaceId) {
 function recordEndTime(from, items) {
   const start = timeToMinutes(from);
   if (start == null) return '';
-  const duration = items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
+  const duration = items.length
+    ? items.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0)
+    : 30;
   return minutesToTime(start + duration) || '';
 }
 
