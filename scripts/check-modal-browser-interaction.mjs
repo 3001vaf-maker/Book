@@ -41,9 +41,11 @@ for (const [name, engine, contextOptions] of [
       assert.ok(box, `${name}: missing ${selector}`);
       await activate({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
     };
-    const closeSheet = async () => {
-      // Dismiss through the real pointer handler, including pointer capture.
-      const zone = await page.locator('[data-v2-layer-gesture-zone]').boundingBox();
+    const closeTopSheet = async () => {
+      const before = await page.locator('[data-modal]').count();
+      assert.ok(before > 0, `${name}: no modal to close`);
+      const top = page.locator('[data-modal]').last();
+      const zone = await top.locator('[data-v2-layer-gesture-zone]').boundingBox();
       assert.ok(zone, `${name}: missing swipe strip`);
       const x = zone.x + zone.width / 2;
       const y = zone.y + zone.height / 2;
@@ -51,7 +53,7 @@ for (const [name, engine, contextOptions] of [
       await page.mouse.down();
       await page.mouse.move(x, y + 100, { steps: 10 });
       await page.mouse.up();
-      await page.locator('[data-modal]').waitFor({ state: 'detached' });
+      await page.waitForFunction((expected) => document.querySelectorAll('[data-modal]').length === expected, before - 1);
     };
 
     await open();
@@ -69,21 +71,60 @@ for (const [name, engine, contextOptions] of [
     await activate(points[0]);
     await page.locator('[data-service-workplace="test-space"]').waitFor();
     await page.waitForTimeout(300);
-    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: old menu remained open`);
+    // Profile settings intentionally hands off to the next X by explicitly closing itself.
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: settings handoff left an extra modal`);
     const checkbox = '[data-service-workplace="test-space"]';
     const checkboxPoints = await targetPoints(checkbox);
     assert.ok(checkboxPoints.every((point) => point.hit), `${name}: workplace checkbox obscured`);
     await activate(checkboxPoints[1]);
     assert.equal(await page.locator('[data-test-selection]').textContent(), '1', `${name}: selection did not update`);
-    await closeSheet();
+    await closeTopSheet();
     assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: stage remained locked`);
+
     if (contextOptions.hasTouch) await page.locator('[data-test-settings]').tap();
     else await page.locator('[data-test-settings]').click();
     await page.waitForTimeout(300);
     await activate((await targetPoints(menuSelector))[1]);
     await page.waitForTimeout(300);
     assert.equal(await page.locator(checkbox).isChecked(), true, `${name}: selection was lost on reopening`);
-    await closeSheet();
+    await closeTopSheet();
+
+    // Actual time correction path: parent X must survive the nested TimePicker X,
+    // and the chosen time must be committed back into that still-live parent.
+    if (contextOptions.hasTouch) await page.locator('[data-test-time-range]').tap();
+    else await page.locator('[data-test-time-range]').click();
+    await page.locator('[data-shared-time-range-form]').waitFor();
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: time-range parent X missing`);
+    const fromTrigger = page.locator('[data-time-picker="from"] [data-time-open]');
+    if (contextOptions.hasTouch) await fromTrigger.tap();
+    else await fromTrigger.click();
+    await page.locator('.modal--time-picker-sheet').waitFor();
+    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: TimePicker replaced parent X instead of stacking`);
+    assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: time-range parent X was destroyed`);
+
+    const hour10 = page.locator('[data-time-wheel-type="hours"][data-value="10"][data-cycle="2"]');
+    const minute15 = page.locator('[data-time-wheel-type="minutes"][data-value="15"][data-cycle="2"]');
+    if (contextOptions.hasTouch) {
+      await hour10.tap();
+      await minute15.tap();
+    } else {
+      await hour10.click();
+      await minute15.click();
+    }
+    await page.waitForTimeout(250);
+
+    const timeSave = page.locator('[data-time-save]');
+    if (contextOptions.hasTouch) await timeSave.tap();
+    else await timeSave.click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 1);
+    assert.equal(await page.locator('[data-shared-time-range-form]').count(), 1, `${name}: parent X did not survive TimePicker save`);
+    assert.equal(await page.locator('[data-time-picker="from"] [data-time-value]').inputValue(), '10:15', `${name}: corrected time was not returned to parent X`);
+
+    const rangeSubmit = page.locator('[data-shared-time-range-form] button[type="submit"]');
+    if (contextOptions.hasTouch) await rangeSubmit.tap();
+    else await rangeSubmit.click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
+    assert.equal(await page.locator('[data-test-time-result]').textContent(), '10:15-18:00', `${name}: corrected time range did not save`);
 
     // X veil: tapping Header A while X is active must only dismiss the X.
     // The underlying A action must never fire from the same input.
@@ -107,7 +148,7 @@ for (const [name, engine, contextOptions] of [
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
 
-    // Journal Shared Select replaces the owning X. A nested Q/X/S stack is forbidden.
+    // Journal selector stacks while choosing, then its committed change explicitly closes the owning X.
     for (let cycle = 0; cycle < 3; cycle += 1) {
       const journalTrigger = page.locator('[data-test-journal-workplace]');
       if (contextOptions.hasTouch) await journalTrigger.tap();
@@ -120,14 +161,14 @@ for (const [name, engine, contextOptions] of [
       if (contextOptions.hasTouch) await journalSelect.tap();
       else await journalSelect.click();
       await page.locator('[data-ui-selector]').waitFor();
-      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal Shared Select stacked over parent X`);
+      assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: Journal selector did not stack while parent input remained active`);
 
       const targetValue = cycle % 2 === 0 ? 'beauty' : '__all__';
       const option = page.locator(`[data-ui-select-option][data-value="${targetValue}"]`);
       if (contextOptions.hasTouch) await option.tap();
       else await option.click();
 
-      await page.locator('[data-modal]').waitFor({ state: 'detached' });
+      await page.waitForFunction(() => document.querySelectorAll('[data-modal]').length === 0);
       assert.equal(await page.locator('.v2-app__stage').evaluate((node) => node.inert), false, `${name}: Journal stage stayed inert after workplace switch`);
       assert.equal(await page.locator('[data-test-journal-workplace]').isEnabled(), true, `${name}: Journal stopped responding after workplace switch`);
     }
@@ -146,7 +187,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (exclusive modal, veil dismissal, Q C ownership, trusted input, menu → workplaces, selection, reopen, dismissal, 10 sheet variants)`);
+    console.log(`${name}: PASS (nested TimePicker X, actual time correction, selector stack/handoff, veil dismissal, Q C ownership, trusted input, 10 sheet variants)`);
   } finally {
     await browser.close();
   }

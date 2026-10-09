@@ -12,7 +12,7 @@
 <body>
 <div id="host"></div>
 <script type="module">
-import { button, modal, mountModal, openSharedProfileSettingsMenu, v2Header, v2Shell } from '/ui/ui.js';
+import { button, modal, mountModal, openSharedProfileSettingsMenu, openTimeRangeAction, v2Header, v2Shell } from '/ui/ui.js';
 import { hydrateWorkplacesFromServer } from '/core/profile/workplaces/data.js';
 import { openServiceWorkplaceSelection } from '/core/service/workplace-selection.js';
 import { openJournalWorkplaceControl } from '/journal/workplace-control.js';
@@ -31,8 +31,10 @@ host.innerHTML = v2Shell({
   header,
   body: button('Настройки', { data: 'data-test-settings' })
     + button('Журнал: пространство', { data: 'data-test-journal-workplace' })
+    + button('Открыть время', { data: 'data-test-time-range' })
     + button('Открыть Q', { data: 'data-test-open-q' })
     + '<output data-test-selection>0</output><output data-test-journal-selection>__all__</output>'
+    + '<output data-test-time-result></output>'
     + '<output data-test-header-a-count>0</output><output data-test-header-c-count>0</output>',
 });
 
@@ -49,6 +51,17 @@ host.querySelector('[data-test-open-q]').addEventListener('click', () => {
     variant: 'q',
     title: 'Q',
   }));
+});
+
+host.querySelector('[data-test-time-range]').addEventListener('click', () => {
+  openTimeRangeAction({
+    from: '09:00',
+    to: '18:00',
+    title: 'График работы',
+    onSave: ({ from, to }) => {
+      host.querySelector('[data-test-time-result]').textContent = `${from}-${to}`;
+    },
+  });
 });
 
 host.querySelector('[data-test-journal-workplace]').addEventListener('click', () => {

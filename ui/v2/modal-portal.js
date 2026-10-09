@@ -78,6 +78,26 @@ function mountV2ModalPortal(host) {
   };
 }
 
+const modalHeaderLocks = new WeakMap();
+
+function retainModalHeaderTarget(target) {
+  if (!target) return () => {};
+  const next = (modalHeaderLocks.get(target) || 0) + 1;
+  modalHeaderLocks.set(target, next);
+  target.classList.add('is-modal-locked');
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = Math.max(0, (modalHeaderLocks.get(target) || 1) - 1);
+    if (count) modalHeaderLocks.set(target, count);
+    else {
+      modalHeaderLocks.delete(target);
+      target.classList.remove('is-modal-locked');
+    }
+  };
+}
+
 function lockModalHeader(app, { allowC = false } = {}) {
   const header = app?.querySelector?.('[data-v2-header]');
   if (!header) return () => {};
@@ -94,21 +114,12 @@ function lockModalHeader(app, { allowC = false } = {}) {
   // Shared modal owner so the veil can dismiss the active modal. The capture
   // handler below consumes that input before any underlying Header action runs.
   // Using inert here would make A/B/D dead zones instead of veil-dismiss zones.
-  targets.forEach((target) => target.classList.add('is-modal-locked'));
-
-  return () => {
-    targets.forEach((target) => target.classList.remove('is-modal-locked'));
-  };
+  const releases = targets.map(retainModalHeaderTarget);
+  return () => releases.forEach((release) => release());
 }
 
 function applicationLayers() {
   return [...document.querySelectorAll('[data-v2-layer]:not([data-v2-layer-kind="technical"])')];
-}
-
-function closeApplicationLayer(layer) {
-  if (!layer) return;
-  if (typeof layer.v2Close === 'function') layer.v2Close();
-  else layer.remove();
 }
 
 function qLayerKey(layer) {
@@ -118,13 +129,23 @@ function qLayerKey(layer) {
   return String(layer.querySelector(':scope > .v2-layer')?.getAttribute('aria-label') || '').trim();
 }
 
-function prepareApplicationModal({ qLayer = false } = {}) {
-  const layers = applicationLayers();
-  if (!layers.length || qLayer) return;
+function applicationLayerKey(layer) {
+  if (!layer) return '';
+  const explicit = String(layer.dataset.v2LayerKey || '').trim();
+  if (explicit) return explicit;
+  if (layer.dataset.v2Q === 'true') {
+    const key = qLayerKey(layer);
+    return key ? `q:${key}` : '';
+  }
+  const kind = String(layer.dataset.v2LayerKind || '').trim();
+  const label = String(layer.querySelector(':scope > .v2-layer')?.getAttribute('aria-label') || '').trim();
+  return label ? `${kind}:${label}` : '';
+}
 
-  const current = layers.at(-1);
-  if (current?.dataset.v2Q === 'true') return;
-  closeApplicationLayer(current);
+function prepareApplicationModal(node) {
+  const key = applicationLayerKey(node);
+  if (!key) return true;
+  return !applicationLayers().some((layer) => applicationLayerKey(layer) === key);
 }
 
 export function mountV2Layer(html, { root = null } = {}) {
@@ -136,12 +157,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
 
-  if (qLayer) {
-    const key = qLayerKey(node);
-    if (key && applicationLayers().some((layer) => qLayerKey(layer) === key)) return null;
-  }
-
-  if (!technical) prepareApplicationModal({ qLayer });
+  if (!technical && !prepareApplicationModal(node)) return null;
 
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
@@ -185,6 +201,8 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   const nativeRemove = node.remove.bind(node);
   let closed = false;
+
+  const isTopApplicationLayer = () => technical || applicationLayers().at(-1) === node;
 
   const eventIsOwnedByModal = (event) => {
     const foreignLayer = event.target.closest?.('[data-v2-layer]');
@@ -239,7 +257,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   };
 
   const handleOutsidePointerDown = (event) => {
-    if (closed || technical || eventIsOwnedByModal(event)) return;
+    if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     // Do not prevent the browser's pointer/touch sequence here. WebKit may
     // otherwise suppress the next trusted tap after the veil dismissal. We
     // stop propagation now and consume the resulting click for the same target.
@@ -249,7 +267,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   };
 
   const handleOutsideClick = (event) => {
-    if (closed || technical || eventIsOwnedByModal(event)) return;
+    if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     close();

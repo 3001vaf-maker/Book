@@ -40,6 +40,7 @@ function openPicker({
   if(!hours.length||!minutes.length)return null;
   const initialHour=hours.includes(current.h)?current.h:hours[0];
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
+  const selectedValues={hours:String(initialHour),minutes:String(initialMinute)};
   const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${button('Сохранить',{data:'data-time-save'})}`;
   const modalRoot=mountModal(document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet'}));
   if(!modalRoot)return null;
@@ -53,7 +54,11 @@ function openPicker({
     return nearest;
   };
 
-  const selectOnly=(viewport,item)=>viewport.querySelectorAll('[data-time-wheel-item]').forEach(other=>other.classList.toggle('is-selected',other===item));
+  const selectOnly=(viewport,item)=>{
+    viewport.querySelectorAll('[data-time-wheel-item]').forEach(other=>other.classList.toggle('is-selected',other===item));
+    const type=item?.dataset.timeWheelType;
+    if((type==='hours'||type==='minutes')&&item?.dataset.value!=null)selectedValues[type]=String(item.dataset.value);
+  };
 
   const center=(type,value)=>{
     const item=modalRoot.querySelector(`[data-time-wheel-type="${type}"][data-value="${CSS.escape(String(value))}"][data-cycle="${MIDDLE_CYCLE}"]`);
@@ -102,9 +107,8 @@ function openPicker({
   }));
 
   modalRoot.querySelector('[data-time-save]')?.addEventListener('click',()=>{
-    modalRoot.querySelectorAll('.time-wheel__viewport').forEach(viewport=>syncColumn(viewport,{recenter:false}));
-    const hour=modalRoot.querySelector('[data-time-wheel-type="hours"].is-selected')?.dataset.value;
-    const minute=modalRoot.querySelector('[data-time-wheel-type="minutes"].is-selected')?.dataset.value;
+    const hour=selectedValues.hours;
+    const minute=selectedValues.minutes;
     if(hour==null||minute==null)return;
     const value=`${String(Number(hour)).padStart(2,'0')}:${String(Number(minute)).padStart(2,'0')}`;
     onSave(value);
