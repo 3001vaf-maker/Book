@@ -35,8 +35,8 @@ assert.match(html, /data-payment-price/);
 assert.match(html, /data-payment-price-condition/);
 assert.match(html, /data-payment-correction-percent/);
 assert.match(html, /data-payment-correction-money/);
-assert.match(html, /Ручная коррекция %/);
-assert.match(html, /Ручная коррекция ₽/);
+assert.match(html, /Ручная коррекция цены, %/);
+assert.match(html, /Ручная коррекция цены, ₽/);
 assert.match(html, /data-payment-remove/);
 assert.match(html, /data-payment-save/);
 assert.match(html, /data-payment-submit/);
@@ -56,7 +56,7 @@ assert.doesNotMatch(embeddedHtml, /data-payment-save|data-payment-submit/);
 
 const automaticPercent = calculateSettlement([
   { sourceId: 'p1', name: 'Стрижка', price: 5000 },
-], { discountPercent: 20 });
+], { pricePercent: 20 });
 assert.equal(automaticPercent.serviceTotal, 5000);
 assert.equal(automaticPercent.correctionTotal, 0);
 assert.equal(automaticPercent.pricePercentTotal, 1000);
@@ -66,12 +66,12 @@ assert.equal(automaticPercent.items[0].planAmount, 4000);
 
 const correctedThenAutomatic = calculateSettlement([
   { sourceId: 'p1', name: 'Стрижка', price: 5000, correctionMode: 'percent', correctionPercent: 10 },
-], { discountPercent: 20 });
+], { pricePercent: 20 });
 assert.equal(correctedThenAutomatic.serviceTotal, 5000);
 assert.equal(correctedThenAutomatic.correctionTotal, 500);
 assert.equal(correctedThenAutomatic.items[0].correctedPrice, 4500);
 assert.equal(correctedThenAutomatic.pricePercentTotal, 900);
-assert.equal(correctedThenAutomatic.discountTotal, 1400);
+assert.equal(correctedThenAutomatic.correctionTotal + correctedThenAutomatic.pricePercentTotal, 1400);
 assert.equal(correctedThenAutomatic.planTotal, 3600);
 
 const correctedWithoutProgram = calculateSettlement([
@@ -151,19 +151,19 @@ const financeUiSource = readFileSync(new URL('../core/finance/dds/index.js', imp
 const financeServiceSource = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 const journalDaySource = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
 
-assert.match(paymentSource, /const discountOptions = \[/);
+assert.match(paymentSource, /const percentOptions = \[/);
 assert.match(paymentSource, /Array\.from\(\{ length: 100 \}/);
 assert.match(paymentSource, /setPercentDisplay/);
 assert.match(paymentSource, /data-payment-correction-mode/);
 assert.match(paymentSource, /data-payment-price-percent/);
 assert.match(paymentSource, /preserve = null/);
-assert.match(paymentSource, /priceInput[^\n]*currentState\(priceInput\)/);
+assert.match(paymentSource, /const \{ percentInput, moneyInput \} = rowValues\(row\)/);
 assert.match(paymentSource, /percentInput[^\n]*addEventListener\('change'/);
 assert.match(paymentSource, /moneyInput[^\n]*addEventListener\('input'/);
 assert.match(paymentSource, /onChange\?\.\(result\)/);
 assert.match(paymentSource, /label: 'Условие'/);
-assert.match(paymentSource, /label: 'Ручная коррекция %'/);
-assert.match(paymentSource, /label: 'Ручная коррекция ₽'/);
+assert.match(paymentSource, /label: 'Ручная коррекция цены, %'/);
+assert.match(paymentSource, /label: 'Ручная коррекция цены, ₽'/);
 assert.match(methodsSource, /const due = Math\.max\(0, numberValue\(total\)\)/);
 assert.match(methodsSource, /const depositReceived = deposits\.reduce/);
 assert.match(methodsSource, /const serviceFromCash = Math\.min/);
