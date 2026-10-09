@@ -148,6 +148,13 @@ function prepareApplicationModal(node) {
   return !applicationLayers().some((layer) => applicationLayerKey(layer) === key);
 }
 
+function retainNestedXParent(kind) {
+  if (kind !== 'bottom') return;
+  const parent = applicationLayers().at(-1);
+  if (parent?.dataset?.v2LayerKind !== 'bottom') return;
+  parent.v2CancelPendingClose?.();
+}
+
 export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
@@ -157,6 +164,11 @@ export function mountV2Layer(html, { root = null } = {}) {
   const technical = kind === 'technical';
   const qLayer = node.dataset.v2Q === 'true';
 
+  // X lifecycle belongs here, not to feature code. Some older callers still do
+  // `parent.v2Close(); openChildX()` as a handoff. Programmatic X close is
+  // deferred for one task; mounting another X cancels that pending close, so
+  // different X layers always stack while duplicate identity is still blocked.
+  if (!technical) retainNestedXParent(kind);
   if (!technical && !prepareApplicationModal(node)) return null;
 
   const host = technical ? document.body : activeV2ModalSurface(root);
@@ -194,6 +206,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   let disposeGesture = () => {};
   let consumeClickTimer = 0;
   let consumedPointerTarget = null;
+  let pendingCloseTimer = 0;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -238,8 +251,15 @@ export function mountV2Layer(html, { root = null } = {}) {
     }, 700);
   };
 
-  const close = () => {
+  const cancelPendingClose = () => {
+    if (!pendingCloseTimer) return;
+    window.clearTimeout(pendingCloseTimer);
+    pendingCloseTimer = 0;
+  };
+
+  const closeNow = () => {
     if (closed) return;
+    cancelPendingClose();
     closed = true;
     document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
     document.removeEventListener('click', handleOutsideClick, true);
@@ -256,6 +276,18 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
+  const requestClose = () => {
+    if (closed || pendingCloseTimer) return;
+    if (technical || kind !== 'bottom') {
+      closeNow();
+      return;
+    }
+    pendingCloseTimer = window.setTimeout(() => {
+      pendingCloseTimer = 0;
+      closeNow();
+    }, 0);
+  };
+
   const handleOutsidePointerDown = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     // Do not prevent the browser's pointer/touch sequence here. WebKit may
@@ -263,26 +295,27 @@ export function mountV2Layer(html, { root = null } = {}) {
     // stop propagation now and consume the resulting click for the same target.
     event.stopImmediatePropagation();
     armFollowUpClickGuard(event.target);
-    close();
+    closeNow();
   };
 
   const handleOutsideClick = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    close();
+    closeNow();
   };
 
-  node.v2Close = close;
-  node.remove = close;
+  node.v2CancelPendingClose = cancelPendingClose;
+  node.v2Close = requestClose;
+  node.remove = requestClose;
   document.addEventListener('pointerdown', handleOutsidePointerDown, true);
   document.addEventListener('click', handleOutsideClick, true);
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,
-    onDismiss: () => node.v2Close?.(),
+    onDismiss: closeNow,
   });
   node.addEventListener('click', (event) => {
-    if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
+    if (event.target.closest('[data-v2-layer-close]')) closeNow();
   });
   return node;
 }
