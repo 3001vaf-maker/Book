@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculateSettlement } from '../core/finance/rules.js';
+import { calculateSettlement } from '../core/finance/index.js';
 import { resolvePersonPriceCondition } from '../core/loyalty/price-condition.js';
 
 // Manual price correction changes the operation price first.
