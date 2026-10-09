@@ -96,10 +96,15 @@ function openProcedureEditor({
   onApply,
 }) {
   const currentId = String(item?.id || '');
-  const usedIds = new Set(items.filter((entry) => String(entry?.id || '') !== currentId).map((entry) => String(entry?.id || '')));
-  const candidates = availableProcedures(workplaceId).filter((procedure) => !usedIds.has(String(procedure?.id || '')));
+  const usedIds = new Set(items
+    .filter((entry) => String(entry?.id || '') !== currentId)
+    .map((entry) => String(entry?.id || '')));
+  const candidates = availableProcedures(workplaceId)
+    .filter((procedure) => !usedIds.has(String(procedure?.id || '')));
   const initialProcedure = currentId ? (catalogProcedure(currentId) || item) : null;
   const initialDuration = Number(item?.duration ?? initialProcedure?.duration) || 0;
+  const canAdd = availableProcedures(workplaceId)
+    .some((procedure) => !items.some((entry) => String(entry?.id || '') === String(procedure?.id || '')));
   const options = [
     { value: '', label: 'Без выбора' },
     ...candidates.map((procedure) => ({ value: String(procedure.id || ''), label: procedure.name || 'Процедура' })),
@@ -116,6 +121,7 @@ function openProcedureEditor({
       ${durationPicker({ name: 'recordProcedureCorrectionDuration', label: 'Время', value: initialDuration })}
       <div class="modal-actions">
         ${button('Сохранить', { data: 'data-record-procedure-correction-save' })}
+        ${item && canAdd ? button('+ Добавить процедуру', { data: 'data-record-procedure-correction-add', variant: 'secondary' }) : ''}
         ${item ? button('Удалить процедуру', { data: 'data-record-procedure-correction-delete', variant: 'danger' }) : ''}
       </div>
     </div>`;
@@ -133,10 +139,15 @@ function openProcedureEditor({
     if (!next || String(next.id || '') === currentId) return;
     const durationValue = layer.querySelector('[data-duration-value]');
     if (durationValue) {
-      durationValue.value = String(Number(next.duration) || 0);
+      const assignment = workplaceAssignment(next, workplaceId);
+      durationValue.value = String(Number(assignment?.duration ?? next.duration) || 0);
       durationValue.dispatchEvent(new Event('input', { bubbles: true }));
       durationValue.dispatchEvent(new Event('change', { bubbles: true }));
     }
+  });
+  layer.querySelector('[data-record-procedure-correction-add]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openProcedureEditor({ items, date, workplaceId, from, excludeId, onApply });
   });
   layer.querySelector('[data-record-procedure-correction-save]')?.addEventListener('click', () => {
     const nextId = String(procedureInput?.value || '');
@@ -146,12 +157,15 @@ function openProcedureEditor({
       return;
     }
     const durationValue = Number(layer.querySelector('[data-duration-value]')?.value);
+    const assignment = workplaceAssignment(nextProcedure, workplaceId);
     const nextItem = {
       ...(item || {}),
       id: String(nextProcedure.id || ''),
       name: String(nextProcedure.name || 'Процедура'),
       cost: nextId === currentId && item ? item.cost : defaultCost(nextProcedure, workplaceId),
-      duration: Number.isFinite(durationValue) ? durationValue : (Number(nextProcedure.duration) || 0),
+      duration: Number.isFinite(durationValue)
+        ? durationValue
+        : (Number(assignment?.duration ?? nextProcedure.duration) || 0),
     };
     const nextItems = item
       ? items.map((entry) => String(entry?.id || '') === currentId ? nextItem : entry)
@@ -171,39 +185,12 @@ export function openRecordProcedureCorrection({
   workplaceId,
   from,
   selectedProcedures = [],
+  procedureIndex = -1,
   excludeId = '',
   onApply = () => {},
 } = {}) {
   const items = normalizeProcedures(selectedProcedures, workplaceId);
-  const availableToAdd = availableProcedures(workplaceId).some((procedure) => !items.some((item) => String(item?.id || '') === String(procedure?.id || '')));
-  const procedureOptions = [
-    { value: '', label: 'Без выбора' },
-    ...items.map((item) => ({ value: String(item.id || ''), label: item.name || 'Процедура' })),
-  ];
-  const selector = items.length ? select({
-    label: 'Процедура',
-    name: 'recordProcedureCorrectionSelect',
-    value: '',
-    options: procedureOptions,
-    aria: 'Выберите процедуру для корректировки',
-  }) : '<div class="muted">В записи пока нет процедур.</div>';
-  const html = `<div class="compact-form">${selector}<div class="modal-actions">${availableToAdd ? button('+ Добавить процедуру', { data: 'data-record-procedure-correction-add', variant: 'secondary' }) : ''}</div></div>`;
-  const layer = mountModal(document.body, modal(html, {
-    variant: 'x',
-    surface: 'app',
-    title: 'Корректировка',
-    className: 'modal--form-sheet',
-  }));
-  if (!layer) return;
-  const input = layer.querySelector('input[name="recordProcedureCorrectionSelect"]');
-  input?.addEventListener('change', () => {
-    const item = items.find((entry) => String(entry?.id || '') === String(input.value || ''));
-    if (!item) return;
-    layer.v2Close?.();
-    openProcedureEditor({ item, items, date, workplaceId, from, excludeId, onApply });
-  });
-  layer.querySelector('[data-record-procedure-correction-add]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openProcedureEditor({ items, date, workplaceId, from, excludeId, onApply });
-  });
+  const index = Number(procedureIndex);
+  const item = Number.isInteger(index) && index >= 0 ? items[index] : null;
+  openProcedureEditor({ item, items, date, workplaceId, from, excludeId, onApply });
 }
