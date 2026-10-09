@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import { calculateSettlement } from '../core/finance/index.js';
 import { resolvePersonPriceCondition } from '../core/loyalty/price-condition.js';
 
-// Manual price correction changes the operation price first.
-// The one automatic PRICE_PERCENT privilege is applied only after that correction.
 const corrected = calculateSettlement([
   {
     sourceType: 'procedure',
@@ -20,7 +18,6 @@ assert.equal(corrected.correctionTotal, 500);
 assert.equal(corrected.pricePercentTotal, 900);
 assert.equal(corrected.planTotal, 3600);
 
-// One automatic percentage source is valid.
 const personalOnly = resolvePersonPriceCondition({ discountPercent: 20 }, []);
 assert.equal(personalOnly.conflict, false);
 assert.equal(personalOnly.percent, 20);
@@ -31,9 +28,7 @@ const programOnly = resolvePersonPriceCondition({ discountPercent: 0 }, [
 ]);
 assert.equal(programOnly.conflict, false);
 assert.equal(programOnly.percent, 20);
-assert.equal(programOnly.source?.type, 'deposit');
 
-// Multiple automatic percentage sources must never be summed or silently selected.
 const conflict = resolvePersonPriceCondition({ discountPercent: 20 }, [
   { type: 'deposit', id: 'deposit-1', name: 'Депозит', percent: 20 },
 ]);
@@ -43,27 +38,47 @@ assert.equal(conflict.source, null);
 assert.equal(conflict.sources.length, 2);
 
 const depositServiceSource = readFileSync(new URL('../server/src/loyalty/deposit.service.ts', import.meta.url), 'utf8');
-const migrationSource = readFileSync(new URL('../server/prisma/migrations/20261008214500_deposit_benefit_balances/migration.sql', import.meta.url), 'utf8');
+const depositStateSource = readFileSync(new URL('../server/src/loyalty/deposit-state.ts', import.meta.url), 'utf8');
+const priceResolverSource = readFileSync(new URL('../server/src/loyalty/price-condition.ts', import.meta.url), 'utf8');
+const financeServiceSource = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
+const schemaSource = readFileSync(new URL('../server/prisma/schema.prisma', import.meta.url), 'utf8');
+const ownershipMigrationSource = readFileSync(new URL('../server/prisma/migrations/20261009121500_make_deposit_state_server_owned/migration.sql', import.meta.url), 'utf8');
 
-// Refund is principal-only. The generic available balance must never become refundable cash.
+// Deposit program and instance are current Prisma/server entities.
+assert.match(schemaSource, /model LoyaltyDepositProgram/);
+assert.match(schemaSource, /model LoyaltyDepositInstance/);
+assert.match(schemaSource, /principalBalance\s+Decimal/);
+assert.match(schemaSource, /benefitBalance\s+Decimal/);
+
+// Runtime no longer reconstructs Deposit state from FinanceOperation through DB trigger/replay.
+assert.match(ownershipMigrationSource, /DROP TRIGGER IF EXISTS "LoyaltyDepositFinanceSync"/);
+assert.match(ownershipMigrationSource, /DROP FUNCTION IF EXISTS loyalty_deposit_recalculate/);
+assert.doesNotMatch(depositServiceSource, /\$queryRaw|\$executeRaw|loyalty_deposit_recalculate/);
+assert.match(depositServiceSource, /loyaltyDepositInstance\.findUnique/);
+
+// Refund is principal-only and closes the real-money obligation through Deposit state owner.
 assert.match(depositServiceSource, /refundableAmount:\s*row\.status === 'active' \? principalBalance : 0/);
 assert.match(depositServiceSource, /amount:\s*current\.refundableAmount/);
 assert.doesNotMatch(depositServiceSource, /refundableAmount:\s*row\.status === 'active' \? balance/);
+assert.match(depositStateSource, /closeDepositForRefund/);
+assert.match(depositStateSource, /benefitBalance:\s*0/);
 
-// Hard delete is destructive: remove the deposit allocation from linked Finance operations,
-// remove deposit-owned funding/withdrawal facts, then remove the instance itself.
-assert.match(depositServiceSource, /depositAllocations:\s*nextAllocations/);
-assert.match(depositServiceSource, /kind:\s*\{ in:\s*\['deposit-funding', 'deposit-withdrawal'\] \}/);
-assert.match(depositServiceSource, /DELETE FROM "LoyaltyDepositInstance"/);
-assert.match(depositServiceSource, /TransactionIsolationLevel\.Serializable/);
+// Upfront benefit is created once; spending preserves exact principal/benefit components.
+assert.match(depositStateSource, /mode === 'accrual'/);
+assert.match(depositStateSource, /principalAmount = Math\.min\(principal, request\.amount\)/);
+assert.match(depositStateSource, /benefitAmount = Math\.min\(benefit, depositMoney\(request\.amount - principalAmount\)\)/);
+assert.match(depositStateSource, /principalAmount:\s*depositMoney\(principalAmount\)/);
+assert.match(depositStateSource, /benefitAmount:\s*depositMoney\(benefitAmount\)/);
 
-// Deposit money and promotional value are separate. Upfront benefit is created once on funding;
-// service-price percent creates no money. Spending consumes principal first and benefit second.
-assert.match(migrationSource, /benefitType=discount is a time-limited discount right and never creates money/);
-assert.match(migrationSource, /benefitType=accrual adds promotional spendable value once, at funding time/);
-assert.match(migrationSource, /IF loyalty_deposit_benefit_mode\(terms_value\) = 'accrual' THEN/);
-assert.match(migrationSource, /principal_used := LEAST\(principal, allocation_amount\);/);
-assert.match(migrationSource, /benefit_used := LEAST\(benefit, GREATEST\(0, allocation_amount - principal_used\)\);/);
-assert.match(migrationSource, /loyalty_deposit_benefit_mode\(terms_value\) <> 'discount'/);
+// Service discount remains a price right and is not forced closed when money reaches zero.
+assert.match(depositStateSource, /nextBalance <= 0\.009 && mode !== 'discount' \? 'closed' : 'active'/);
+
+// The server, not the browser, owns the final automatic percentage and settlement calculation.
+assert.match(priceResolverSource, /resolvePersonPriceCondition/);
+assert.match(financeServiceSource, /resolvePersonPricePercent\(tx, tenantId, input\.person, occurredAt\)/);
+assert.match(financeServiceSource, /canonicalSettlementInput\(requestedSettlement, condition\.percent\)/);
+assert.match(financeServiceSource, /calculateCanonicalSettlement\(items, \{ pricePercent \}\)/);
+assert.match(financeServiceSource, /consumeDepositAllocations\(tx, tenantId/);
+assert.match(financeServiceSource, /restoreDepositAllocations\(tx, tenantId/);
 
 console.log('deposit business contract tests: OK');
