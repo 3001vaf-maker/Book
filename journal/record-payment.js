@@ -237,9 +237,6 @@ function paymentItems(settlement) {
     correctionMoney: item.correctionMoney,
     pricePercent: item.pricePercent,
     pricePercentMoney: item.pricePercentMoney,
-    discountMode: item.discountMode,
-    discountPercent: item.discountPercent,
-    discountMoney: item.discountMoney,
   }));
 }
 

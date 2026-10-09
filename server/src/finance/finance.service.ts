@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { SaasAccessService } from '../saas-access/saas-access.service';
+import { calculateCanonicalSettlement, repriceCanonicalSettlement } from './settlement-rules';
 
 type JsonObject = Record<string, any>;
 type Db = PrismaService | Prisma.TransactionClient;
@@ -243,6 +244,14 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly access: SaasAccessService,
   ) {}
+
+  calculateSettlement(items: JsonObject[], pricePercent: unknown = 0) {
+    return calculateCanonicalSettlement(items, pricePercent);
+  }
+
+  repriceSettlement(items: JsonObject[], current: unknown, pricePercent: unknown = 0) {
+    return repriceCanonicalSettlement(items, current, pricePercent);
+  }
 
   private async serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
     let lastError: unknown = null;

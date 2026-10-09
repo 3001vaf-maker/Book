@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { FinanceService } from '../finance/finance.service';
-import { calculateCanonicalSettlement, repriceCanonicalSettlement } from '../finance/settlement-rules';
 import { resolvePersonPricePercent } from '../loyalty/price-condition';
 import { ProcedureService } from '../procedure/procedure.service';
 import { TimeService } from '../time/time.service';
@@ -227,7 +226,7 @@ export class RecordService {
     const group = normalizeGroup(input.group, person, groupCapacityFromProcedures(procedureSnapshots));
     if (group?.participants?.length) person = clone(group.participants[0]);
     const pricePercent = await this.pricePercent(tenantId, person);
-    const settlement = calculateCanonicalSettlement(this.settlementSources(procedureSnapshots, products), pricePercent);
+    const settlement = this.finance.calculateSettlement(this.settlementSources(procedureSnapshots, products), pricePercent);
 
     const now = new Date().toISOString();
     const createdAt = text(input.createdAt) || now;
@@ -358,7 +357,7 @@ export class RecordService {
       const events = byRecord.get(text(record.id)) || [];
       const lifecycle = this.projectLifecycle(record, events);
       const pricePercent = await this.pricePercent(tenantId, person);
-      const fallbackSettlement = calculateCanonicalSettlement(
+      const fallbackSettlement = this.finance.calculateSettlement(
         this.settlementSources(
           arrayValue(record.procedures).map((item) => objectValue(item)),
           arrayValue(record.products).map((item) => objectValue(item)),
@@ -459,7 +458,7 @@ export class RecordService {
 
     const currentPerson = objectValue(current.person);
     const currentPricePercent = await this.pricePercent(tenantId, currentPerson);
-    const currentFallbackSettlement = calculateCanonicalSettlement(
+    const currentFallbackSettlement = this.finance.calculateSettlement(
       this.settlementSources(
         arrayValue(current.procedures).map((item) => objectValue(item)),
         arrayValue(current.products).map((item) => objectValue(item)),
@@ -476,9 +475,9 @@ export class RecordService {
     const nextSettlementSources = this.settlementSources(procedures, products);
     const nextPricePercent = await this.pricePercent(tenantId, person);
     const settlement = personChanged
-      ? calculateCanonicalSettlement(nextSettlementSources, nextPricePercent)
+      ? this.finance.calculateSettlement(nextSettlementSources, nextPricePercent)
       : (refreshProcedures || productsChanged)
-        ? repriceCanonicalSettlement(nextSettlementSources, currentSettlement, nextPricePercent)
+        ? this.finance.repriceSettlement(nextSettlementSources, currentSettlement, nextPricePercent)
         : null;
 
     const { finance: _financeProjection, ...currentRecord } = current;

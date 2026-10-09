@@ -63,8 +63,8 @@ function pricePercentForItem(item: JsonObject, defaultPercent: number) {
   return settlementPercent(defaultPercent);
 }
 
-export function calculateCanonicalSettlement(values: unknown[], discountValue: unknown = 0) {
-  const defaultPercent = settlementPercent(discountValue);
+export function calculateCanonicalSettlement(values: unknown[], pricePercentValue: unknown = 0) {
+  const defaultPercent = settlementPercent(pricePercentValue);
   const items = (Array.isArray(values) ? values : []).map((value) => {
     const item = objectValue(value);
     const price = settlementMoney(item.price ?? item.cost);
@@ -72,7 +72,6 @@ export function calculateCanonicalSettlement(values: unknown[], discountValue: u
     const correction = correctionForItem(item, price);
     const correctedPrice = settlementMoney(price - correction.money);
     const pricePercentMoney = settlementMoney(Math.min(correctedPrice, correctedPrice * pricePercent / 100));
-    const totalReduction = settlementMoney(correction.money + pricePercentMoney);
     return {
       sourceType: sourceType(item),
       sourceId: sourceId(item),
@@ -84,9 +83,6 @@ export function calculateCanonicalSettlement(values: unknown[], discountValue: u
       correctionMoney: correction.money,
       pricePercent,
       pricePercentMoney,
-      discountMode: pricePercent > 0 ? 'percent' : correction.money > 0 ? 'money' : 'none',
-      discountPercent: pricePercent,
-      discountMoney: totalReduction,
       planAmount: settlementMoney(correctedPrice - pricePercentMoney),
     };
   });
@@ -94,25 +90,23 @@ export function calculateCanonicalSettlement(values: unknown[], discountValue: u
   const serviceTotal = settlementMoney(items.reduce((sum, item) => sum + item.price, 0));
   const correctionTotal = settlementMoney(items.reduce((sum, item) => sum + item.correctionMoney, 0));
   const pricePercentTotal = settlementMoney(items.reduce((sum, item) => sum + item.pricePercentMoney, 0));
-  const discountTotal = settlementMoney(correctionTotal + pricePercentTotal);
   const planTotal = settlementMoney(items.reduce((sum, item) => sum + item.planAmount, 0));
   const percents = [...new Set(items.map((item) => Math.round(item.pricePercent * 10000) / 10000))];
   return {
     items,
     serviceTotal,
-    discountPercent: percents.length === 1 ? percents[0] : null,
+    pricePercent: percents.length === 1 ? percents[0] : null,
     correctionTotal,
     pricePercentTotal,
-    discountTotal,
     planTotal,
   };
 }
 
-export function repriceCanonicalSettlement(values: unknown[], current: unknown, discountValue: unknown = 0) {
+export function repriceCanonicalSettlement(values: unknown[], current: unknown, pricePercentValue: unknown = 0) {
   const previous = objectValue(current);
   const priorItems = Array.isArray(previous.items) ? previous.items.map(objectValue) : [];
   const bySource = new Map(priorItems.map((item) => [sourceKey(item), item]));
-  const defaultPercent = settlementPercent(discountValue);
+  const defaultPercent = settlementPercent(pricePercentValue);
   const items = (Array.isArray(values) ? values : []).map((value, index) => {
     const item = objectValue(value);
     const type = sourceType(item);
