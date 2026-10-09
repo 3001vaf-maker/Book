@@ -1,0 +1,73 @@
+name: Finalize deposit price path
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/finalize-deposit-price-path.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Align browser runtime payment assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/professional-core-runtime-browser.html')
+          text = path.read_text()
+          old = """ok(Boolean(paymentZ?.querySelector('[data-payment-price]')), 'Payment Z3 editable procedure price missing');
+ok(Boolean(paymentZ?.querySelector('input[data-payment-discount-percent]')), 'Payment Z3 percent discount selector missing');
+ok(Boolean(paymentZ?.querySelector('[data-payment-discount-money]')), 'Payment Z3 money discount field missing');"""
+          new = """const paymentPrice = paymentZ?.querySelector('[data-payment-price]');
+ok(Boolean(paymentPrice), 'Payment Z3 procedure price missing');
+ok(paymentPrice?.readOnly === true || paymentPrice?.hasAttribute('readonly'), 'Payment Z3 base price must be read-only');
+ok(Boolean(paymentZ?.querySelector('input[data-payment-correction-percent]')), 'Payment Z3 manual percent price correction selector missing');
+ok(Boolean(paymentZ?.querySelector('[data-payment-correction-money]')), 'Payment Z3 manual money price correction field missing');
+ok(!paymentZ?.querySelector('[data-payment-discount-percent],[data-payment-discount-money]'), 'Payment Z3 must not expose retired discount controls');"""
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit('Expected payment runtime assertions were not found')
+          PY
+      - name: Check architecture
+        run: npm run check
+      - name: Run tests
+        run: npm test
+      - name: Install server dependencies
+        run: npm install --prefix server
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix server
+      - name: Build server
+        run: npm run build --prefix server
+      - name: Commit runtime test cleanup
+        run: |
+          if git diff --quiet; then
+            echo 'No runtime test changes needed'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add tests/professional-core-runtime-browser.html
+            git commit -m 'Align runtime payment test with price correction'
+            git push origin HEAD:staging
+          fi
+      - name: Remove temporary workflow
+        run: |
+          git fetch origin staging
+          git reset --hard origin/staging
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/finalize-deposit-price-path.yml
+          git commit -m 'Remove temporary payment runtime workflow'
+          git push origin HEAD:staging
