@@ -48,20 +48,20 @@ if (settlement.includes('owner?.discountPercent') || settlement.includes('person
 }
 
 const recordUi = readFileSync('journal/record.js', 'utf8');
-if (/discountPercent\s*:/.test(recordUi)) {
-  errors.push('journal/record.js must not snapshot a person discount percent into a record');
-}
+if (/discountPercent\s*:/.test(recordUi)) errors.push('journal/record.js must not snapshot a person discount percent into a record');
 
 const recordServer = readFileSync('server/src/record/record.service.ts', 'utf8');
-if (/discountPercent\s*:/.test(recordServer)) {
-  errors.push('server/src/record/record.service.ts must not snapshot a person discount percent into a record');
-}
+if (/discountPercent\s*:/.test(recordServer)) errors.push('server/src/record/record.service.ts must not snapshot a person discount percent into a record');
 if (!recordServer.includes('resolvePersonPricePercent') || !recordServer.includes('this.pricePercent')) {
   errors.push('server/src/record/record.service.ts must resolve automatic percent through the canonical server resolver');
 }
 
 const serverPriceCondition = readFileSync('server/src/loyalty/price-condition.ts', 'utf8');
-if (!serverPriceCondition.includes('resolvePersonPricePercent') || !serverPriceCondition.includes('sources.length > 1')) {
+if (
+  !serverPriceCondition.includes('resolvePersonPricePercent')
+  || !serverPriceCondition.includes('resolvePersonPriceCondition')
+  || !serverPriceCondition.includes('condition.conflict')
+) {
   errors.push('server/src/loyalty/price-condition.ts must own server price-percent resolution and conflict detection');
 }
 

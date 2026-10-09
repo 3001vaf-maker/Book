@@ -2,9 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { FinanceService } from '../finance/finance.service';
+import {
+  depositBenefitMode,
+  depositBenefitRate,
+  depositTermActiveAt,
+  expireDepositInstances,
+} from './deposit-state';
 
 type JsonObject = Record<string, any>;
-
 type DepositRow = {
   depositId: string;
   programId: string;
@@ -48,27 +53,6 @@ function money(value: unknown) {
   return Math.round(Math.max(0, numberValue(value)) * 100) / 100;
 }
 
-function benefitMode(terms: JsonObject) {
-  const type = text(terms.benefitType).toLowerCase();
-  if (type === 'discount') return 'discount';
-  if (type === 'accrual') return 'accrual';
-  return 'none';
-}
-
-function benefitRate(terms: JsonObject) {
-  return Math.max(0, Math.min(100, numberValue(terms.benefitValue)));
-}
-
-function termActiveAt(terms: JsonObject, value: Date) {
-  if (text(terms.termMode).toLowerCase() !== 'dated') return true;
-  const start = text(terms.termStartDate).slice(0, 10);
-  const end = text(terms.termEndDate).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
-  const day = value.toISOString().slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(start) && day < start) return false;
-  return day <= end;
-}
-
 function depositAllocations(value: unknown) {
   return arrayValue(value)
     .map((entry) => {
@@ -94,45 +78,12 @@ export class DepositService {
     private readonly finance: FinanceService,
   ) {}
 
-  private async syncExpiry(tenantId: string, depositId = '') {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "LoyaltyDepositInstance"
-      SET "principalBalance" = 0,
-          "benefitBalance" = 0,
-          "balance" = 0,
-          "status" = 'expired',
-          "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${tenantId}
-        AND (${depositId} = '' OR "depositId" = ${depositId})
-        AND "status" = 'active'
-        AND LOWER(COALESCE("terms"->>'termMode', 'indefinite')) = 'dated'
-        AND COALESCE("terms"->>'termEndDate', '') ~ '^\d{4}-\d{2}-\d{2}$'
-        AND ("terms"->>'termEndDate')::date < CURRENT_DATE
-    `);
-  }
-
   private async rows(tenantId: string, personKeyValue = '') {
-    await this.syncExpiry(tenantId);
-    if (personKeyValue) {
-      return this.prisma.$queryRaw<DepositRow[]>(Prisma.sql`
-        SELECT
-          "depositId", "programId", "programName", "personKey", "person", "terms",
-          "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
-          "fundedAt", "fundingOperationId", "createdAt", "updatedAt"
-        FROM "LoyaltyDepositInstance"
-        WHERE "tenantId" = ${tenantId} AND "personKey" = ${personKeyValue}
-        ORDER BY "fundedAt" DESC, "createdAt" DESC
-      `);
-    }
-    return this.prisma.$queryRaw<DepositRow[]>(Prisma.sql`
-      SELECT
-        "depositId", "programId", "programName", "personKey", "person", "terms",
-        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
-        "fundedAt", "fundingOperationId", "createdAt", "updatedAt"
-      FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY "fundedAt" DESC, "createdAt" DESC
-    `);
+    await expireDepositInstances(this.prisma, tenantId);
+    return this.prisma.loyaltyDepositInstance.findMany({
+      where: { tenantId, ...(personKeyValue ? { personKey: personKeyValue } : {}) },
+      orderBy: [{ fundedAt: 'desc' }, { createdAt: 'desc' }],
+    });
   }
 
   private async operations(tenantId: string) {
@@ -145,8 +96,8 @@ export class DepositService {
   private history(row: DepositRow, operations: any[]) {
     const id = row.depositId;
     const terms = objectValue(row.terms);
-    const mode = benefitMode(terms);
-    const rate = benefitRate(terms);
+    const mode = depositBenefitMode(terms);
+    const rate = depositBenefitRate(terms);
     const items: JsonObject[] = [];
 
     for (const operation of operations) {
@@ -215,7 +166,7 @@ export class DepositService {
     const benefitBalance = money(row.benefitBalance);
     const balance = money(row.balance);
     const terms = objectValue(row.terms);
-    const mode = benefitMode(terms);
+    const mode = depositBenefitMode(terms);
     return {
       depositId: row.depositId,
       programId: row.programId,
@@ -228,9 +179,9 @@ export class DepositService {
       balance,
       terms,
       benefitMode: mode,
-      discountPercent: mode === 'discount' && row.status === 'active' && termActiveAt(terms, new Date()) ? benefitRate(terms) : 0,
+      discountPercent: mode === 'discount' && row.status === 'active' && depositTermActiveAt(terms, new Date()) ? depositBenefitRate(terms) : 0,
       status: row.status,
-      canRefund: row.status === 'active' && principalBalance > 0.009 && termActiveAt(terms, new Date()),
+      canRefund: row.status === 'active' && principalBalance > 0.009 && depositTermActiveAt(terms, new Date()),
       fundedAt: row.fundedAt.toISOString(),
       fundingOperationId: row.fundingOperationId,
       history: this.history(row, operations),
@@ -247,17 +198,10 @@ export class DepositService {
 
   async get(tenantId: string, depositId: string) {
     const id = text(depositId);
-    await this.syncExpiry(tenantId, id);
-    const rows = await this.prisma.$queryRaw<DepositRow[]>(Prisma.sql`
-      SELECT
-        "depositId", "programId", "programName", "personKey", "person", "terms",
-        "initialAmount", "principalBalance", "benefitBalance", "balance", "status",
-        "fundedAt", "fundingOperationId", "createdAt", "updatedAt"
-      FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId} AND "depositId" = ${id}
-      LIMIT 1
-    `);
-    const row = rows[0];
+    await expireDepositInstances(this.prisma, tenantId, id);
+    const row = await this.prisma.loyaltyDepositInstance.findUnique({
+      where: { tenantId_depositId: { tenantId, depositId: id } },
+    });
     if (!row) throw new NotFoundException('Депозит не найден');
     return this.dto(row, await this.operations(tenantId));
   }
@@ -289,14 +233,10 @@ export class DepositService {
     const id = text(depositId);
     if (!id) return;
 
-    const row = await tx.$queryRaw<Array<{ depositId: string }>>(Prisma.sql`
-      SELECT "depositId"
-      FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId} AND "depositId" = ${id}
-      LIMIT 1
-      FOR UPDATE
-    `);
-    if (!row.length) return;
+    const row = await tx.loyaltyDepositInstance.findUnique({
+      where: { tenantId_depositId: { tenantId, depositId: id } },
+    });
+    if (!row) return;
 
     const operations = await tx.financeOperation.findMany({
       where: { tenantId, kind: { in: ['payment', 'refund'] } },
@@ -337,11 +277,7 @@ export class DepositService {
         kind: { in: ['deposit-funding', 'deposit-withdrawal'] },
       },
     });
-
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM "LoyaltyDepositInstance"
-      WHERE "tenantId" = ${tenantId} AND "depositId" = ${id}
-    `);
+    await tx.loyaltyDepositInstance.delete({ where: { id: row.id } });
   }
 
   async hardDelete(tenantId: string, depositId: string) {
@@ -355,26 +291,13 @@ export class DepositService {
     const id = text(programId);
     if (!id) throw new BadRequestException('Депозитная программа не найдена');
     await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{ depositId: string }>>(Prisma.sql`
-        SELECT "depositId"
-        FROM "LoyaltyDepositInstance"
-        WHERE "tenantId" = ${tenantId} AND "programId" = ${id}
-        ORDER BY "createdAt" ASC
-        FOR UPDATE
-      `);
+      const rows = await tx.loyaltyDepositInstance.findMany({
+        where: { tenantId, programId: id },
+        orderBy: { createdAt: 'asc' },
+        select: { depositId: true },
+      });
       for (const row of rows) await this.hardDeleteWith(tx, tenantId, row.depositId);
-
-      const auxiliary = await tx.businessAuxiliaryState.findUnique({ where: { tenantId } });
-      if (auxiliary) {
-        const data = objectValue(auxiliary.data);
-        const nextPrograms = arrayValue(data.depositPrograms)
-          .filter((program) => text(objectValue(program).id) !== id)
-          .map((program) => clone(objectValue(program)));
-        await tx.businessAuxiliaryState.update({
-          where: { tenantId },
-          data: { data: { ...clone(data), depositPrograms: nextPrograms } as Prisma.InputJsonValue },
-        });
-      }
+      await tx.loyaltyDepositProgram.deleteMany({ where: { tenantId, programId: id } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return { deleted: true, programId: id };
   }

@@ -125,11 +125,10 @@ export function normalizeRecordSettlement(value = null) {
 export function hydrateRecordSettlement(record = null) {
   if (!record?.id) return record;
   const condition = recordSettlementPriceCondition(record?.person);
-  const { personDiscountPercent: _priceProjection, ...cleanRecord } = record;
   const normalizedRecord = {
-    ...cleanRecord,
-    procedures: Array.isArray(cleanRecord.procedures) ? cleanRecord.procedures : [],
-    products: Array.isArray(cleanRecord.products) ? cleanRecord.products : [],
+    ...record,
+    procedures: Array.isArray(record.procedures) ? record.procedures : [],
+    products: Array.isArray(record.products) ? record.products : [],
   };
   const projectedSettlement = getRecordSettlement(normalizedRecord, { pricePercent: condition.percent });
   return {
