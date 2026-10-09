@@ -60,6 +60,21 @@ export function depositPersonKey(value: unknown) {
   return text(person.key ?? person.personKey ?? person.id);
 }
 
+function normalizedDepositAllocations(values: unknown) {
+  return (Array.isArray(values) ? values : [])
+    .map((value) => {
+      const row = objectValue(value);
+      return {
+        depositId: text(row.depositId ?? row.sourceId ?? row.id),
+        name: text(row.name ?? row.label),
+        amount: depositMoney(row.amount),
+        principalAmount: depositMoney(row.principalAmount),
+        benefitAmount: depositMoney(row.benefitAmount),
+      };
+    })
+    .filter((row) => row.depositId && row.amount > 0);
+}
+
 export async function expireDepositInstances(db: Db, tenantId: string, depositId = '') {
   const rows = await db.loyaltyDepositInstance.findMany({
     where: {
@@ -141,16 +156,7 @@ export async function activeDepositPriceSources(db: Db, tenantId: string, person
 }
 
 export async function consumeDepositAllocations(db: Db, tenantId: string, values: unknown, expectedPersonKey: string, occurredAt: Date) {
-  const requested = (Array.isArray(values) ? values : [])
-    .map((value) => {
-      const row = objectValue(value);
-      return {
-        depositId: text(row.depositId ?? row.sourceId ?? row.id),
-        name: text(row.name ?? row.label),
-        amount: depositMoney(row.amount),
-      };
-    })
-    .filter((row) => row.depositId && row.amount > 0);
+  const requested = normalizedDepositAllocations(values);
   const seen = new Set<string>();
   const result: DepositAllocation[] = [];
 
@@ -200,19 +206,7 @@ export async function consumeDepositAllocations(db: Db, tenantId: string, values
 }
 
 export async function restoreDepositAllocations(db: Db, tenantId: string, values: unknown, at: Date) {
-  const allocations = (Array.isArray(values) ? values : [])
-    .map((value) => {
-      const row = objectValue(value);
-      return {
-        depositId: text(row.depositId ?? row.sourceId ?? row.id),
-        name: text(row.name ?? row.label),
-        amount: depositMoney(row.amount),
-        principalAmount: depositMoney(row.principalAmount),
-        benefitAmount: depositMoney(row.benefitAmount),
-      };
-    })
-    .filter((row) => row.depositId && row.amount > 0);
-
+  const allocations = normalizedDepositAllocations(values);
   for (const allocation of allocations) {
     const row = await db.loyaltyDepositInstance.findUnique({
       where: { tenantId_depositId: { tenantId, depositId: allocation.depositId } },
@@ -222,10 +216,7 @@ export async function restoreDepositAllocations(db: Db, tenantId: string, values
     const principal = depositMoney(row.principalBalance);
     const benefit = depositMoney(row.benefitBalance);
     const principalRestore = Math.min(allocation.amount, allocation.principalAmount || allocation.amount);
-    const benefitRestore = Math.min(
-      depositMoney(allocation.amount - principalRestore),
-      allocation.benefitAmount,
-    );
+    const benefitRestore = Math.min(depositMoney(allocation.amount - principalRestore), allocation.benefitAmount);
     const nextPrincipal = depositMoney(principal + principalRestore);
     const nextBenefit = depositMoney(benefit + benefitRestore);
     const nextBalance = depositMoney(nextPrincipal + nextBenefit);
@@ -236,6 +227,37 @@ export async function restoreDepositAllocations(db: Db, tenantId: string, values
         benefitBalance: nextBenefit,
         balance: nextBalance,
         status: 'active',
+      },
+    });
+  }
+}
+
+export async function reconsumeDepositAllocations(db: Db, tenantId: string, values: unknown, expectedPersonKey: string, at: Date) {
+  const allocations = normalizedDepositAllocations(values);
+  for (const allocation of allocations) {
+    await expireDepositInstances(db, tenantId, allocation.depositId);
+    const row = await db.loyaltyDepositInstance.findUnique({
+      where: { tenantId_depositId: { tenantId, depositId: allocation.depositId } },
+    });
+    if (!row) throw new BadRequestException('Депозит для отмены возврата не найден');
+    if (expectedPersonKey && row.personKey !== expectedPersonKey) throw new BadRequestException('Депозит принадлежит другому человеку');
+    if (row.status !== 'active' || !depositTermActiveAt(row.terms, at)) throw new BadRequestException('Депозит больше недоступен');
+    const principal = depositMoney(row.principalBalance);
+    const benefit = depositMoney(row.benefitBalance);
+    const principalUse = allocation.principalAmount;
+    const benefitUse = allocation.benefitAmount;
+    if (principalUse > principal + 0.009 || benefitUse > benefit + 0.009) throw new BadRequestException('Состояние депозита изменилось и не позволяет отменить возврат');
+    const nextPrincipal = depositMoney(principal - principalUse);
+    const nextBenefit = depositMoney(benefit - benefitUse);
+    const nextBalance = depositMoney(nextPrincipal + nextBenefit);
+    const mode = depositBenefitMode(row.terms);
+    await db.loyaltyDepositInstance.update({
+      where: { id: row.id },
+      data: {
+        principalBalance: nextPrincipal,
+        benefitBalance: nextBenefit,
+        balance: nextBalance,
+        status: nextBalance <= 0.009 && mode !== 'discount' ? 'closed' : 'active',
       },
     });
   }
