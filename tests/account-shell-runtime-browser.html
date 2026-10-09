@@ -150,7 +150,7 @@ relationship?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true
 await wait(140);
 ok(state.accountTab === 'contact-detail', 'Professional contact profile did not open');
 const contactZ = root.querySelector('[data-v2-z-layer].account-contact-detail-z');
-ok(Boolean(contactZ)", 'Professional contact profile must open as stacked Z');
+ok(Boolean(contactZ), 'Professional contact profile must open as stacked Z');
 
 mark('linked-investments-contact');
 const acceptedInvestmentCard = contactZ?.querySelector('[data-account-investment="tenant-invest:investment-accepted"]');
@@ -162,11 +162,11 @@ await wait(90);
 let investmentZ = root.querySelector('[data-v2-z-layer].account-investment-z');
 ok(Boolean(investmentZ), 'Linked investor card must open a real stacked Z');
 ok(Boolean(root.querySelector('[data-account-investment-chat]')), 'Linked investor Z must expose shared D chat');
-ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROIÙ');
+ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROI');
 ok(investmentZ?.textContent.includes('История'), 'Linked investor Z must expose investment history');
-ok(investmentZ?.textContent.includes('Вложение')), 'Linked investor history must mirror project contribution');
-ok(investmentZ?.textContent.includes('Доход')), 'Linked investor history must mirror paid income');
-ok(investmentZ?.textContent.includes('Изменение оценки')), 'Linked investor history must include non-cash valuation');
+ok(investmentZ?.textContent.includes('Вложение'), 'Linked investor history must mirror project contribution');
+ok(investmentZ?.textContent.includes('Доход'), 'Linked investor history must mirror paid income');
+ok(investmentZ?.textContent.includes('Изменение оценки'), 'Linked investor history must include non-cash valuation');
 investmentZ?.v2Close?.();
 await wait(90);
 proposal?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
