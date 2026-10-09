@@ -84,23 +84,12 @@ for (const token of [
 if (!assignment.includes('Личный счёт') || !assignment.includes('**не назначается вообще**')) {
   errors.push('LOYALTY_ASSIGNMENT_CONTRACT.md must explicitly exclude Personal Account from assignment');
 }
-if (!finance.includes('Личный счёт хранит только **реальные деньги')) {
-  errors.push('LOYALTY_FINANCE_CONTRACT.md must keep Personal Account money-only');
-}
-if (/два независимых номинала|бонусный номинал Личного счёта|срок жизни бонусов принадлежит [`']?Личн/i.test(finance)) {
-  errors.push('LOYALTY_FINANCE_CONTRACT.md contains retired Personal Account bonus ownership');
-}
-for (const token of [
-  'ближайшей датой окончания',
-  '1 бонус = 1 единица валюты профиля / бизнеса',
-  'уже созданные начисления не переписываются задним числом',
-  'рабочая / фактическая дата события',
-  'аудитная дата внесения записи',
-]) {
+if (!finance.includes('Личный счёт хранит только **реальные деньги')) errors.push('LOYALTY_FINANCE_CONTRACT.md must keep Personal Account money-only');
+if (/два независимых номинала|бонусный номинал Личного счёта|срок жизни бонусов принадлежит [`']?Личн/i.test(finance)) errors.push('LOYALTY_FINANCE_CONTRACT.md contains retired Personal Account bonus ownership');
+for (const token of ['ближайшей датой окончания','1 бонус = 1 единица валюты профиля / бизнеса','уже созданные начисления не переписываются задним числом','рабочая / фактическая дата события','аудитная дата внесения записи']) {
   if (!finance.toLowerCase().includes(token.toLowerCase())) errors.push(`LOYALTY_FINANCE_CONTRACT.md lost approved financial detail: ${token}`);
 }
-
-for (const token of ['Фаза A — UI', 'Фаза B — доменные сущности', 'Фаза C — persistence / API', 'Фаза D — интеграции', 'Восстановление после смены / обрыва чата', 'commit SHA', 'Нормативный документ нельзя «упрощать» ценой потери решений']) {
+for (const token of ['Фаза A — UI','Фаза B — доменные сущности','Фаза C — persistence / API','Фаза D — интеграции','Восстановление после смены / обрыва чата','commit SHA','Нормативный документ нельзя «упрощать» ценой потери решений']) {
   if (!execution.includes(token)) errors.push(`LOYALTY_EXECUTION_CONTRACT.md missing execution rule: ${token}`);
 }
 
@@ -119,20 +108,11 @@ for (const item of expectedNavigation) {
   if (index >= 0 && index <= previousIndex) errors.push('Loyalty E order must remain Deposit → Personal Account → Certificate → Subscription → Referral → Bonus');
   previousIndex = Math.max(previousIndex, index);
 }
-
 if (!/id:\s*['"]loyalty['"][^\n]*label:\s*['"]Лояльность['"]/.test(core)) errors.push('core.js must expose top-level F Loyalty');
 if (!/renderLoyaltySection/.test(core)) errors.push('core.js must route Loyalty through its owner renderer');
 
-const ownerModules = [
-  ['personal-account', personalAccountUI],
-  ['certificate', certificateUI],
-  ['subscription', subscriptionUI],
-  ['referral', referralUI],
-  ['bonus', bonusUI],
-];
-for (const [name] of ownerModules) {
-  if (!loyaltyRoot.includes(`./${name}/index.js`)) errors.push(`core/loyalty/index.js must route ${name} through its dedicated owner module`);
-}
+const ownerModules = [['personal-account', personalAccountUI],['certificate', certificateUI],['subscription', subscriptionUI],['referral', referralUI],['bonus', bonusUI]];
+for (const [name] of ownerModules) if (!loyaltyRoot.includes(`./${name}/index.js`)) errors.push(`core/loyalty/index.js must route ${name} through its dedicated owner module`);
 if (/data-loyalty-stage-action|previewCards|Интерфейс готов|визуальный mock/i.test(loyaltyRoot)) errors.push('core/loyalty/index.js must not contain placeholder E implementations');
 
 if (!/export async function renderPersonalAccount/.test(personalAccountUI)) errors.push('Personal Account UI owner is missing');
@@ -140,26 +120,16 @@ if (/label:\s*['"]\+['"]|data-(?:personal-account|loyalty)-create|data-loyalty-s
 if (/бонус/i.test(personalAccountUI)) errors.push('Personal Account UI must not expose a bonus balance');
 if (!/Денежный остаток/.test(personalAccountUI)) errors.push('Personal Account UI must expose money-only balance');
 
-const visualOwners = [
-  ['Personal Account', personalAccountUI, 'personal-account'],
-  ['Certificate', certificateUI, 'certificate'],
-  ['Subscription', subscriptionUI, 'subscription'],
-  ['Referral', referralUI, 'referral'],
-  ['Bonus', bonusUI, 'bonus'],
-];
+const visualOwners = [['Personal Account', personalAccountUI, 'personal-account'],['Certificate', certificateUI, 'certificate'],['Subscription', subscriptionUI, 'subscription'],['Referral', referralUI, 'referral'],['Bonus', bonusUI, 'bonus']];
 for (const [label, sourceText, type] of visualOwners) {
   if (!sourceText.includes('entityCardStack')) errors.push(`${label} Z1 must use the shared visual-card stack`);
   if (!sourceText.includes('loyaltyVisualCard')) errors.push(`${label} must render shared entityVisualCard-based cards`);
   if (!sourceText.includes(`type: '${type}'`)) errors.push(`${label} A → View must edit its own card type`);
 }
-for (const token of ['entityCardStack', 'entityVisualCard', 'openEntityCardAppearanceQ']) {
-  if (!depositUI.includes(token)) errors.push(`Deposit must reuse shared ${token}`);
-}
+for (const token of ['entityCardStack', 'entityVisualCard', 'openEntityCardAppearanceQ']) if (!depositUI.includes(token)) errors.push(`Deposit must reuse shared ${token}`);
 
 if (/\/finance\/deposits/.test(depositData)) errors.push('Deposit browser data must not use /finance/deposits as its canonical API');
-for (const route of ['/loyalty/deposits', '/loyalty/deposits/person/']) {
-  if (!depositData.includes(route)) errors.push(`Deposit browser data missing canonical route ${route}`);
-}
+for (const route of ['/loyalty/deposits', '/loyalty/deposits/person/']) if (!depositData.includes(route)) errors.push(`Deposit browser data missing canonical route ${route}`);
 
 const loyaltyCss = walk(join(root, 'core/loyalty')).map(rel).filter((path) => path.endsWith('.css'));
 if (loyaltyCss.length) errors.push(`Loyalty must not own local CSS: ${loyaltyCss.join(', ')}`);
@@ -168,10 +138,15 @@ for (const [label, sourceText] of [['Deposit', depositUI], ['Certificate', certi
   if (/\b(?:alert|confirm|prompt)\s*\(/.test(sourceText)) errors.push(`${label} UI must not use browser dialogs`);
 }
 
-for (const token of ['model LoyaltyDepositProgram', 'model LoyaltyDepositInstance', 'principalBalance', 'benefitBalance']) {
-  if (!prismaSchema.includes(token)) errors.push(`Prisma schema missing canonical Deposit model token: ${token}`);
-}
-for (const token of ['DROP TRIGGER IF EXISTS "LoyaltyDepositFinanceSync"', 'DROP FUNCTION IF EXISTS loyalty_deposit_recalculate', 'LoyaltyDepositProgram']) {
+for (const token of ['model LoyaltyDepositProgram','model LoyaltyDepositInstance','principalBalance','benefitBalance']) if (!prismaSchema.includes(token)) errors.push(`Prisma schema missing canonical Deposit model token: ${token}`);
+for (const token of [
+  'DROP TRIGGER IF EXISTS "LoyaltyDepositFinanceSync"',
+  'DROP FUNCTION IF EXISTS loyalty_deposit_recalculate',
+  'DROP TRIGGER IF EXISTS "PersonSinglePricePercentGuard"',
+  'DROP TRIGGER IF EXISTS "DepositSinglePricePercentGuard"',
+  'DROP TRIGGER IF EXISTS "FinancePaymentSinglePricePercentGuard"',
+  'LoyaltyDepositProgram',
+]) {
   if (!ownershipMigration.includes(token)) errors.push(`Deposit ownership migration missing retirement token: ${token}`);
 }
 
@@ -181,9 +156,7 @@ if (!/this\.finance\.recordDepositFunding/.test(depositService) || !/this\.finan
 if (!/loyaltyDepositProgram/.test(auxiliaryState)) errors.push('Deposit programs must persist through canonical LoyaltyDepositProgram state');
 if (!/consumeDepositAllocations/.test(depositState) || !/principalAmount/.test(depositState) || !/benefitAmount/.test(depositState)) errors.push('Deposit state owner must mutate and preserve exact principal/benefit allocation components');
 if (!/resolvePersonPriceCondition/.test(priceCondition) || /loyalty_deposit_benefit_/.test(priceCondition)) errors.push('Server price condition must use canonical resolver without SQL helper bridge');
-for (const token of ['resolvePersonPricePercent', 'canonicalSettlementInput', 'calculateCanonicalSettlement', 'consumeDepositAllocations', 'restoreDepositAllocations']) {
-  if (!financeService.includes(token)) errors.push(`Finance server missing authoritative pricing/deposit step: ${token}`);
-}
+for (const token of ['resolvePersonPricePercent','canonicalSettlementInput','calculateCanonicalSettlement','consumeDepositAllocations','restoreDepositAllocations']) if (!financeService.includes(token)) errors.push(`Finance server missing authoritative pricing/deposit step: ${token}`);
 if (/\$queryRaw[^]*LoyaltyDepositInstance|loyalty_deposit_recalculate|loyalty_deposit_finance_sync/.test(financeService)) errors.push('Finance runtime must not reconstruct Deposit state from Finance operations');
 
 if (!/@Controller\(['"]loyalty['"]\)/.test(loyaltyController) || !/deposits\/fund/.test(loyaltyController)) errors.push('LoyaltyController must own the canonical Deposit HTTP surface');
@@ -198,5 +171,4 @@ if (errors.length) {
   for (const error of errors) console.error(`- ${error}`);
   process.exit(1);
 }
-
 console.log('Loyalty architecture check passed.');
