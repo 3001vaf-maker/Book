@@ -27,12 +27,22 @@ import {
 const recordServiceSource = readFileSync(new URL('../core/record/service.js', import.meta.url), 'utf8');
 const serverRecordSource = readFileSync(new URL('../server/src/record/record.service.ts', import.meta.url), 'utf8');
 const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
+const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(recordServiceSource, /from ['"][^'"]*finance\/index\.js['"]/);
 assert.match(recordServiceSource, /'finance'/);
 assert.match(serverRecordSource, /this\.finance\.upsertSettlement/);
 assert.match(serverRecordSource, /const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/);
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
+
+const transferSelectorSource = recordViewSource.match(/const openRecordTransferSelector = \(\) => \{([\s\S]*?)\n  \};\n\n  const confirmHardDelete/)?.[1] || '';
+assert.ok(transferSelectorSource, 'Record transfer selector must exist');
+assert.match(recordViewSource, /label:\s*'Корректировка процедуры по времени'/);
+assert.match(recordViewSource, /const openProcedureTimeCorrection = \(\) => \{[\s\S]*?openRecordEdit\('procedure'\)/);
+assert.match(transferSelectorSource, /value:\s*'workplace'/);
+assert.match(transferSelectorSource, /value:\s*'date'/);
+assert.match(transferSelectorSource, /value:\s*'time'/);
+assert.doesNotMatch(transferSelectorSource, /value:\s*'procedure'/);
 
 // Record owns source facts; Finance projection calculates the initial Settlement.
 hydrateDaysFromServer([
