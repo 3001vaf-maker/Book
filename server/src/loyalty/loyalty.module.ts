@@ -4,11 +4,12 @@ import { FinanceModule } from '../finance/finance.module';
 import { PrismaService } from '../prisma.service';
 import { DepositService } from './deposit.service';
 import { LoyaltyController } from './loyalty.controller';
+import { PersonalAccountService } from './personal-account.service';
 
 @Module({
   imports: [AuthModule, FinanceModule],
   controllers: [LoyaltyController],
-  providers: [DepositService, PrismaService],
-  exports: [DepositService],
+  providers: [DepositService, PersonalAccountService, PrismaService],
+  exports: [DepositService, PersonalAccountService],
 })
 export class LoyaltyModule {}
