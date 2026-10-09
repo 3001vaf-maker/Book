@@ -85,7 +85,7 @@ function accountInfo(person = {}) {
   ]);
 }
 
-async function openAccountLayer(root, person = {}) {
+export async function openPersonalAccountForPerson(root, person = {}) {
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'loyalty-personal-account-z' }), { stack: true });
   if (!layer) return null;
   layer.innerHTML = page([
@@ -120,7 +120,7 @@ export async function renderPersonalAccount(root) {
   root.querySelectorAll('[data-personal-account-person]').forEach((node) => {
     node.addEventListener('click', () => {
       const person = values.find((item) => personKey(item) === String(node.dataset.personalAccountPerson || ''));
-      if (person) openAccountLayer(root, person);
+      if (person) openPersonalAccountForPerson(root, person);
     });
   });
   notifyLoyaltyContext();
