@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from 
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FinanceService } from './finance.service';
+import { PaymentSettlementService } from './payment-settlement.service';
 
 type AuthenticatedRequest = Request & {
   auth?: { platformAccountId: string; tenantId: string; role: string };
@@ -10,7 +11,10 @@ type AuthenticatedRequest = Request & {
 @Controller('finance')
 @UseGuards(JwtAuthGuard)
 export class FinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly payments: PaymentSettlementService,
+  ) {}
 
   @Get()
   get(@Req() request: AuthenticatedRequest) {
@@ -79,7 +83,7 @@ export class FinanceController {
 
   @Post('operations/payment')
   payment(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
-    return this.finance.recordPayment(request.auth!.tenantId, body);
+    return this.payments.recordPayment(request.auth!.tenantId, body);
   }
 
   @Post('operations/:operationId/refund')
@@ -88,7 +92,7 @@ export class FinanceController {
     @Param('operationId') operationId: string,
     @Body() body: unknown,
   ) {
-    return this.finance.recordRefund(request.auth!.tenantId, operationId, body);
+    return this.payments.recordRefund(request.auth!.tenantId, operationId, body);
   }
 
   @Put('operations/:operationId')
