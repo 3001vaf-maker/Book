@@ -12,7 +12,7 @@
 <body>
 <div id="host"></div>
 <script type="module">
-import { button, modal, mountModal, openSharedProfileSettingsMenu, openTimeRangeAction, v2Header, v2Shell } from '/ui/ui.js';
+import { button, modal, mountModal, openSharedProfileSettingsMenu, openTimeRangeAction, openDayWorkplaceTime, v2Header, v2Shell } from '/ui/ui.js';
 import { hydrateWorkplacesFromServer } from '/core/profile/workplaces/data.js';
 import { openServiceWorkplaceSelection } from '/core/service/workplace-selection.js';
 import { openJournalWorkplaceControl } from '/journal/workplace-control.js';
@@ -21,6 +21,7 @@ hydrateWorkplacesFromServer([{ key: 'test-space', name: 'Тестовое про
 let selection = [];
 let headerACount = 0;
 let headerCCount = 0;
+let journalTime = { from: '09:00', to: '18:00' };
 const host = document.querySelector('#host');
 const header = v2Header({
   a: { kind: 'settings', aria: 'A', data: 'data-test-header-a' },
@@ -32,9 +33,10 @@ host.innerHTML = v2Shell({
   body: button('Настройки', { data: 'data-test-settings' })
     + button('Журнал: пространство', { data: 'data-test-journal-workplace' })
     + button('Открыть время', { data: 'data-test-time-range' })
+    + button('Журнал: рабочее время', { data: 'data-test-journal-time' })
     + button('Открыть Q', { data: 'data-test-open-q' })
     + '<output data-test-selection>0</output><output data-test-journal-selection>__all__</output>'
-    + '<output data-test-time-result></output>'
+    + '<output data-test-time-result></output><output data-test-journal-time-result>09:00-18:00</output>'
     + '<output data-test-header-a-count>0</output><output data-test-header-c-count>0</output>',
 });
 
@@ -61,6 +63,30 @@ host.querySelector('[data-test-time-range]').addEventListener('click', () => {
     onSave: ({ from, to }) => {
       host.querySelector('[data-test-time-result]').textContent = `${from}-${to}`;
     },
+  });
+});
+
+function openJournalTimeEditor() {
+  openDayWorkplaceTime({
+    title: 'Рабочее время',
+    from: journalTime.from,
+    to: journalTime.to,
+    onSave: ({ from, to }) => {
+      journalTime = { from, to };
+      host.querySelector('[data-test-journal-time-result]').textContent = `${from}-${to}`;
+      return { ok: true };
+    },
+  });
+}
+
+host.querySelector('[data-test-journal-time]').addEventListener('click', () => {
+  const action = mountModal(document.body, modal(button('Корректировать время', { data: 'data-test-open-journal-time-editor' }), {
+    variant: 'x',
+    title: 'Рабочее время: действия',
+    xRole: 'action',
+  }));
+  action?.querySelector('[data-test-open-journal-time-editor]')?.addEventListener('click', () => {
+    openJournalTimeEditor();
   });
 });
 
