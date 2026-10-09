@@ -6,13 +6,14 @@ function text(value = '') {
 }
 
 function receiptRow(item = {}) {
+  const value = `<strong>${text(item.value)}</strong>`;
   const action = item?.action && typeof item.action === 'object'
-    ? iconButton(item.action.label || '×', {
+    ? `<div class="read-only-sheet__row-actions">${value}${iconButton(item.action.label || '×', {
       className: item.action.className || 'remove-button',
       data: item.action.data || '',
       aria: item.action.aria || 'Действие',
-    })
-    : `<strong>${text(item.value)}</strong>`;
+    })}</div>`
+    : value;
   return `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span>${action}</div>`;
 }
 

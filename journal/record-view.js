@@ -23,6 +23,7 @@ import { journalRecordActionContext } from './record-action-context.js';
 import { getProfile } from '../core/profile/data.js';
 import { openRecordPayment } from './record-payment.js';
 import { openRecordEditFlow } from './record.js';
+import { openRecordProcedureCorrection } from './record-procedure-correction.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 
 function recordOwnerOptions({ settings = false, chatPersonKey = '', chatPersonKeys = [] } = {}) {
@@ -248,8 +249,55 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     startTimer = setTimeout(() => render(), Math.min(delay + 50, 2147483647));
   };
 
-  const openRecordEditSelector = () => {
+  const openRecordEdit = (startAt) => {
     const paid = isPaid();
+    openRecordEditFlow({
+      startAt,
+      date: state.date,
+      workplaceId: state.workplaceId,
+      from: state.from,
+      to: state.to,
+      selectedProcedures: state.procedures,
+      excludeId: record.id,
+      chatPersonKey: state.person?.key || state.person?.id || '',
+      chatPersonKeys: chatKeysForState(state),
+      onApply: (next) => {
+        state = {
+          ...state,
+          date: next.date,
+          workplaceId: next.workplaceId,
+          from: next.from,
+          to: next.to,
+          ...(paid ? {} : { procedures: next.procedures }),
+          attendance: '',
+        };
+        render();
+      },
+    });
+  };
+
+  const openProcedureCorrection = (procedureIndex) => {
+    if (isPaid()) return;
+    openRecordProcedureCorrection({
+      date: dateKey(state.date),
+      workplaceId: state.workplaceId,
+      from: state.from,
+      selectedProcedures: state.procedures,
+      procedureIndex,
+      excludeId: record.id,
+      onApply: ({ procedures, to }) => {
+        state = {
+          ...state,
+          procedures,
+          to: to || state.to,
+          attendance: '',
+        };
+        render();
+      },
+    });
+  };
+
+  const openRecordTransferSelector = () => {
     const layer = mountModal(document.body, modal(
       `<div class="compact-form">${select({
         label: 'Изменить',
@@ -260,7 +308,6 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
           { value: 'workplace', label: 'Пространство' },
           { value: 'date', label: 'Дата' },
           { value: 'time', label: 'Время' },
-          ...(!paid ? [{ value: 'procedure', label: 'Процедура' }] : []),
         ],
         aria: 'Выберите этап переноса записи',
       })}</div>`,
@@ -271,29 +318,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       const startAt = String(input.value || '');
       if (!startAt) return;
       layer.v2Close?.();
-      openRecordEditFlow({
-        startAt,
-        date: state.date,
-        workplaceId: state.workplaceId,
-        from: state.from,
-        to: state.to,
-        selectedProcedures: state.procedures,
-        excludeId: record.id,
-        chatPersonKey: state.person?.key || state.person?.id || '',
-        chatPersonKeys: chatKeysForState(state),
-        onApply: (next) => {
-          state = {
-            ...state,
-            date: next.date,
-            workplaceId: next.workplaceId,
-            from: next.from,
-            to: next.to,
-            ...(paid ? {} : { procedures: next.procedures }),
-            attendance: '',
-          };
-          render();
-        },
-      });
+      openRecordEdit(startAt);
     });
   };
 
@@ -332,6 +357,8 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
   const render = () => {
     scheduleStartRender();
     const paid = isPaid();
+    const currentRecord = getRecords().find((item) => String(item?.id || '') === String(record.id)) || record;
+    const cancelled = currentRecord?.status === 'cancelled';
     const personSource = state.person || findPerson(record) || {};
     const currentPerson = personSource?.key
       ? people().find((person) => String(person.key) === String(personSource.key)) || personSource
@@ -353,9 +380,17 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       discount: Number(discountPercent) > 0 ? `${formatPercent(discountPercent)}%` : '0%',
       total: formatMoney(finance?.planTotal),
       procedures: [
-        ...state.procedures.map((item) => ({
+        ...state.procedures.map((item, index) => ({
           name: item.name || '',
           right: item.cost === '' || item.cost == null ? '' : formatMoney(item.cost),
+          ...(!paid && !cancelled ? {
+            action: {
+              label: '⚙',
+              className: 'record-procedure-settings-button',
+              data: `data-record-view-procedure-edit="${index}"`,
+              aria: `Настройки процедуры ${item.name || ''}`,
+            },
+          } : {}),
         })),
         ...state.products.map((item) => ({
           name: item.name || '',
@@ -395,6 +430,11 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       });
     }
 
+    root.querySelectorAll('[data-record-view-procedure-edit]').forEach((node) => node.addEventListener('click', () => {
+      const index = Number(node.dataset.recordViewProcedureEdit);
+      if (!Number.isInteger(index) || !state.procedures[index]) return;
+      openProcedureCorrection(index);
+    }));
     m.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
       if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
@@ -455,7 +495,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         !cancelled ? {
           id: 'move',
           label: 'Перенос',
-          onSelect: openRecordEditSelector,
+          onSelect: openRecordTransferSelector,
         } : null,
         !cancelled ? {
           id: 'cancel',

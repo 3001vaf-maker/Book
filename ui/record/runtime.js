@@ -240,6 +240,7 @@ export function recordConfirmationMiniCard({
     groups: (Array.isArray(procedures) ? procedures : []).map((item = {}) => [{
       label: item.name || item.title || 'Процедура',
       value: item.right || item.costText || '',
+      ...(item.action ? { action: item.action } : {}),
     }]),
   });
 
