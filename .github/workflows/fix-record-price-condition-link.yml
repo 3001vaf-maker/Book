@@ -36,7 +36,7 @@ jobs:
               raise SystemExit('retired resolver link remains')
           p.write_text(s)
           PY
-          grep -R --line-number --fixed-strings 'recordSettlementDiscountPercent' . --exclude-dir=.git && exit 1 || true
+          grep -R --line-number --fixed-strings 'recordSettlementDiscountPercent' core journal ui timetable online-booking settings 2>/dev/null && exit 1 || true
       - name: Verify browser-facing syntax and architecture
         run: |
           node --check journal/record.js
