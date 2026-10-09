@@ -25,24 +25,24 @@ const cents = calculateSettlement([
     sourceId: 'p1',
     name: 'Процедура',
     price: 100.01,
-    discountMode: 'percent',
-    discountPercent: 33.333,
+    correctionMode: 'percent',
+    correctionPercent: 33.333,
   },
   {
     sourceType: 'product',
     sourceId: 'g1',
     name: 'Товар',
     price: 59.99,
-    discountMode: 'money',
-    discountMoney: 10.005,
+    correctionMode: 'money',
+    correctionMoney: 10.005,
   },
 ]);
 assert.equal(cents.serviceTotal, 160);
-assert.equal(cents.items[0].discountMoney, 33.34);
+assert.equal(cents.items[0].correctionMoney, 33.34);
 assert.equal(cents.items[0].planAmount, 66.67);
-assert.equal(cents.items[1].discountMoney, 10.01);
+assert.equal(cents.items[1].correctionMoney, 10.01);
 assert.equal(cents.items[1].planAmount, 49.98);
-assert.equal(cents.discountTotal, 43.35);
+assert.equal(cents.correctionTotal, 43.35);
 assert.equal(cents.planTotal, 116.65);
 
 // Reload must prefer canonical FinanceSettlement over a transient Record.finance projection.
@@ -51,8 +51,8 @@ const corrected6400 = calculateSettlement([{
   sourceId: 'p-reload',
   name: 'Окрашивание',
   price: 8000,
-  discountMode: 'percent',
-  discountPercent: 20,
+  correctionMode: 'percent',
+  correctionPercent: 20,
 }]);
 const correctedPayment = paymentFixture({
   id: 'payment-reload',
