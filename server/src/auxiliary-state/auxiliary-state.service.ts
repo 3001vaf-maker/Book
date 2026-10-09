@@ -39,7 +39,7 @@ function normalize(value: unknown): AuxiliaryBundle {
     products: (Array.isArray(source.products) ? source.products : []).map((item) => clone(objectValue(item))),
     productHistory: (Array.isArray(source.productHistory) ? source.productHistory : []).map((item) => clone(objectValue(item))),
     cardAppearanceTemplates: (Array.isArray(source.cardAppearanceTemplates) ? source.cardAppearanceTemplates : []).map((item) => clone(objectValue(item))),
-    depositPrograms: (Array.isArray(source.depositPrograms) ? source.depositPrograms : []).map((item) => clone(objectValue(item))),
+    depositPrograms: [],
   };
 }
 
@@ -75,9 +75,19 @@ export class AuxiliaryStateService {
     });
   }
 
+  private async depositPrograms(tenantId: string) {
+    const rows = await this.prisma.loyaltyDepositProgram.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: 'asc' }, { programId: 'asc' }],
+    });
+    return rows.map((row) => clone(objectValue(row.data)));
+  }
+
   async get(tenantId: string) {
     const row = await this.ensureState(tenantId);
-    return normalize(row.data);
+    const current = normalize(row.data);
+    current.depositPrograms = await this.depositPrograms(tenantId);
+    return current;
   }
 
   private investmentRole(value: unknown) {
@@ -201,21 +211,40 @@ export class AuxiliaryStateService {
     }
   }
 
+  private async updateDepositPrograms(tenantId: string, requested: unknown[]) {
+    const before = await this.depositPrograms(tenantId);
+    const next = this.protectDepositPrograms(before, requested);
+    await this.prisma.$transaction(async (tx) => {
+      for (const program of next) {
+        const programId = text(objectValue(program).id);
+        await tx.loyaltyDepositProgram.upsert({
+          where: { tenantId_programId: { tenantId, programId } },
+          create: { tenantId, programId, data: json(program) },
+          update: { data: json(program) },
+        });
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    return this.get(tenantId);
+  }
+
   async updateDataset(tenantId: string, dataset: string, body: unknown) {
     const key = text(dataset);
     if (!DATASETS.has(key)) throw new BadRequestException('Неизвестный набор связанных данных');
-    const row = await this.ensureState(tenantId);
-    const current = normalize(row.data);
     const value = objectValue(body).value;
     const requested = Array.isArray(value) ? clone(value) : [];
+    if (key === 'depositPrograms') return this.updateDepositPrograms(tenantId, requested);
+
+    const row = await this.ensureState(tenantId);
+    const current = normalize(row.data);
     let next = requested;
     if (key === 'investments') next = this.protectInvestmentAgreements(current.investments, requested);
-    if (key === 'depositPrograms') next = this.protectDepositPrograms(current.depositPrograms, requested);
     if (key === 'investments') {
       await this.assertInvestmentMutationAllowed(tenantId, current.investments, next);
     }
     (current as any)[key] = next;
-    await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(current) } });
-    return current;
+    const persisted = { ...current } as any;
+    delete persisted.depositPrograms;
+    await this.prisma.businessAuxiliaryState.update({ where: { tenantId }, data: { data: json(persisted) } });
+    return this.get(tenantId);
   }
 }
