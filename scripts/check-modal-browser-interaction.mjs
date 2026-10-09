@@ -123,7 +123,7 @@ for (const [name, engine, contextOptions] of [
       assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Journal action X missing`);
       assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'action', `${name}: Journal first X role is not action`);
       await tapOrClick(page.locator('[data-test-open-journal-time-editor]'));
-      await page.locator('[name="dayWorkplaceFrom"]').waitFor();
+      await page.locator('[data-day-workplace-time-save]').waitFor();
       assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: action X did not hand off to Journal editor X`);
       assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'editor', `${name}: Journal working-time X role is not editor`);
     };
