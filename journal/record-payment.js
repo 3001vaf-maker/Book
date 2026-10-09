@@ -33,6 +33,7 @@ import {
   saveSettlementSnapshot,
 } from '../core/finance/index.js';
 import { listPersonDeposits } from '../core/loyalty/deposit/data.js';
+import { loadPersonalAccount } from '../core/loyalty/personal-account/data.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../core/time/index.js';
 import { getAllPeople } from '../core/people/data.js';
@@ -254,11 +255,33 @@ async function depositsForRecord(record, payment = null) {
   }));
 }
 
+async function personalAccountForRecord(record, settlement, due) {
+  const person = personForRecord(record);
+  const key = String(person?.key || person?.id || '').trim();
+  if (!key) return null;
+  const account = await loadPersonalAccount(key).catch(() => null);
+  if (!account) return null;
+  const balance = Math.max(0, Number(account?.balance || 0));
+  const spendLimitPercent = Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0));
+  const alreadyUsed = (Array.isArray(account?.movements) ? account.movements : [])
+    .filter((item) => String(item?.kind || '') === 'payment'
+      && String(item?.direction || '').toUpperCase() === 'OUT'
+      && String(item?.sourceType || '') === 'record'
+      && String(item?.sourceId || '') === String(record?.id || ''))
+    .reduce((sum, item) => sum + Math.max(0, Number(item?.amount || 0)), 0);
+  const limit = Math.max(0, Number(settlement?.planTotal || 0)) * spendLimitPercent / 100;
+  const availableAmount = Math.min(balance, Math.max(0, limit - alreadyUsed), Math.max(0, Number(due || 0)));
+  return { ...account, personKey: key, balance, spendLimitPercent, availableAmount };
+}
+
 async function openPaymentAllocationLayer(parentLayer, record, settlement, onCompleted) {
   const current = getRecord(record?.id) || record;
   const state = paymentStateForRecord(current);
   const total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
-  const deposits = await depositsForRecord(current);
+  const [deposits, personalAccount] = await Promise.all([
+    depositsForRecord(current),
+    personalAccountForRecord(current, settlement, total),
+  ]);
   const layer = mountV2ZLayer(parentLayer, v2ZLayer(
     `${blankPaymentContext(current)}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
     { className: 'record-payment-allocation-z' },
@@ -270,7 +293,7 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
     ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
     <div class="form-grid">
       ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: true })}
-      ${paymentMethods({ wallets: getWallets(), deposits, total, showAction: false, showTotal: false })}
+      ${paymentMethods({ wallets: getWallets(), deposits, personalAccount, total, showAction: false, showTotal: false })}
     </div>`;
   initDatePickers(host);
 
@@ -289,6 +312,8 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
             settlement,
             allocations: allocationState.allocations,
             depositAllocations: allocationState.depositAllocations,
+            personalAccountAmount: allocationState.personalAccountAmount,
+            finalizeDebt: allocationState.remaining > 0.009,
             maxAmount: total,
             serviceAmount: allocationState.applied,
             tips: allocationState.tips,
