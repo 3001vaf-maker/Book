@@ -1,0 +1,86 @@
+name: Apply contact browser regression contract
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/apply-contact-browser-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - name: Update browser regression contract
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('tests/account-shell-runtime-browser.html')
+          source = path.read_text()
+          start = source.index("mark('linked-investments');")
+          end = source.index("\nawait edgeOpen(1);", start)
+          replacement = """mark('linked-investments-overview');
+ok(!root.querySelector('[data-account-investment=\"tenant-invest:investment-accepted\"]'), 'Accepted linked investment must not appear in Overview');
+ok(!root.querySelector('[data-account-investment-proposal]'), 'Pending investment proposal must not appear in Overview');
+
+await edgeOpen(1);
+await selectRoot('contacts',11);
+const relationship = root.querySelector('[data-global-relationship=\"tenant-invest\"]');
+ok(Boolean(relationship), 'Professional contact card missing');
+relationship?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(140);
+ok(state.accountTab === 'contact-detail', 'Professional contact profile did not open');
+const contactZ = root.querySelector('[data-v2-z-layer].account-contact-detail-z');
+ok(Boolean(contactZ), 'Professional contact profile must open as stacked Z');
+
+mark('linked-investments-contact');
+const acceptedInvestmentCard = contactZ?.querySelector('[data-account-investment=\"tenant-invest:investment-accepted\"]');
+ok(Boolean(acceptedInvestmentCard?.classList.contains('entity-visual-card')), 'Accepted linked investment must appear as a full card in professional contact profile');
+const proposal = contactZ?.querySelector('[data-account-investment-proposal=\"tenant-invest:investment-pending\"]');
+ok(Boolean(proposal?.classList.contains('entity-visual-card')), 'Pending investment proposal must appear as a full card in professional contact profile');
+acceptedInvestmentCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(90);
+let investmentZ = root.querySelector('[data-v2-z-layer].account-investment-z');
+ok(Boolean(investmentZ), 'Linked investor card must open a real stacked Z');
+ok(Boolean(root.querySelector('[data-account-investment-chat]')), 'Linked investor Z must expose shared D chat');
+ok(investmentZ?.textContent.includes('ROI'), 'Investor Z must expose ROI');
+ok(investmentZ?.textContent.includes('История'), 'Linked investor Z must expose investment history');
+ok(investmentZ?.textContent.includes('Вложение'), 'Linked investor history must mirror project contribution');
+ok(investmentZ?.textContent.includes('Доход'), 'Linked investor history must mirror paid income');
+ok(investmentZ?.textContent.includes('Изменение оценки'), 'Linked investor history must include non-cash valuation');
+investmentZ?.v2Close?.();
+await wait(90);
+proposal?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+const proposalModal = document.querySelector('[data-modal][data-v2-layer-kind=\"bottom\"]');
+ok(Boolean(proposalModal), 'Investment proposal must open as shared bottom action modal');
+ok(Boolean(proposalModal?.querySelector('[data-account-investment-accept]')), 'Investment proposal Accept action missing');
+ok(Boolean(proposalModal?.querySelector('[data-account-investment-decline]')), 'Investment proposal Decline action missing');
+proposalModal?.v2Close?.();
+await wait(50);
+contactZ?.v2Close?.();
+await wait(100);
+"""
+          source = source[:start] + replacement + source[end:]
+          # The replacement already performs the first contacts navigation.
+          source = source.replace("\nawait edgeOpen(1);\nawait selectRoot('profile',11);", "\nawait edgeOpen(2);\nawait selectRoot('profile',12);", 1)
+          source = source.replace("\nawait edgeOpen(2);\nawait selectRoot('contacts',12);", "\nawait edgeOpen(3);\nawait selectRoot('contacts',13);", 1)
+          source = source.replace("\nawait edgeOpen(3);\nawait selectRoot('history',13);", "\nawait edgeOpen(4);\nawait selectRoot('history',14);", 1)
+          source = source.replace("\nawait edgeOpen(4);\nawait selectRoot('home',14);", "\nawait edgeOpen(5);\nawait selectRoot('home',15);", 1)
+          path.write_text(source)
+          PY
+          git diff --check
+      - name: Commit browser contract
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/account-shell-runtime-browser.html
+          git commit -m "Update professional contact browser regression"
+          git push origin HEAD:staging
