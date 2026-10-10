@@ -7,6 +7,7 @@ import {
 import {
   button,
   emptyState,
+  escapeHtml,
   field,
   infoUI,
   miniCard,
@@ -239,10 +240,10 @@ function renderEmailZ2(layer, state = {}) {
     workspaceHeaderContext({ title: 'Email' }),
     emailMiniCard(state),
     `<div class="form-grid">
-      <div class="muted">Провайдер: ${provider}</div>
-      <div class="muted">Отправитель: ${state?.fromEmail || 'не настроен'}</div>
-      <div class="muted">SMTP: ${state?.transportReachable ? 'доступен' : 'недоступен'}</div>
-      ${reason ? `<div class="muted">Причина: ${reason}</div>` : ''}
+      <div class="muted">${escapeHtml(`Провайдер: ${provider}`)}</div>
+      <div class="muted">${escapeHtml(`Отправитель: ${state?.fromEmail || 'не настроен'}`)}</div>
+      <div class="muted">${escapeHtml(`SMTP: ${state?.transportReachable ? 'доступен' : 'недоступен'}`)}</div>
+      ${reason ? `<div class="muted">${escapeHtml(`Причина: ${reason}`)}</div>` : ''}
     </div>`,
   ]);
   window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
