@@ -1,5 +1,6 @@
 import {
   bindAccountTelegramEntry,
+  clearAccount,
   getAccountToken,
   resolveAccountTelegramEntry,
 } from '../core/account/index.js';
@@ -17,22 +18,35 @@ export async function startAccountRuntime({ tenantId = '', telegramEntry = '' } 
   if (!tenant) return () => {};
 
   let telegramAttempted = !entry;
+  let telegramReadyForBind = false;
+  let telegramResolving = false;
   let disposed = false;
 
-  if (entry && !getAccountToken(tenant)) {
+  async function resolveTelegramEntry() {
+    if (disposed || telegramAttempted || telegramReadyForBind || telegramResolving || !entry) return;
+    telegramResolving = true;
     try {
       const resolved = await resolveAccountTelegramEntry(tenant, entry);
       if (resolved?.exists && resolved?.accessToken) {
         telegramAttempted = true;
         removeTelegramEntryFromUrl();
+        return;
       }
+
+      // An unknown Telegram must never inherit whichever Account happened to
+      // be left authenticated in this browser. Force explicit identity first.
+      clearAccount(tenant);
+      telegramReadyForBind = true;
     } catch {
-      // Keep the entry token for the normal login/registration path.
+      // Do not bind an unresolved Telegram ticket to an arbitrary existing
+      // browser session. Resolution will retry while the ticket remains valid.
+    } finally {
+      telegramResolving = false;
     }
   }
 
   async function bindTelegramWhenAuthenticated() {
-    if (disposed || telegramAttempted || !getAccountToken(tenant)) return;
+    if (disposed || telegramAttempted || !telegramReadyForBind || !getAccountToken(tenant)) return;
     try {
       await bindAccountTelegramEntry(tenant, entry);
       telegramAttempted = true;
@@ -42,7 +56,11 @@ export async function startAccountRuntime({ tenantId = '', telegramEntry = '' } 
     }
   }
 
-  const interval = window.setInterval(() => void bindTelegramWhenAuthenticated(), 1500);
+  await resolveTelegramEntry();
+  const interval = window.setInterval(() => {
+    void resolveTelegramEntry();
+    void bindTelegramWhenAuthenticated();
+  }, 1500);
   void bindTelegramWhenAuthenticated();
 
   return () => {

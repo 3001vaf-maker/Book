@@ -65,7 +65,11 @@ assert.match(communication, /AccountContactType\.TELEGRAM/);
 assert.match(communication, /Этот Telegram уже зарегистрирован в другом аккаунте/);
 
 assert.match(runtime, /resolveAccountTelegramEntry/);
-assert.match(runtime, /if \(entry && !getAccountToken\(tenant\)\)/);
+assert.match(runtime, /clearAccount,/);
+assert.match(runtime, /let telegramReadyForBind = false;/);
+assert.match(runtime, /clearAccount\(tenant\);/, 'Unknown Telegram entry must not inherit whichever Account is already authenticated in the browser');
+assert.match(runtime, /!telegramReadyForBind \|\| !getAccountToken\(tenant\)/, 'Telegram may bind only after the entry has been resolved and the user explicitly authenticates');
+assert.doesNotMatch(runtime, /if \(entry && !getAccountToken\(tenant\)\)/, 'Telegram entry resolution must not be skipped just because a stale Account token exists');
 
 assert.match(controller, /@Get\('account\/me'\)/, 'Global client app must expose a tenant-free Account route');
 assert.match(controller, /@Get\('account\/relationships'\)/, 'Global client app must expose Account relationships');
