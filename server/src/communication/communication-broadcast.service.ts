@@ -160,7 +160,7 @@ export class CommunicationBroadcastService {
   }
 
   async deleteGroup(tenantId: string, idValue: unknown) {
-    const id = text(idValue); if (!id) throw new BadRequestException('Не указан шаблон');
+    const id = text(idValue); if (!id) throw new BadRequestException('Не указана группа');
     const deleted = await this.prisma.$executeRaw`DELETE FROM "CommunicationGroup" WHERE "id" = ${id} AND "tenantId" = ${tenantId}`;
     if (!deleted) throw new NotFoundException('Группа не найдена');
     return { deleted: true, id };
