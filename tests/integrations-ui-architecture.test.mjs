@@ -5,6 +5,7 @@ const integrations = readFileSync(new URL('../settings/integrations/integrations
 const telegramCore = readFileSync(new URL('../core/integrations/telegram.js', import.meta.url), 'utf8');
 const emailCore = readFileSync(new URL('../core/integrations/email.js', import.meta.url), 'utf8');
 const inputs = readFileSync(new URL('../ui/inputs/index.js', import.meta.url), 'utf8');
+const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const telegramService = readFileSync(new URL('../server/src/communication/telegram-bot.service.ts', import.meta.url), 'utf8');
 const transactionalEmail = readFileSync(new URL('../server/src/transactional-email/transactional-email.service.ts', import.meta.url), 'utf8');
@@ -14,17 +15,28 @@ assert.match(integrations, /workspaceHeaderContext\(\{ title: 'Интеграц�
 assert.match(integrations, /miniCardRail\(\[/);
 assert.match(integrations, /telegramMiniCard\(telegramState/);
 assert.match(integrations, /emailMiniCard\(emailState/);
-assert.match(integrations, /mountV2ZLayer/);
-assert.match(integrations, /v2ZLayer/);
-assert.match(integrations, /title: 'Telegram'/);
-assert.match(integrations, /title: 'Email'/);
-assert.match(integrations, /label: 'Подключить'/);
-assert.match(integrations, /data-v2-primary-visible="false"/);
-assert.match(integrations, /label: 'Отключить'/);
-assert.match(integrations, /data-v2-primary-variant="danger"/);
-assert.match(integrations, /Восстановить webhook/);
+
+assert.match(integrations, /modal\(telegramXContent\(resolved\)/);
+assert.match(integrations, /variant: 'x'/);
+assert.match(integrations, /xRole: 'editor'/);
+assert.match(integrations, /infoUI\('', \{/);
+assert.match(integrations, /actionOnly: true/);
+assert.match(integrations, /openDocumentViewer\(\{ title: info\.title, content: info\.content \}\)/);
+assert.match(integrations, /@BotFather/);
+assert.match(integrations, /\/newbot/);
+assert.match(integrations, /Токен Telegram-бота/);
+assert.match(integrations, /button\(connected \? 'Отключить' : 'Подключить'/);
+assert.match(integrations, /label: 'Telegram-бот'/);
+assert.match(integrations, /disabled: true/);
+assert.match(integrations, /modal-title modal-title--action/);
+assert.match(modalCss, /\.modal-title--action\{display:flex;align-items:center;justify-content:space-between/);
+
+assert.doesNotMatch(integrations, /repairTelegramBotConnection|Восстановить webhook|telegramDiagnostics/);
+assert.doesNotMatch(integrations, /Ключ шифрования:|API для webhook:|Очередь Telegram:|Webhook: не работает|fetch failed/);
+assert.doesNotMatch(integrations, /integration-telegram-layer/);
+assert.doesNotMatch(integrations, /workspaceHeaderContext\(\{ title: 'Telegram'/);
+assert.match(integrations, /integration-email-layer/);
 assert.match(integrations, /SMTP:/);
-assert.match(integrations, /disabled: connected/);
 assert.doesNotMatch(integrations, /Заменить токен|Новый токен бота|pageHeader|folderList|actionBlock/);
 
 assert.match(telegramCore, /integrations\/telegram\/repair/);

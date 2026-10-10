@@ -68,7 +68,7 @@
   };
   let runtimeTelegramConnected = false;
   const runtimeTelegramState = () => runtimeTelegramConnected
-    ? { connected:true, botUsername:'@runtime_bot', status:'active', webhookActive:true }
+    ? { connected:true, botUsername:'@runtime_bot', status:'active', webhookActive:true, configuration:{accountAppUrlConfigured:true} }
     : { connected:false };
   const runtimeProduct = {
     id:'runtime-service-product',
@@ -1253,32 +1253,60 @@ await tapAndOpen(fDeck(), fCard('settings'), 30, 'settings-integrations-root');
 await tapAndOpen(eDeck(), eCard('integrations'), 31, 'settings-integrations');
 await wait(140);
 const integrationsSurface = shell()?.querySelector('[data-v2-workspace-surface]');
-ok(Boolean(integrationsSurface?.querySelector('[data-integration-open="telegram"].mini-card')), 'Integrations Z1 must show Telegram as a miniCard');
+const telegramCard = integrationsSurface?.querySelector('[data-integration-open="telegram"].mini-card');
+ok(Boolean(telegramCard), 'Integrations Z1 must show Telegram as a miniCard');
+ok(telegramCard?.textContent.includes('Не подключён'), 'Disconnected Telegram miniCard must show status');
 ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Integrations Z1 must not expose Header C');
-integrationsSurface?.querySelector('[data-integration-open="telegram"]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+telegramCard?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(100);
-let telegramZ2 = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(Boolean(telegramZ2), 'Telegram must open as Z2');
-let telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
+ok(!shell()?.querySelector('[data-v2-z-layer]'), 'Telegram miniCard must not create Z2');
+let telegramX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+ok(Boolean(telegramX?.querySelector('.modal--form-sheet')), 'Telegram must open as shared X editor');
+ok(Boolean(telegramX?.querySelector('[data-telegram-help] [data-info-trigger]')), 'Telegram X must expose shared I information control');
+let telegramToken = telegramX?.querySelector('[name="telegramBotToken"]');
+let telegramAction = telegramX?.querySelector('[data-telegram-action]');
 ok(Boolean(telegramToken) && !telegramToken.disabled, 'Disconnected Telegram token field must be editable');
-ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Telegram C must be absent before a token is entered');
+ok(telegramAction?.textContent?.trim() === 'Подключить', 'Disconnected Telegram X action must be Connect');
+ok(Boolean(telegramAction?.disabled), 'Telegram Connect must stay disabled until token input');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Telegram X must not use Header C');
+
+telegramX?.querySelector('[data-telegram-help] [data-info-trigger]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+const telegramGuide = document.querySelector('[data-modal][data-v2-layer-kind="technical"]');
+ok(Boolean(telegramGuide), 'Telegram I must open the shared technical document modal');
+ok(telegramGuide?.textContent.includes('@BotFather') && telegramGuide?.textContent.includes('/newbot'),
+  'Telegram setup guide must contain BotFather steps');
+telegramGuide?.v2Close?.();
+await wait(40);
+
 telegramToken.value = '123456:abcdefghijklmnopqrstuvwxyz';
 telegramToken.dispatchEvent(new Event('input',{bubbles:true}));
 await wait(40);
-ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent?.trim() === 'Подключить', 'Telegram C must become Connect after token input');
-shell()?.querySelector('[data-v2-workspace-primary]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(120);
-telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
-ok(Boolean(telegramToken?.disabled), 'Connected Telegram token field must be disabled');
-const disconnectC = shell()?.querySelector('[data-v2-workspace-primary]');
-ok(disconnectC?.textContent?.trim() === 'Отключить', 'Connected Telegram C must become Disconnect');
-ok(disconnectC?.classList.contains('v2-header__control--danger'), 'Telegram Disconnect C must use shared danger state');
-disconnectC?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(120);
-telegramToken = telegramZ2?.querySelector('[name="telegramBotToken"]');
-ok(Boolean(telegramToken) && !telegramToken.disabled && telegramToken.value === '', 'After disconnect token field must be empty and editable');
-ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'After disconnect Header C must disappear until a new token is entered');
-telegramZ2?.v2Close?.();
+ok(!telegramAction?.disabled, 'Telegram Connect must become active after token input');
+telegramX?.querySelector('[data-telegram-integration-form]')
+  ?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(140);
+
+telegramX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+const connectedBot = telegramX?.querySelector('[name="telegramBot"]');
+telegramAction = telegramX?.querySelector('[data-telegram-action]');
+ok(Boolean(connectedBot?.disabled) && connectedBot?.value === '@runtime_bot', 'Connected Telegram X must show disabled bot field');
+ok(telegramAction?.textContent?.trim() === 'Отключить', 'Connected Telegram X action must be Disconnect');
+ok(telegramAction?.classList.contains('ui-button--danger'), 'Telegram Disconnect must use shared danger button');
+ok(!telegramX?.textContent.includes('Webhook') && !telegramX?.textContent.includes('Ключ шифрования') && !telegramX?.textContent.includes('Очередь Telegram'),
+  'Telegram X must not expose technical diagnostics');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'), 'Connected Telegram must still not use Header C');
+
+telegramX?.querySelector('[data-telegram-integration-form]')
+  ?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+await wait(140);
+telegramX = document.querySelector('[data-modal][data-v2-layer-kind="bottom"]');
+telegramToken = telegramX?.querySelector('[name="telegramBotToken"]');
+telegramAction = telegramX?.querySelector('[data-telegram-action]');
+ok(Boolean(telegramToken) && !telegramToken.disabled && telegramToken.value === '', 'After disconnect Telegram token field must be empty and editable');
+ok(telegramAction?.textContent?.trim() === 'Подключить', 'After disconnect Telegram X action must return to Connect');
+telegramX?.v2Close?.();
 await wait(60);
 
 mark('tags-mini-card-editor');
