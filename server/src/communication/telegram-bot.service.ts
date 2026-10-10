@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
@@ -32,6 +33,7 @@ function telegramUsername(value: unknown) { const clean = text(value).replace(/^
 
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TelegramBotService.name);
   private pollTimer: NodeJS.Timeout | null = null;
   private readonly dispatching = new Set<string>();
 
@@ -44,10 +46,26 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const interval = Math.max(1000, Number(process.env.TELEGRAM_DELIVERY_POLL_MS || 3000));
-    this.pollTimer = setInterval(() => void this.dispatchAllTenants(), interval);
+    this.pollTimer = setInterval(() => this.dispatchAllTenantsInBackground(), interval);
     this.pollTimer.unref?.();
   }
   onModuleDestroy() { if (this.pollTimer) clearInterval(this.pollTimer); this.pollTimer = null; }
+
+  private dispatchAllTenantsInBackground() {
+    void this.dispatchAllTenants().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Telegram delivery polling failed: ${message}`, stack);
+    });
+  }
+
+  private dispatchTenantInBackground(tenantId: string) {
+    void this.dispatchTenant(tenantId).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Telegram delivery dispatch failed for tenant ${tenantId}: ${message}`, stack);
+    });
+  }
 
   private encryptionKey() {
     const secret = text(process.env.TELEGRAM_CREDENTIALS_KEY);
@@ -111,7 +129,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       }
       throw new ConflictException('Telegram-бот уже подключён. Сначала отключите его.');
     }
-    void this.dispatchTenant(tenantId);
+    this.dispatchTenantInBackground(tenantId);
     return this.getConnection(tenantId);
   }
 

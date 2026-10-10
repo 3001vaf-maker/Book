@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 const emailChannel = fs.readFileSync('server/src/communication/email-channel.service.ts', 'utf8');
+const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const notification = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const broadcast = fs.readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
 const compose = fs.readFileSync('chat/chat.js', 'utf8');
@@ -24,6 +25,17 @@ assert.match(emailChannel, /pendingEmailDeliveries/);
 assert.match(emailChannel, /markEmailSent/);
 assert.match(emailChannel, /markEmailFailed/);
 assert.match(emailChannel, /recordMessage[\s\S]*channel: 'EMAIL'/);
+assert.match(emailChannel, /private dispatchPendingInBackground\(\)/);
+assert.match(emailChannel, /dispatchPendingNotifications\(\)\.catch/);
+assert.doesNotMatch(emailChannel, /setInterval\(\(\) => void this\.dispatchPendingNotifications\(\)/);
+assert.doesNotMatch(emailChannel, /void this\.dispatchPendingNotifications\(\);/);
+
+assert.match(telegramBot, /private dispatchAllTenantsInBackground\(\)/);
+assert.match(telegramBot, /dispatchAllTenants\(\)\.catch/);
+assert.match(telegramBot, /private dispatchTenantInBackground\(tenantId: string\)/);
+assert.match(telegramBot, /dispatchTenant\(tenantId\)\.catch/);
+assert.doesNotMatch(telegramBot, /setInterval\(\(\) => void this\.dispatchAllTenants\(\)/);
+assert.doesNotMatch(telegramBot, /void this\.dispatchTenant\(tenantId\);/);
 
 assert.match(notification, /ACTIVE_EXTERNAL_CHANNELS = new Set\(\['TELEGRAM', 'EMAIL'\]\)/);
 assert.match(notification, /pendingEmailDeliveries/);
@@ -54,4 +66,4 @@ assert.match(envExample, /TRANSACTIONAL_EMAIL_FROM_EMAIL=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
 assert.doesNotMatch(envExample, /YANDEX_SMTP/);
 
-console.log('Email channel contract tests passed');
+console.log('Email and background delivery contract tests passed');

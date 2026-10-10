@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
@@ -22,6 +22,7 @@ function escapeHtml(value: string) {
 
 @Injectable()
 export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(EmailChannelService.name);
   private pollTimer: NodeJS.Timeout | null = null;
   private dispatching = false;
 
@@ -35,14 +36,22 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const interval = Math.max(1000, Number(process.env.EMAIL_DELIVERY_POLL_MS || 3000));
-    this.pollTimer = setInterval(() => void this.dispatchPendingNotifications(), interval);
+    this.pollTimer = setInterval(() => this.dispatchPendingInBackground(), interval);
     this.pollTimer.unref?.();
-    void this.dispatchPendingNotifications();
+    this.dispatchPendingInBackground();
   }
 
   onModuleDestroy() {
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = null;
+  }
+
+  private dispatchPendingInBackground() {
+    void this.dispatchPendingNotifications().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Email delivery polling failed: ${message}`, stack);
+    });
   }
 
   async sendMessage(
