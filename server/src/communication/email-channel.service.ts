@@ -70,9 +70,6 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
     const identity = await this.communications.emailIdentity(tenantId, input || {});
     if (!identity) throw new BadRequestException('Email у человека не указан');
 
-    if (!(await this.consentPolicy.hasActivePdnConsentForContact(tenantId, 'EMAIL', identity.externalUserId))) {
-      throw new BadRequestException('Нет действующего согласия на обработку ПДН');
-    }
     if (
       purpose === 'MARKETING'
       && !(await this.consentPolicy.canSendMarketing(tenantId, 'EMAIL', identity.externalUserId))
