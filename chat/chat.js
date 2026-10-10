@@ -1,4 +1,4 @@
-import { getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
+import { getCommunicationChannels, getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
 import {
   deleteBroadcastTemplate,
   deleteCommunicationGroup,
@@ -12,6 +12,7 @@ import { findPeopleByPhone, getAllPeople } from '../core/people/data.js';
 import {
   button,
   checkList,
+  clearV2ZHeaderRows,
   collectCheckList,
   emptyState,
   escapeHtml,
@@ -29,15 +30,24 @@ import {
   workspaceHeaderContext,
 } from '../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer } from '../ui/chat/index.js';
-import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
+import { mountChatChannelHeader, mountChatList, mountChatThread } from '../core/chat/runtime.js';
 import { settingsPanel } from '../ui/settings/index.js';
 import { formView } from '../ui/forms/index.js';
 
-const DIRECT_CHANNEL_OPTIONS = Object.freeze([
-  { value: 'PUSH', label: 'Push' },
-  { value: 'TELEGRAM', label: 'Telegram' },
-  { value: 'EMAIL', label: 'Email' },
-]);
+const DIRECT_CHANNEL_LABELS = Object.freeze({
+  PUSH: 'Push',
+  TELEGRAM: 'Telegram',
+  EMAIL: 'Email',
+});
+
+function directChannelOptions(channels = []) {
+  const available = new Set(['PUSH', ...(Array.isArray(channels) ? channels : [])]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter((value) => DIRECT_CHANNEL_LABELS[value]));
+  return ['PUSH', 'TELEGRAM', 'EMAIL']
+    .filter((value) => available.has(value))
+    .map((value) => ({ value, label: DIRECT_CHANNEL_LABELS[value] }));
+}
 
 function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
@@ -84,6 +94,7 @@ function renderChatSurface(root, {
   d = null,
   body = '',
 } = {}) {
+  clearV2ZHeaderRows(root);
   root.classList.add('v2-workspace-surface--chat');
   root.innerHTML = `${workspaceHeaderContext({
     title,
@@ -162,6 +173,12 @@ async function renderCompose(root, state, recipient) {
   state.view = 'compose';
   state.recipient = recipient;
   const allowsAttachments = recipient.mode === 'one';
+  const directPerson = allowsAttachments ? personByKey(recipient.personKeys?.[0]) : null;
+  if (allowsAttachments && !directPerson) throw new Error('Человек не найден');
+  const channelState = directPerson
+    ? await getCommunicationChannels({ phone: phoneOf(directPerson), uei: directPerson.uei || '' }).catch(() => ({ channels: ['PUSH'] }))
+    : null;
+  const directOptions = directPerson ? directChannelOptions(channelState?.channels) : [];
   const broadcastChannel = recipient.mode === 'one'
     ? ''
     : select({
@@ -185,11 +202,12 @@ async function renderCompose(root, state, recipient) {
         placeholder: 'Написать сообщение...',
         attachments: allowsAttachments,
         attachmentTrigger: allowsAttachments ? 'external' : 'composer',
-        channelOptions: recipient.mode === 'one' ? DIRECT_CHANNEL_OPTIONS : [],
-        channel: recipient.mode === 'one' ? 'PUSH' : '',
       })}
     `,
   });
+  const selectedDirectChannel = directPerson
+    ? mountChatChannelHeader(root, { channelOptions: directOptions, channel: 'PUSH' })
+    : () => '';
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => openProfileChatSettings(root, state));
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
   const form = root.querySelector('[data-message-composer]');
@@ -206,13 +224,10 @@ async function renderCompose(root, state, recipient) {
     if (submit) submit.disabled = true;
     try {
       if (recipient.mode === 'one') {
-        const person = personByKey(recipient.personKeys?.[0]);
-        if (!person) throw new Error('Человек не найден');
-        const data = new FormData(form);
         await sendCommunicationMessage({
-          channel: String(data.get('messageChannel') || 'PUSH'),
-          phone: phoneOf(person),
-          uei: person.uei || '',
+          channel: selectedDirectChannel() || 'PUSH',
+          phone: phoneOf(directPerson),
+          uei: directPerson.uei || '',
           body,
           attachments,
         });
@@ -398,7 +413,13 @@ async function openThread(root, state, thread) {
   });
 
   try {
-    const messages = await getCommunicationThread({ phone, uei });
+    const [messages, channelState] = await Promise.all([
+      getCommunicationThread({ phone, uei }),
+      getCommunicationChannels({ phone, uei }).catch(() => ({ channels: ['PUSH'] })),
+    ]);
+    const channelOptions = directChannelOptions(channelState?.channels);
+    const previousChannel = lastDirectChannel(messages);
+    const channel = channelOptions.some((option) => option.value === previousChannel) ? previousChannel : 'PUSH';
     mountChatThread(root, {
       title,
       messages,
@@ -406,10 +427,10 @@ async function openThread(root, state, thread) {
       surface: (surface) => renderChatSurface(root, surface),
       onSettings: () => openProfileChatSettings(root, state),
       onContacts: () => openProfessionalContacts(root, state),
-      channelOptions: DIRECT_CHANNEL_OPTIONS,
-      channel: lastDirectChannel(messages),
-      onSend: async ({ body, attachments, channel }) => {
-        await sendCommunicationMessage({ channel, phone, uei, body, attachments });
+      channelOptions,
+      channel,
+      onSend: async ({ body, attachments, channel: selectedChannel }) => {
+        await sendCommunicationMessage({ channel: selectedChannel, phone, uei, body, attachments });
         await openThread(root, state, thread);
       },
     });
