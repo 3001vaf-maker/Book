@@ -1,4 +1,5 @@
 import { button } from '../buttons/index.js';
+import { select } from '../selectors/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { openNotice } from '../modals/index.js';
 
@@ -99,8 +100,29 @@ export function initMessageComposer(root = document) {
   });
 }
 
-export function messageComposer({ placeholder = 'Написать сообщение...', data = 'data-message-composer', sendData = 'data-message-send', attachments = false, attachmentTrigger = 'composer' } = {}) {
+export function messageComposer({
+  placeholder = 'Написать сообщение...',
+  data = 'data-message-composer',
+  sendData = 'data-message-send',
+  attachments = false,
+  attachmentTrigger = 'composer',
+  channelOptions = [],
+  channel = '',
+} = {}) {
   const externalAttachmentTrigger = attachments && attachmentTrigger === 'external';
-  const composerClass = attachments && !externalAttachmentTrigger ? 'message-composer message-composer--with-attachments' : 'message-composer message-composer--plain';
-  return `<form class="${composerClass}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach${externalAttachmentTrigger ? ' sr-only' : ''}" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+  const channels = Array.isArray(channelOptions) ? channelOptions.filter((option) => option?.value) : [];
+  const classes = [
+    'message-composer',
+    attachments && !externalAttachmentTrigger ? 'message-composer--with-attachments' : 'message-composer--plain',
+    channels.length ? 'message-composer--with-channel' : '',
+  ].filter(Boolean).join(' ');
+  const channelMarkup = channels.length ? select({
+    label: 'Канал',
+    name: 'messageChannel',
+    value: channel || String(channels[0]?.value || ''),
+    options: channels,
+    aria: 'Канал отправки сообщения',
+    className: 'message-composer__channel',
+  }) : '';
+  return `<form class="${classes}" ${data}>${channelMarkup}${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach${externalAttachmentTrigger ? ' sr-only' : ''}" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }

@@ -33,6 +33,12 @@ import { mountChatList, mountChatThread } from '../core/chat/runtime.js';
 import { settingsPanel } from '../ui/settings/index.js';
 import { formView } from '../ui/forms/index.js';
 
+const DIRECT_CHANNEL_OPTIONS = Object.freeze([
+  { value: 'PUSH', label: 'Push' },
+  { value: 'TELEGRAM', label: 'Telegram' },
+  { value: 'EMAIL', label: 'Email' },
+]);
+
 function personNameByPhone(phone, uei = '') {
   const people = findPeopleByPhone(phone);
   const person = people.find((item) => !uei || String(item.uei || '') === String(uei)) || people[0];
@@ -52,6 +58,23 @@ function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function directChannelValue(value) {
+  const channel = String(value || '').trim().toUpperCase();
+  if (channel === 'IN_APP' || channel === 'PUSH') return 'PUSH';
+  if (channel === 'TELEGRAM' || channel === 'EMAIL') return channel;
+  return '';
+}
+
+function lastDirectChannel(messages = []) {
+  const values = Array.isArray(messages) ? messages : [];
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if (String(values[index]?.direction || '').toLowerCase() !== 'outbound') continue;
+    const channel = directChannelValue(values[index]?.channel);
+    if (channel) return channel;
+  }
+  return 'PUSH';
 }
 
 function renderChatSurface(root, {
@@ -158,7 +181,13 @@ async function renderCompose(root, state, recipient) {
       <div class="action-block"><strong>Кому: ${recipientLabel(recipient)}</strong></div>
       ${broadcastChannel}
       ${button('Выбрать шаблон', { variant: 'secondary', data: 'data-profile-template-choose' })}
-      ${messageComposer({ placeholder: 'Написать сообщение...', attachments: allowsAttachments, attachmentTrigger: allowsAttachments ? 'external' : 'composer' })}
+      ${messageComposer({
+        placeholder: 'Написать сообщение...',
+        attachments: allowsAttachments,
+        attachmentTrigger: allowsAttachments ? 'external' : 'composer',
+        channelOptions: recipient.mode === 'one' ? DIRECT_CHANNEL_OPTIONS : [],
+        channel: recipient.mode === 'one' ? 'PUSH' : '',
+      })}
     `,
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => openProfileChatSettings(root, state));
@@ -179,7 +208,14 @@ async function renderCompose(root, state, recipient) {
       if (recipient.mode === 'one') {
         const person = personByKey(recipient.personKeys?.[0]);
         if (!person) throw new Error('Человек не найден');
-        await sendCommunicationMessage({ phone: phoneOf(person), uei: person.uei || '', body, attachments });
+        const data = new FormData(form);
+        await sendCommunicationMessage({
+          channel: String(data.get('messageChannel') || 'PUSH'),
+          phone: phoneOf(person),
+          uei: person.uei || '',
+          body,
+          attachments,
+        });
       } else {
         await sendBroadcast({
           channel: String(root.querySelector('[name="broadcastChannel"]')?.value || 'TELEGRAM'),
@@ -191,11 +227,11 @@ async function renderCompose(root, state, recipient) {
         });
       }
       await renderThreads(root, state);
-    } catch {
+    } catch (error) {
       if (submit) submit.disabled = false;
       openNotice({
         title: 'Сообщение не отправлено',
-        message: 'Не удалось отправить сообщение',
+        message: error instanceof Error && error.message ? error.message : 'Не удалось отправить сообщение',
         action: 'Закрыть',
         variant: 'technical',
       });
@@ -370,12 +406,14 @@ async function openThread(root, state, thread) {
       surface: (surface) => renderChatSurface(root, surface),
       onSettings: () => openProfileChatSettings(root, state),
       onContacts: () => openProfessionalContacts(root, state),
-      onSend: async ({ body, attachments }) => {
-        await sendCommunicationMessage({ phone, uei, body, attachments });
+      channelOptions: DIRECT_CHANNEL_OPTIONS,
+      channel: lastDirectChannel(messages),
+      onSend: async ({ body, attachments, channel }) => {
+        await sendCommunicationMessage({ channel, phone, uei, body, attachments });
         await openThread(root, state, thread);
       },
     });
-  } catch {
+  } catch (error) {
     renderChatSurface(root, {
       title,
       c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
@@ -385,7 +423,7 @@ async function openThread(root, state, thread) {
     root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
-      message: 'Не удалось загрузить переписку',
+      message: error instanceof Error && error.message ? error.message : 'Не удалось загрузить переписку',
       action: 'Закрыть',
       variant: 'technical',
     });
@@ -416,7 +454,7 @@ async function renderThreads(root, state) {
       emptyTitle: 'Чат пока пуст',
       emptyText: 'Сообщения и системные уведомления людей появятся здесь.',
     });
-  } catch {
+  } catch (error) {
     renderChatSurface(root, {
       title: 'Чат',
       c: { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' },
@@ -426,7 +464,7 @@ async function renderThreads(root, state) {
     root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => openProfessionalContacts(root, state));
     openNotice({
       title: 'Чат недоступен',
-      message: 'Не удалось загрузить диалоги',
+      message: error instanceof Error && error.message ? error.message : 'Не удалось загрузить диалоги',
       action: 'Закрыть',
       variant: 'technical',
     });

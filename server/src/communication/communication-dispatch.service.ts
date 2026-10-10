@@ -21,7 +21,7 @@ export class CommunicationDispatchService {
   ) {}
 
   private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    const channels: string[] = [];
+    const channels: string[] = ['PUSH'];
     if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
     if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
@@ -36,9 +36,7 @@ export class CommunicationDispatchService {
     }
     const preferences = await this.history.getPreferences(tenantId, input || {});
     const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
-    const selected = preferred || available[0] || '';
-    if (!selected) throw new NotFoundException('У человека нет доступного канала');
-    return selected;
+    return preferred || available[0];
   }
 
   async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
@@ -50,12 +48,16 @@ export class CommunicationDispatchService {
       throw new BadRequestException('Нет действующего согласия на обработку ПДН');
     }
 
-    if (attachments.length) {
+    const channel = await this.resolveChannel(tenantId, input || {});
+    if (attachments.length && channel !== 'PUSH') {
+      throw new BadRequestException('Вложения можно отправить только через Push');
+    }
+    if (channel === 'PUSH') {
       return this.communications.recordMessage(tenantId, {
         phone: input?.phone,
         uei: input?.uei,
         direction: 'outbound',
-        kind: 'media',
+        kind: attachments.length ? 'media' : 'message',
         purpose: input.purpose,
         channel: 'IN_APP',
         body,
@@ -63,8 +65,6 @@ export class CommunicationDispatchService {
         status: 'delivered',
       });
     }
-
-    const channel = await this.resolveChannel(tenantId, input || {});
     if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body, purpose: input.purpose });
     if (channel === 'EMAIL') return this.email.sendMessage(tenantId, { phone: input?.phone, uei: input?.uei, subject: input?.subject, body, purpose: input.purpose });
     throw new BadRequestException('Канал пока не подключён');

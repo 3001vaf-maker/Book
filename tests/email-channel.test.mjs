@@ -9,13 +9,20 @@ const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.servi
 const notification = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const broadcast = fs.readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
 const compose = fs.readFileSync('chat/chat.js', 'utf8');
+const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
+const sharedChat = fs.readFileSync('ui/chat/index.js', 'utf8');
 const transactional = fs.readFileSync('server/src/transactional-email/transactional-email.service.ts', 'utf8');
 const envExample = fs.readFileSync('server/.env.example', 'utf8');
 
 assert.match(communication, /async emailIdentity\(/);
 assert.match(communication, /person\.emails/);
+assert.match(communication, /AND "channel" = 'IN_APP'/);
+assert.match(dispatch, /const channels: string\[\] = \['PUSH'\]/);
 assert.match(dispatch, /channels\.push\('EMAIL'\)/);
 assert.match(dispatch, /email\.isAvailable\(tenantId\)/);
+assert.match(dispatch, /channel === 'PUSH'/);
+assert.match(dispatch, /channel: 'IN_APP'/);
+assert.match(dispatch, /Вложения можно отправить только через Push/);
 assert.match(dispatch, /channel === 'EMAIL'/);
 assert.match(dispatch, /email\.sendMessage/);
 
@@ -54,7 +61,16 @@ assert.match(notification, /canSendEmailDelivery/);
 
 assert.match(broadcast, /channel === 'EMAIL'/);
 assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/);
+assert.match(compose, /DIRECT_CHANNEL_OPTIONS/);
+assert.match(compose, /value: 'PUSH', label: 'Push'/);
+assert.match(compose, /value: 'TELEGRAM', label: 'Telegram'/);
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
+assert.match(compose, /channelOptions: DIRECT_CHANNEL_OPTIONS/);
+assert.match(compose, /sendCommunicationMessage\(\{ channel/);
+assert.match(chatRuntime, /channelOptions = \[\]/);
+assert.match(chatRuntime, /formData\.get\('messageChannel'\)/);
+assert.match(sharedChat, /name: 'messageChannel'/);
+assert.match(sharedChat, /channelOptions/);
 
 assert.match(transactional, /import \* as nodemailer from 'nodemailer'/);
 assert.match(transactional, /postbox\.cloud\.yandex\.net/);
@@ -73,4 +89,4 @@ assert.match(envExample, /YANDEX_MAIL_OAUTH_CLIENT_SECRET=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
 assert.doesNotMatch(envExample, /YANDEX_SMTP/);
 
-console.log('Email and background delivery contract tests passed');
+console.log('Email, direct chat channel, and background delivery contract tests passed');
