@@ -10,9 +10,59 @@ type TransactionalEmailInput = {
   tag?: string;
 };
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error) return String(error.message || '');
+  return String(error || '');
+}
+
 @Injectable()
 export class TransactionalEmailService {
   private readonly logger = new Logger(TransactionalEmailService.name);
+
+  configurationStatus() {
+    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-postbox').trim().toLowerCase();
+    const apiKeyIdConfigured = Boolean(String(process.env.POSTBOX_API_KEY_ID || '').trim());
+    const apiKeySecretConfigured = Boolean(String(process.env.POSTBOX_API_KEY_SECRET || '').trim());
+    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
+    const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || '').trim();
+    const providerSupported = provider === 'yandex-postbox';
+    const missing: string[] = [];
+    if (!apiKeyIdConfigured) missing.push('POSTBOX_API_KEY_ID');
+    if (!apiKeySecretConfigured) missing.push('POSTBOX_API_KEY_SECRET');
+    if (!fromEmail) missing.push('TRANSACTIONAL_EMAIL_FROM_EMAIL');
+    if (!providerSupported) missing.push('TRANSACTIONAL_EMAIL_PROVIDER');
+    return {
+      channel: 'EMAIL',
+      provider,
+      providerSupported,
+      apiKeyIdConfigured,
+      apiKeySecretConfigured,
+      fromEmailConfigured: Boolean(fromEmail),
+      fromEmail,
+      fromName,
+      configured: providerSupported && missing.length === 0,
+      missing,
+    };
+  }
+
+  async getStatus() {
+    const configuration = this.configurationStatus();
+    if (!configuration.configured) {
+      const reason = !configuration.providerSupported
+        ? `Неподдерживаемый провайдер транзакционной почты: ${configuration.provider}`
+        : `Не настроено: ${configuration.missing.join(', ')}`;
+      return { ...configuration, status: 'not_configured', transportReachable: false, reason };
+    }
+    try {
+      await this.transporter().verify();
+      return { ...configuration, status: 'ready', transportReachable: true, reason: '' };
+    } catch (error) {
+      const reason = errorMessage(error) || 'Cloud Postbox недоступен';
+      this.logger.error(`Postbox verify failed: ${reason}`);
+      return { ...configuration, status: 'error', transportReachable: false, reason };
+    }
+  }
 
   private transporter() {
     const apiKeyId = String(process.env.POSTBOX_API_KEY_ID || '').trim();
@@ -37,18 +87,15 @@ export class TransactionalEmailService {
   }
 
   async send(input: TransactionalEmailInput) {
-    const provider = String(process.env.TRANSACTIONAL_EMAIL_PROVIDER || 'yandex-postbox').trim().toLowerCase();
-    if (provider !== 'yandex-postbox') {
-      throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${provider}`);
+    const configuration = this.configurationStatus();
+    if (!configuration.providerSupported) {
+      throw new ServiceUnavailableException(`Неподдерживаемый провайдер транзакционной почты: ${configuration.provider}`);
     }
-
-    const fromEmail = String(process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL || '').trim().toLowerCase();
-    const fromName = String(process.env.TRANSACTIONAL_EMAIL_FROM_NAME || '').trim();
-    if (!fromEmail) throw new ServiceUnavailableException('Email отправителя ещё не настроен');
+    if (!configuration.fromEmailConfigured) throw new ServiceUnavailableException('Email отправителя ещё не настроен');
 
     try {
       const result = await this.transporter().sendMail({
-        from: fromName ? { address: fromEmail, name: fromName } : fromEmail,
+        from: configuration.fromName ? { address: configuration.fromEmail, name: configuration.fromName } : configuration.fromEmail,
         to: input.toName
           ? { address: String(input.to || '').trim().toLowerCase(), name: input.toName }
           : String(input.to || '').trim().toLowerCase(),

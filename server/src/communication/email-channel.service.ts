@@ -54,6 +54,10 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  integrationStatus() {
+    return this.email.getStatus();
+  }
+
   async sendMessage(
     tenantId: string,
     input: { phone?: unknown; uei?: unknown; subject?: unknown; body?: unknown; purpose?: unknown },
