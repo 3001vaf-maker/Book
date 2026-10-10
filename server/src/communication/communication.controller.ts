@@ -9,12 +9,15 @@ import { TelegramBotService } from './telegram-bot.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
 
-function accountAppOrigin() {
-  try { return new URL(String(process.env.ACCOUNT_APP_URL || '')).origin; } catch { return ''; }
+function professionalAppOrigin() {
+  const fallback = process.env.NODE_ENV === 'production'
+    ? 'https://book.va-tools.ru'
+    : String(process.env.FRONTEND_ORIGIN || 'http://localhost:8080').trim();
+  try { return new URL(fallback).origin; } catch { return ''; }
 }
 
 function emailOAuthPage(success: boolean) {
-  const origin = accountAppOrigin();
+  const origin = professionalAppOrigin();
   const payload = JSON.stringify({ type: 'va-tools:email-integration', connected: success });
   const target = JSON.stringify(origin);
   const title = success ? 'Почта подключена' : 'Не удалось подключить почту';

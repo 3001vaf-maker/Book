@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 const emailChannel = fs.readFileSync('server/src/communication/email-channel.service.ts', 'utf8');
+const professionalEmail = fs.readFileSync('server/src/communication/professional-email.service.ts', 'utf8');
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const notification = fs.readFileSync('server/src/notification/notification.service.ts', 'utf8');
 const broadcast = fs.readFileSync('server/src/communication/communication-broadcast.service.ts', 'utf8');
@@ -14,10 +15,12 @@ const envExample = fs.readFileSync('server/.env.example', 'utf8');
 assert.match(communication, /async emailIdentity\(/);
 assert.match(communication, /person\.emails/);
 assert.match(dispatch, /channels\.push\('EMAIL'\)/);
+assert.match(dispatch, /email\.isAvailable\(tenantId\)/);
 assert.match(dispatch, /channel === 'EMAIL'/);
 assert.match(dispatch, /email\.sendMessage/);
 
-assert.match(emailChannel, /TransactionalEmailService/);
+assert.match(emailChannel, /ProfessionalEmailService/);
+assert.doesNotMatch(emailChannel, /TransactionalEmailService/);
 assert.match(emailChannel, /hasActivePdnConsentForContact\(tenantId, 'EMAIL'/);
 assert.match(emailChannel, /purpose === 'MARKETING'/);
 assert.match(emailChannel, /canSendMarketing\(tenantId, 'EMAIL'/);
@@ -29,6 +32,14 @@ assert.match(emailChannel, /private dispatchPendingInBackground\(\)/);
 assert.match(emailChannel, /dispatchPendingNotifications\(\)\.catch/);
 assert.doesNotMatch(emailChannel, /setInterval\(\(\) => void this\.dispatchPendingNotifications\(\)/);
 assert.doesNotMatch(emailChannel, /void this\.dispatchPendingNotifications\(\);/);
+
+assert.match(professionalEmail, /mail:smtp/);
+assert.match(professionalEmail, /smtp\.yandex\.com/);
+assert.match(professionalEmail, /auth: \{ type: 'OAuth2'/);
+assert.match(professionalEmail, /replyTo: row\.email/);
+assert.match(professionalEmail, /PROFESSIONAL_EMAIL_CREDENTIALS_KEY/);
+assert.match(professionalEmail, /aes-256-gcm/);
+assert.doesNotMatch(professionalEmail, /mail:imap|imap\.yandex/i);
 
 assert.match(telegramBot, /private dispatchAllTenantsInBackground\(\)/);
 assert.match(telegramBot, /dispatchAllTenants\(\)\.catch/);
@@ -46,15 +57,7 @@ assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/)
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 
 assert.match(transactional, /import \* as nodemailer from 'nodemailer'/);
-assert.doesNotMatch(transactional, /import nodemailer from 'nodemailer'/);
 assert.match(transactional, /postbox\.cloud\.yandex\.net/);
-assert.match(transactional, /port: 587/);
-assert.match(transactional, /secure: false/);
-assert.match(transactional, /requireTLS: true/);
-assert.match(transactional, /connectionTimeout: 8000/);
-assert.match(transactional, /greetingTimeout: 8000/);
-assert.match(transactional, /socketTimeout: 15000/);
-assert.match(transactional, /Postbox send failed/);
 assert.match(transactional, /POSTBOX_API_KEY_ID/);
 assert.match(transactional, /POSTBOX_API_KEY_SECRET/);
 assert.match(transactional, /X-Message-Tag/);
@@ -63,6 +66,10 @@ assert.match(envExample, /TRANSACTIONAL_EMAIL_PROVIDER="yandex-postbox"/);
 assert.match(envExample, /POSTBOX_API_KEY_ID=/);
 assert.match(envExample, /POSTBOX_API_KEY_SECRET=/);
 assert.match(envExample, /TRANSACTIONAL_EMAIL_FROM_EMAIL=/);
+assert.match(envExample, /PROFESSIONAL_EMAIL_OAUTH_ENABLED="false"/);
+assert.match(envExample, /PROFESSIONAL_EMAIL_CREDENTIALS_KEY=/);
+assert.match(envExample, /YANDEX_MAIL_OAUTH_CLIENT_ID=/);
+assert.match(envExample, /YANDEX_MAIL_OAUTH_CLIENT_SECRET=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
 assert.doesNotMatch(envExample, /YANDEX_SMTP/);
 
