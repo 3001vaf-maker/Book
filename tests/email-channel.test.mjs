@@ -24,6 +24,10 @@ assert.match(emailChannel, /pendingEmailDeliveries/);
 assert.match(emailChannel, /markEmailSent/);
 assert.match(emailChannel, /markEmailFailed/);
 assert.match(emailChannel, /recordMessage[\s\S]*channel: 'EMAIL'/);
+assert.match(emailChannel, /private dispatchPendingInBackground\(\)/);
+assert.match(emailChannel, /dispatchPendingNotifications\(\)\.catch/);
+assert.doesNotMatch(emailChannel, /setInterval\(\(\) => void this\.dispatchPendingNotifications\(\)/);
+assert.doesNotMatch(emailChannel, /void this\.dispatchPendingNotifications\(\);/);
 
 assert.match(notification, /ACTIVE_EXTERNAL_CHANNELS = new Set\(\['TELEGRAM', 'EMAIL'\]\)/);
 assert.match(notification, /pendingEmailDeliveries/);
