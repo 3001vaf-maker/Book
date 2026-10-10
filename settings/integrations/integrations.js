@@ -63,16 +63,36 @@ function emailMiniCard(state = {}, { interactive = false } = {}) {
   });
 }
 
+function telegramTechnicalDiagnostics(state = {}) {
+  const config = state?.configuration || {};
+  const yesNo = (value) => value === true ? 'да' : value === false ? 'нет' : 'неизвестно';
+  const configured = (value) => value === true ? 'OK' : value === false ? 'НЕТ' : 'неизвестно';
+  const pending = Number(state?.webhookPendingUpdateCount);
+  return [
+    'Техническая диагностика — временно',
+    `API интеграции: ${state?.error ? `ОШИБКА — ${String(state.error)}` : 'OK'}`,
+    `Подключение сохранено: ${yesNo(Boolean(state?.connected))}`,
+    `Webhook активен: ${yesNo(state?.webhookActive)}`,
+    `Webhook совпадает: ${yesNo(state?.webhookUrlMatches)}`,
+    `Ошибка webhook: ${String(state?.webhookError || 'нет')}`,
+    `Ожидающих обновлений: ${Number.isFinite(pending) ? pending : 'неизвестно'}`,
+    `TELEGRAM_CREDENTIALS_KEY: ${configured(config?.credentialsKeyConfigured)}`,
+    `PUBLIC_API_URL: ${configured(config?.publicApiUrlConfigured)}`,
+    `ACCOUNT_APP_URL: ${configured(config?.accountAppUrlConfigured)}`,
+  ].join('\n');
+}
+
 function telegramInfoDocument(state = {}) {
+  const diagnostics = telegramTechnicalDiagnostics(state);
   if (state?.error) {
     return {
       title: 'Связь недоступна',
-      content: 'Сейчас приложение не может проверить состояние подключения. Повторно вводить токен не нужно.\n\nПопробуйте открыть интеграцию позже.',
+      content: `Сейчас приложение не может проверить состояние подключения. Повторно вводить токен не нужно.\n\nПопробуйте открыть интеграцию позже.\n\n${diagnostics}`,
     };
   }
 
   if (!state?.connected) {
-    return { title: 'Как подключить Telegram', content: TELEGRAM_SETUP_GUIDE };
+    return { title: 'Как подключить Telegram', content: `${TELEGRAM_SETUP_GUIDE}\n\n${diagnostics}` };
   }
 
   const bot = String(state?.botUsername || '').trim();
@@ -80,13 +100,13 @@ function telegramInfoDocument(state = {}) {
   if (works) {
     return {
       title: 'Подключено',
-      content: `${bot ? `Бот ${bot} подключён.` : 'Бот подключён.'}\n\nПриложение выполняет необходимые технические настройки автоматически. Дополнительных действий не требуется.\n\nЧтобы подключить другого бота, сначала отключите текущего.`,
+      content: `${bot ? `Бот ${bot} подключён.` : 'Бот подключён.'}\n\nПриложение выполняет необходимые технические настройки автоматически. Дополнительных действий не требуется.\n\nЧтобы подключить другого бота, сначала отключите текущего.\n\n${diagnostics}`,
     };
   }
 
   return {
     title: 'Связь недоступна',
-    content: `${bot ? `Бот ${bot} подключён, но сейчас не удаётся подтвердить связь.` : 'Бот подключён, но сейчас не удаётся подтвердить связь.'}\n\nПовторно вводить токен не нужно.\n\nЕсли связь долго не восстановится, отключите бота и подключите его заново.`,
+    content: `${bot ? `Бот ${bot} подключён, но сейчас не удаётся подтвердить связь.` : 'Бот подключён, но сейчас не удаётся подтвердить связь.'}\n\nПовторно вводить токен не нужно.\n\nЕсли связь долго не восстановится, отключите бота и подключите его заново.\n\n${diagnostics}`,
   };
 }
 
@@ -301,7 +321,9 @@ async function renderIntegrations(root) {
   const host = root.querySelector('[data-integrations-list]');
   if (host) host.innerHTML = emptyState('Загрузка', 'Проверяем интеграции.');
   const [telegramResult, emailResult] = await Promise.allSettled([getTelegramBotConnection(), getEmailConnection()]);
-  const telegramState = telegramResult.status === 'fulfilled' ? telegramResult.value : { error: 'Не удалось проверить состояние подключения' };
+  const telegramState = telegramResult.status === 'fulfilled'
+    ? telegramResult.value
+    : { error: telegramResult.reason instanceof Error ? telegramResult.reason.message : String(telegramResult.reason || 'Не удалось проверить состояние подключения') };
   const emailState = emailResult.status === 'fulfilled' ? emailResult.value : { error: 'Не удалось проверить состояние подключения' };
   renderIntegrationCards(root, telegramState, emailState);
   window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
