@@ -119,7 +119,8 @@ export class PlatformNoticeService {
       ? notice.metadata as Record<string, any>
       : {};
     const tenantId = text(metadata.tenantId);
-    const url = tenantId ? `/admin/?liveRequest=${encodeURIComponent(tenantId)}` : '/admin/';
+    const explicitUrl = text(metadata.url);
+    const url = explicitUrl || (tenantId ? `/admin/?liveRequest=${encodeURIComponent(tenantId)}` : '/admin/');
     const payload = JSON.stringify({
       notificationId: notice.id,
       title: notice.title,
@@ -200,6 +201,25 @@ export class PlatformNoticeService {
         body: input.body || '',
         metadata: json(input.metadata),
       },
+    });
+  }
+
+  async pushToTenantOwner(
+    tenantId: string,
+    input: { type: string; title: string; body?: string; metadata?: unknown },
+  ) {
+    const membership = await this.prisma.membership.findFirst({
+      where: { tenantId, role: 'OWNER' },
+      orderBy: { createdAt: 'asc' },
+      select: { platformAccountId: true },
+    });
+    if (!membership) return { sent: 0, failed: 0 };
+    return this.dispatchPush(membership.platformAccountId, {
+      id: randomUUID(),
+      title: input.title,
+      body: input.body || '',
+      type: input.type,
+      metadata: json(input.metadata),
     });
   }
 
