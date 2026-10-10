@@ -8,6 +8,13 @@ import { SaasAccessService } from '../saas-access/saas-access.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 
+function telegramRecipient(input: { phone?: unknown; uei?: unknown } = {}) {
+  const phone = text(input?.phone);
+  return phone
+    ? { phone, uei: '' }
+    : { phone: '', uei: text(input?.uei) };
+}
+
 @Injectable()
 export class CommunicationDispatchService {
   constructor(
@@ -20,7 +27,7 @@ export class CommunicationDispatchService {
 
   async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const channels: string[] = ['PUSH'];
-    if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
+    if (await this.communications.telegramIdentity(tenantId, telegramRecipient(input || {}))) channels.push('TELEGRAM');
     if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
   }
@@ -60,7 +67,10 @@ export class CommunicationDispatchService {
         status: 'delivered',
       });
     }
-    if (channel === 'TELEGRAM') return this.telegram.sendChatMessage(tenantId, { phone: input?.phone, uei: input?.uei, body, purpose: input.purpose });
+    if (channel === 'TELEGRAM') {
+      const recipient = telegramRecipient(input || {});
+      return this.telegram.sendChatMessage(tenantId, { ...recipient, body, purpose: input.purpose });
+    }
     if (channel === 'EMAIL') return this.email.sendMessage(tenantId, { phone: input?.phone, uei: input?.uei, subject: input?.subject, body, purpose: input.purpose });
     throw new BadRequestException('Канал пока не подключён');
   }
