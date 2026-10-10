@@ -96,6 +96,12 @@ export class CommunicationController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('chat/channels')
+  async chatChannels(@Req() request: OwnerRequest, @Query('phone') phone = '', @Query('uei') uei = '') {
+    return { channels: await this.dispatch.availableChannels(request.auth!.tenantId, { phone, uei }) };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('chat/preferences')
   chatPreferences(@Req() request: OwnerRequest, @Query('phone') phone = '', @Query('uei') uei = '') {
     return this.history.getPreferences(request.auth!.tenantId, { phone, uei });
