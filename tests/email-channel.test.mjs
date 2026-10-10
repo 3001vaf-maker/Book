@@ -66,6 +66,15 @@ assert.match(telegramBot, /dispatchTenant\(tenantId\)\.catch/);
 assert.doesNotMatch(telegramBot, /hasActivePdnConsentForContact\(tenantId, 'TELEGRAM'/);
 assert.doesNotMatch(telegramBot, /setInterval\(\(\) => void this\.dispatchAllTenants\(\)/);
 assert.doesNotMatch(telegramBot, /void this\.dispatchTenant\(tenantId\);/);
+assert.match(telegramBot, /TELEGRAM_API_TIMEOUT_MS = 10_000/);
+assert.match(telegramBot, /AbortSignal\.timeout\(TELEGRAM_API_TIMEOUT_MS\)/);
+assert.match(telegramBot, /\[telegram-api\]/);
+assert.match(telegramBot, /\[telegram-health\]/);
+assert.match(telegramBot, /\[telegram-webhook\]/);
+assert.match(telegramBot, /const isStart =/);
+assert.match(telegramBot, /web_app: \{ url: url\.toString\(\) \}/);
+assert.match(telegramBot, /Открыть приложение/);
+assert.doesNotMatch(telegramBot, /Открыть Book|Откройте Book/);
 
 assert.match(notification, /ACTIVE_EXTERNAL_CHANNELS = new Set\(\['TELEGRAM', 'EMAIL'\]\)/);
 assert.match(notification, /purpose !== 'MARKETING'\) return true/);
@@ -107,6 +116,7 @@ assert.match(envExample, /PROFESSIONAL_EMAIL_CREDENTIALS_KEY=/);
 assert.match(envExample, /YANDEX_MAIL_OAUTH_CLIENT_ID=/);
 assert.match(envExample, /YANDEX_MAIL_OAUTH_CLIENT_SECRET=/);
 assert.match(envExample, /EMAIL_DELIVERY_POLL_MS=/);
+assert.match(envExample, /ACCOUNT_APP_URL="https:\/\/client\.example\.com"/);
 assert.doesNotMatch(envExample, /YANDEX_SMTP/);
 
-console.log('Email, direct chat Z Header channel, and background delivery contract tests passed');
+console.log('Email, direct chat Z Header channel, Telegram diagnostics, and background delivery contract tests passed');
