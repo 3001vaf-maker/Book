@@ -1,0 +1,2 @@
+ALTER TABLE "TelegramBotConnection"
+    ADD COLUMN IF NOT EXISTS "inboundOffset" BIGINT NOT NULL DEFAULT 0;
