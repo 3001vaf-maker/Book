@@ -1,10 +1,44 @@
-import { emptyState, v2ListEntries, v2ListEntry, openNotice } from '../../ui/ui.js';
+import {
+  emptyState,
+  initSegmentControls,
+  openNotice,
+  segmentControl,
+  setV2ZHeaderRows,
+  v2ListEntries,
+  v2ListEntry,
+} from '../../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
 function chatTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function zSurface(root) {
+  if (!root) return null;
+  if (root.matches?.('[data-v2-z],[data-v2-z-layer]')) return root;
+  return root.closest?.('[data-v2-z],[data-v2-z-layer]') || null;
+}
+
+export function mountChatChannelHeader(root, { channelOptions = [], channel = 'PUSH' } = {}) {
+  const options = (Array.isArray(channelOptions) ? channelOptions : [])
+    .filter((option) => option?.value)
+    .map((option) => ({ value: String(option.value), label: String(option.label || option.value) }));
+  if (!options.length) return () => '';
+
+  const available = options.map((option) => option.value);
+  const requested = String(channel || '').trim().toUpperCase();
+  const initial = available.includes(requested) ? requested : available[0];
+  setV2ZHeaderRows(root, [segmentControl(options, {
+    value: initial,
+    name: 'messageChannel',
+    aria: 'Канал отправки сообщения',
+  })]);
+
+  const surface = zSurface(root) || root;
+  initSegmentControls(surface);
+  return () => String(surface.querySelector?.('[name="messageChannel"]')?.value || initial).trim().toUpperCase();
 }
 
 export function normalizeChatMessages(messages = []) {
@@ -73,9 +107,7 @@ export function mountChatThread(root, {
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
   const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
-  const composer = Array.isArray(channelOptions) && channelOptions.length
-    ? messageComposer({ attachments: true, attachmentTrigger: 'external', channelOptions, channel })
-    : messageComposer({ attachments: true, attachmentTrigger: 'external' });
+  const composer = messageComposer({ attachments: true, attachmentTrigger: 'external' });
   const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
     mode: 'thread',
@@ -86,6 +118,7 @@ export function mountChatThread(root, {
     body,
   });
 
+  const selectedChannel = mountChatChannelHeader(root, { channelOptions, channel });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
 
@@ -111,11 +144,10 @@ export function mountChatThread(root, {
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      const formData = new FormData(form);
       await onSend({
         body: bodyValue,
         attachments,
-        channel: String(formData.get('messageChannel') || channel || '').trim().toUpperCase(),
+        channel: selectedChannel() || String(channel || 'PUSH').trim().toUpperCase(),
       });
     } catch (error) {
       if (submit) submit.disabled = false;
