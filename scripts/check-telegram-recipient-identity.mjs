@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const accountRuntime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
+const communicationDispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
 const communicationModule = fs.readFileSync('server/src/communication/communication.module.ts', 'utf8');
@@ -43,6 +44,14 @@ expect(
   communicationService.includes('ORDER BY EXISTS (')
     && communicationService.includes('"primaryTelegram"."isPrimary" = TRUE'),
   'Outbound Telegram routing must prefer the canonical primary Telegram destination over a newer stale identity.',
+);
+expect(
+  communicationDispatch.includes('function telegramRecipient(')
+    && communicationDispatch.includes("? { phone, uei: '' }")
+    && communicationDispatch.includes('telegramIdentity(tenantId, telegramRecipient(input || {}))')
+    && communicationDispatch.includes('const recipient = telegramRecipient(input || {});')
+    && communicationDispatch.includes('this.telegram.sendChatMessage(tenantId, { ...recipient, body, purpose: input.purpose })'),
+  'Professional D Telegram routing must use the selected person phone as the recipient boundary and never fall through to another Person via UEI.',
 );
 expect(
   telegramBot.includes("chat_id: telegramUserId")
