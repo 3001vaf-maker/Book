@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AccountContactType } from '@prisma/client';
 import { BusinessStateService } from '../business-state/business-state.service';
+import { PlatformNoticeService } from '../platform-notice/platform-notice.service';
 import { PrismaService } from '../prisma.service';
 import { normalizeMessagePurpose, type MessagePurpose } from './message-purpose';
 
@@ -102,6 +103,7 @@ export class CommunicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly businessState: BusinessStateService,
+    private readonly platformNotices: PlatformNoticeService,
   ) {}
 
   async createTelegramEntry(tenantId: string, input: { telegramUserId?: unknown; username?: unknown }) {
@@ -331,7 +333,7 @@ export class CommunicationService {
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const id = randomUUID();
     const now = new Date();
-    await this.prisma.$executeRaw`
+    const inserted = await this.prisma.$executeRaw`
       INSERT INTO "CommunicationMessage" (
         "id", "tenantId", "personPhone", "uei", "direction", "kind", "purpose", "channel", "body", "attachments",
         "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "failedAt", "error"
@@ -341,6 +343,20 @@ export class CommunicationService {
         ${status === 'sent' ? now : null}, ${status === 'delivered' ? now : null}, ${status === 'failed' ? now : null}, ${error}
       ) ON CONFLICT DO NOTHING
     `;
+    if (inserted && direction === 'inbound' && purpose === 'DIRECT' && status !== 'failed') {
+      await this.platformNotices.pushToTenantOwner(tenantId, {
+        type: 'DIRECT_MESSAGE_RECEIVED',
+        title: 'Новое сообщение',
+        body: body || (attachments.length ? 'Новое вложение' : ''),
+        metadata: {
+          tenantId,
+          url: '/',
+          phone: personPhone,
+          uei,
+          channel,
+        },
+      }).catch(() => ({ sent: 0, failed: 0 }));
+    }
     return { id, tenantId, personPhone, uei, direction, kind, purpose, channel, body, attachments, externalMessageId, externalThreadId, status, createdAt: now, error };
   }
 
@@ -354,7 +370,6 @@ export class CommunicationService {
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
-        AND "channel" = 'IN_APP'
         AND ((${personPhone} <> '' AND "personPhone" = ${personPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
     `;
