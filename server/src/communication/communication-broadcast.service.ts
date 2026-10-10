@@ -160,7 +160,7 @@ export class CommunicationBroadcastService {
   }
 
   async deleteGroup(tenantId: string, idValue: unknown) {
-    const id = text(idValue); if (!id) throw new BadRequestException('Не указана группа');
+    const id = text(idValue); if (!id) throw new BadRequestException('Не указан шаблон');
     const deleted = await this.prisma.$executeRaw`DELETE FROM "CommunicationGroup" WHERE "id" = ${id} AND "tenantId" = ${tenantId}`;
     if (!deleted) throw new NotFoundException('Группа не найдена');
     return { deleted: true, id };
@@ -233,10 +233,6 @@ export class CommunicationBroadcastService {
     for (const person of requested) {
       const destination = await this.channelDestination(tenantId, channel, person);
       if (!destination) { excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-channel' }); continue; }
-      if (!(await this.documents.hasActivePdnConsentForContact(tenantId, channel, destination))) {
-        excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-pdn-consent' });
-        continue;
-      }
       if (!(await this.documents.canSendMarketing(tenantId, channel, destination))) {
         excluded.push({ personKey: person.personKey, phone: person.phone, reason: 'no-marketing-consent' });
         continue;
