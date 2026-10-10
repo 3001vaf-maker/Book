@@ -26,24 +26,26 @@ assert.doesNotMatch(consentPolicy, /async requiredConsentState\(/);
 assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/records'\)/);
 assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/notifications'\)/);
 assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Post\(':tenantId\/account\/notifications\/:notificationId\/read'\)/);
-assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
-assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/account\/chat\/messages'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Get\(':tenantId\/account\/chat'\)/);
+assert.match(bookingController, /@UseGuards\(AccountGuard\)\s+@Post\(':tenantId\/account\/chat\/messages'\)/);
+assert.doesNotMatch(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@(?:Get|Post)\(':tenantId\/account\/chat/);
 assert.match(bookingController, /@UseGuards\(AccountGuard, BookingPdnConsentGuard\)\s+@Post\(':tenantId\/requests'\)/);
 assert.match(bookingService, /async createRequest[\s\S]*hasActivePdnConsent\(tenantId, accountId\)/);
 assert.doesNotMatch(bookingService, /async createRequest[\s\S]*requiredConsentState\(tenantId, accountId\)/);
 
-assert.match(notification, /!\(await this\.documents\.hasActivePdnConsent\(tenantId, identity\.accountId\)\)/);
-assert.match(notification, /!\(await this\.documents\.hasActivePdnConsent\(tenantId, accountId\)\)/);
+// PDN remains part of the document/booking contract, but it must not gate message delivery.
+assert.doesNotMatch(notification, /hasActivePdnConsent\(tenantId, identity\.accountId\)/);
+assert.doesNotMatch(notification, /hasActivePdnConsent\(tenantId, accountId\)/);
 assert.match(notification, /purpose !== 'MARKETING'[\s\S]*canSendMarketing/);
 
-assert.match(broadcast, /hasActivePdnConsentForContact\(tenantId, channel, destination\)[\s\S]*canSendMarketing\(tenantId, channel, destination\)/);
-assert.match(broadcast, /reason: 'no-pdn-consent'/);
+assert.doesNotMatch(broadcast, /hasActivePdnConsentFor(?:Contact|Identity)\(/);
+assert.doesNotMatch(broadcast, /reason: 'no-pdn-consent'/);
 assert.match(broadcast, /reason: 'no-marketing-consent'/);
+assert.match(broadcast, /canSendMarketing\(tenantId, channel, destination\)/);
 
-assert.match(dispatch, /hasActivePdnConsentForIdentity\(tenantId, input\?\.phone, input\?\.uei\)/);
-assert.match(telegram, /hasActivePdnConsentForContact\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
-assert.match(telegram, /blocked: 'PDN_CONSENT_REQUIRED'/);
+assert.doesNotMatch(dispatch, /hasActivePdnConsent/);
+assert.doesNotMatch(telegram, /hasActivePdnConsentForContact\(tenantId, 'TELEGRAM', identity\.externalUserId\)/);
+assert.doesNotMatch(telegram, /blocked: 'PDN_CONSENT_REQUIRED'/);
 assert.match(telegram, /purpose === 'MARKETING'[\s\S]*canSendMarketing/);
-
 
 console.log('PDN grey-zone tests: OK');

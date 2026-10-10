@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { TelegramBotService } from './telegram-bot.service';
@@ -13,7 +12,6 @@ function text(value: unknown) { return String(value ?? '').trim(); }
 export class CommunicationDispatchService {
   constructor(
     private readonly communications: CommunicationService,
-    private readonly consentPolicy: ConsentPolicyService,
     private readonly history: CommunicationHistoryService,
     private readonly telegram: TelegramBotService,
     private readonly email: EmailChannelService,
@@ -39,20 +37,11 @@ export class CommunicationDispatchService {
     return preferred || available[0];
   }
 
-  private async hasPdnConsent(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
-    if (await this.consentPolicy.hasActivePdnConsentForIdentity(tenantId, input?.phone, input?.uei)) return true;
-    const phone = text(input?.phone);
-    return phone ? this.consentPolicy.hasActivePdnConsentForContact(tenantId, 'PHONE', phone) : false;
-  }
-
   async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
     await this.access.assertRealOperationsAllowed(tenantId);
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
-    if (!(await this.hasPdnConsent(tenantId, input || {}))) {
-      throw new BadRequestException('Нет действующего согласия на обработку ПДН');
-    }
 
     const channel = await this.resolveChannel(tenantId, input || {});
     if (attachments.length && channel !== 'PUSH') {

@@ -238,9 +238,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
     const identity = await this.communications.telegramIdentity(tenantId, input || {}); if (!identity) throw new NotFoundException('Telegram у человека не подключён');
-    if (!(await this.consentPolicy.hasActivePdnConsentForContact(tenantId, 'TELEGRAM', identity.externalUserId))) {
-      throw new BadRequestException('Нет действующего согласия на обработку ПДН');
-    }
     if (purpose === 'MARKETING' && !(await this.consentPolicy.canSendMarketing(tenantId, 'TELEGRAM', identity.externalUserId))) {
       throw new BadRequestException('Нет действующего рекламного согласия для Telegram');
     }
@@ -304,8 +301,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (!identity) return { ok: true, linked: false };
     }
     if (messageBody && messageBody !== '/start') {
-      const pdnAllowed = await this.consentPolicy.hasActivePdnConsentForContact(connection.tenantId, 'TELEGRAM', telegramUserId);
-      if (!pdnAllowed) return { ok: true, linked: true, blocked: 'PDN_CONSENT_REQUIRED' };
       await this.communications.recordMessage(connection.tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
     }
     return { ok: true, linked: true };
