@@ -36,5 +36,8 @@ export function initV2WorkspaceInteraction(root, options = {}) {
     },
   });
   setV2MenuHeaderState(app, Boolean(options.deckOpen));
-  return () => dispose?.();
+  return () => {
+    setV2MenuHeaderState(app, false);
+    dispose?.();
+  };
 }
