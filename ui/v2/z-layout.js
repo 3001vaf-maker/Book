@@ -42,6 +42,7 @@ const Z_BODY_SECTION_STYLE = [
 ].join(';');
 
 const Z_BODY_KINDS = new Set(['content', 'full', 'list']);
+const Z_HEADER_OWNER_BOUND = new WeakSet();
 
 function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
@@ -102,10 +103,21 @@ function resolveZSurface(root) {
   return root.closest?.('[data-v2-z],[data-v2-z-layer]') || null;
 }
 
+function bindV2ZHeaderOwner(root) {
+  if (!root || Z_HEADER_OWNER_BOUND.has(root) || typeof root.replaceChildren !== 'function') return;
+  const replaceChildren = root.replaceChildren.bind(root);
+  root.replaceChildren = (...children) => {
+    clearV2ZHeaderRows(root);
+    return replaceChildren(...children);
+  };
+  Z_HEADER_OWNER_BOUND.add(root);
+}
+
 export function setV2ZHeaderRows(root, rows = []) {
   const surface = resolveZSurface(root);
   const host = surface?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
   if (!host) return [];
+  bindV2ZHeaderOwner(root);
   const values = (Array.isArray(rows) ? rows : [rows]).filter((row) => String(row || '').trim());
   host.innerHTML = values.map((row, index) => `<div data-v2-z-header-row="${index}" style="min-width:0">${row}</div>`).join('');
   host.querySelectorAll(':scope > [data-v2-z-header-row] > *').forEach((node) => {
