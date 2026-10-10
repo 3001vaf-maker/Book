@@ -10,6 +10,8 @@ const booking = read('server/src/online-booking/online-booking.service.ts');
 const notification = read('server/src/notification/notification.service.ts');
 const telegram = read('server/src/communication/telegram-bot.service.ts');
 const broadcast = read('server/src/communication/communication-broadcast.service.ts');
+const dispatch = read('server/src/communication/communication-dispatch.service.ts');
+const communicationController = read('server/src/communication/communication.controller.ts');
 
 assert.match(registry, /user-document-pdn-consent'[\s\S]*?documentId: 'pdn-consent'[\s\S]*?personConsent: true[\s\S]*?required: true/, 'PDN consent must remain mandatory');
 assert.match(registry, /user-document-messages-consent'[\s\S]*?documentId: 'messages-consent'[\s\S]*?personConsent: true[\s\S]*?required: false/, 'Marketing consent must remain optional');
@@ -37,5 +39,9 @@ assert.match(telegram, /hasActivePdnConsentForContact\(tenantId, 'TELEGRAM', ide
 assert.match(telegram, /purpose === 'MARKETING'[\s\S]*canSendMarketing/);
 
 assert.match(broadcast, /hasActivePdnConsentForContact\(tenantId, channel, destination\)[\s\S]*canSendMarketing\(tenantId, channel, destination\)/);
+
+assert.match(communicationController, /sendChatMessage[\s\S]*purpose: 'DIRECT'/, 'Personal D must remain DIRECT, not MARKETING');
+assert.match(dispatch, /hasActivePdnConsentForIdentity\(tenantId, input\?\.phone, input\?\.uei\)[\s\S]*hasActivePdnConsentForContact\(tenantId, 'PHONE', phone\)/, 'Personal D must resolve existing PDN consent through the canonical account phone when the local person-account link is missing');
+assert.doesNotMatch(dispatch, /canSendMarketing/, 'Personal D dispatch must not require advertising consent');
 
 console.log('Consent access contract tests: OK');
