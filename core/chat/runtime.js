@@ -64,6 +64,8 @@ export function mountChatThread(root, {
   onSend,
   onMessageOpen = null,
   sendErrorMessage = 'Не удалось отправить сообщение',
+  channelOptions = [],
+  channel = '',
 } = {}) {
   if (typeof surface !== 'function') throw new Error('Chat surface owner is required');
   if (typeof onSend !== 'function') throw new Error('Chat send owner is required');
@@ -71,7 +73,10 @@ export function mountChatThread(root, {
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
   const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
-  const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({ attachments: true, attachmentTrigger: 'external' })}`;
+  const composer = Array.isArray(channelOptions) && channelOptions.length
+    ? messageComposer({ attachments: true, attachmentTrigger: 'external', channelOptions, channel })
+    : messageComposer({ attachments: true, attachmentTrigger: 'external' });
+  const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
     mode: 'thread',
     title,
@@ -106,12 +111,17 @@ export function mountChatThread(root, {
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      await onSend({ body: bodyValue, attachments });
-    } catch {
+      const formData = new FormData(form);
+      await onSend({
+        body: bodyValue,
+        attachments,
+        channel: String(formData.get('messageChannel') || channel || '').trim().toUpperCase(),
+      });
+    } catch (error) {
       if (submit) submit.disabled = false;
       openNotice({
         title: 'Сообщение не отправлено',
-        message: sendErrorMessage,
+        message: error instanceof Error && error.message ? error.message : sendErrorMessage,
         action: 'Закрыть',
         variant: 'technical',
       });

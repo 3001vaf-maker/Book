@@ -323,6 +323,7 @@ export class CommunicationService {
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
+        AND "channel" = 'IN_APP'
         AND ((${personPhone} <> '' AND "personPhone" = ${personPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
       ORDER BY "createdAt" ASC, "id" ASC LIMIT ${safeLimit}
     `;
