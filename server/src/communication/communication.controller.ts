@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
+import { EmailChannelService } from './email-channel.service';
 import { TelegramBotService } from './telegram-bot.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
@@ -12,10 +13,15 @@ type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: st
 export class CommunicationController {
   constructor(
     private readonly telegramBots: TelegramBotService,
+    private readonly emailChannel: EmailChannelService,
     private readonly history: CommunicationHistoryService,
     private readonly dispatch: CommunicationDispatchService,
     private readonly broadcasts: CommunicationBroadcastService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('integrations/email')
+  emailConnection() { return this.emailChannel.integrationStatus(); }
 
   @UseGuards(JwtAuthGuard)
   @Get('integrations/telegram')
@@ -24,6 +30,10 @@ export class CommunicationController {
   @UseGuards(JwtAuthGuard)
   @Put('integrations/telegram')
   connectTelegram(@Req() request: OwnerRequest, @Body() body: { token?: unknown }) { return this.telegramBots.connect(request.auth!.tenantId, body?.token); }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('integrations/telegram/repair')
+  repairTelegram(@Req() request: OwnerRequest) { return this.telegramBots.repairConnection(request.auth!.tenantId); }
 
   @UseGuards(JwtAuthGuard)
   @Delete('integrations/telegram')
