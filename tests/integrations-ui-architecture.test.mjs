@@ -56,7 +56,9 @@ assert.doesNotMatch(integrations, /Заменить токен|Новый ток
 assert.match(telegramCore, /integrations\/telegram\/repair/);
 assert.match(emailCore, /integrations\/email\/connect/);
 assert.match(emailCore, /method: 'DELETE'/);
-assert.match(telegramService, /getWebhookInfo/);
+assert.match(telegramService, /getUpdates/);
+assert.match(telegramService, /deleteWebhook/);
+assert.match(telegramService, /inboundOffset/);
 assert.match(telegramService, /repairConnection/);
 assert.match(telegramService, /configurationStatus/);
 assert.match(telegramService, /PUBLIC_API_URL/);
