@@ -4,6 +4,8 @@ const accountRuntime = fs.readFileSync('online-booking/account-runtime.js', 'utf
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
 const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
+const communicationModule = fs.readFileSync('server/src/communication/communication.module.ts', 'utf8');
+const platformNotice = fs.readFileSync('server/src/platform-notice/platform-notice.service.ts', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -59,7 +61,34 @@ expect(
 expect(
   communicationHistory.includes('FROM "CommunicationMessage" m')
     && !communicationHistory.match(/FROM "CommunicationMessage" m[\s\S]{0,400}m\."channel"\s*=\s*'IN_APP'/),
-  'D chat history must include Telegram messages, not only in-app messages.',
+  'Professional D chat history must include Telegram messages, not only in-app messages.',
+);
+
+const accountThreadStart = communicationService.indexOf('async listThread(');
+const accountThreadEnd = communicationService.indexOf('async listThreads(', accountThreadStart);
+const accountThread = communicationService.slice(accountThreadStart, accountThreadEnd);
+expect(
+  accountThread.includes('FROM "CommunicationMessage"')
+    && !accountThread.includes('"channel" = \'IN_APP\''),
+  'End-user D chat must show one conversation across in-app and external delivery channels.',
+);
+expect(
+  communicationService.includes('PlatformNoticeService')
+    && communicationService.includes("direction === 'inbound'")
+    && communicationService.includes("purpose === 'DIRECT'")
+    && communicationService.includes('pushToTenantOwner(tenantId'),
+  'Every newly persisted inbound direct message must notify the professional owner.',
+);
+expect(
+  platformNotice.includes('async pushToTenantOwner(')
+    && platformNotice.includes('const explicitUrl = text(metadata.url);')
+    && platformNotice.includes('explicitUrl ||'),
+  'Professional direct-message push must use the existing platform push owner and support an application URL.',
+);
+expect(
+  communicationModule.includes('PlatformNoticeModule')
+    && communicationModule.includes('NotificationModule, PlatformNoticeModule'),
+  'Communication must consume PlatformNoticeModule instead of owning a parallel push implementation.',
 );
 
 if (failures.length) {
