@@ -3,20 +3,54 @@ import {
   connectTelegramBot,
   disconnectTelegramBot,
   getTelegramBotConnection,
-  repairTelegramBotConnection,
 } from '../../core/integrations/telegram.js';
 import {
   button,
   emptyState,
-  escapeHtml,
   field,
+  infoUI,
   miniCard,
   miniCardRail,
+  modal,
+  mountModal,
   mountV2ZLayer,
+  openDocumentViewer,
   page,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+
+const TELEGRAM_SETUP_GUIDE = `1. Откройте Telegram.
+
+В поиске найдите официального бота @BotFather и откройте его.
+
+2. Создайте нового бота.
+
+Отправьте BotFather команду /newbot.
+
+3. Укажите название.
+
+BotFather попросит написать название бота. Введите любое понятное вам название. Это название будут видеть пользователи в Telegram.
+
+4. Создайте username.
+
+BotFather попросит придумать уникальное имя пользователя. Username обязательно должен заканчиваться на bot. Если выбранное имя занято, Telegram попросит выбрать другое.
+
+5. Получите токен.
+
+После создания BotFather пришлёт токен бота — длинную строку из цифр и символов.
+
+6. Скопируйте токен.
+
+Скопируйте его целиком. Не изменяйте токен и не передавайте его другим людям: он даёт доступ к управлению ботом.
+
+7. Вернитесь в приложение.
+
+Откройте Интеграции → Telegram, вставьте токен в поле «Токен Telegram-бота» и нажмите «Подключить».
+
+8. Готово.
+
+После подключения приложение самостоятельно выполнит необходимые технические настройки Telegram. Дополнительно настраивать технические параметры не требуется.`;
 
 function telegramSubtitle(state = {}) {
   if (state?.error) return 'Недоступен';
@@ -56,134 +90,138 @@ function emailMiniCard(state = {}, { interactive = false } = {}) {
   });
 }
 
-function setPrimaryVisible(source, visible) {
-  if (!source) return;
-  source.dataset.v2PrimaryVisible = visible ? 'true' : 'false';
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-}
-
-function telegramDiagnostics(state = {}) {
-  const configuration = state?.configuration || {};
-  const lines = [
-    `Ключ шифрования: ${configuration.credentialsKeyConfigured ? 'настроен' : 'не настроен'}`,
-    `API для webhook: ${configuration.publicApiUrlConfigured ? 'настроен' : 'не настроен'}`,
-    `Ссылка в приложение: ${configuration.accountAppUrlConfigured ? 'настроена' : 'не настроена'}`,
-  ];
-  if (state?.connected) {
-    lines.push(`Webhook: ${state?.webhookActive ? 'активен' : 'не работает'}`);
-    lines.push(`Очередь Telegram: ${Math.max(0, Number(state?.webhookPendingUpdateCount || 0))}`);
+function telegramInfoDocument(state = {}) {
+  if (!state?.connected) {
+    return {
+      title: 'Как подключить Telegram',
+      content: TELEGRAM_SETUP_GUIDE,
+    };
   }
-  if (state?.webhookError) lines.push(`Причина: ${String(state.webhookError)}`);
-  return lines.map((line) => `<div class="muted">${escapeHtml(line)}</div>`).join('');
+
+  const bot = String(state?.botUsername || '').trim();
+  const works = Boolean(state?.webhookActive && state?.configuration?.accountAppUrlConfigured);
+  if (works) {
+    return {
+      title: 'Telegram подключён',
+      content: `${bot ? `Бот ${bot} подключён.` : 'Telegram-бот подключён.'}\n\nПриложение выполняет необходимые технические настройки автоматически. Дополнительных действий не требуется.\n\nЧтобы подключить другого бота, сначала отключите текущего.`,
+    };
+  }
+
+  return {
+    title: 'Telegram требует внимания',
+    content: `${bot ? `Бот ${bot} сохранён.` : 'Telegram-бот сохранён.'}\n\nСейчас приложение не может подтвердить связь с Telegram. Повторно вводить токен не нужно.\n\nОткройте интеграцию позже, чтобы приложение повторило проверку. Если состояние долго не меняется, отключите текущего бота и подключите его заново.`,
+  };
 }
 
-function renderTelegramZ2(layer, baseRoot, state = {}) {
-  const connected = Boolean(state?.connected);
-  const c = connected
-    ? {
-        label: 'Отключить',
-        data: 'data-telegram-primary data-v2-primary-variant="danger"',
-        aria: 'Отключить Telegram',
-      }
-    : {
-        label: 'Подключить',
-        data: 'data-telegram-primary data-v2-primary-visible="false"',
-        aria: 'Подключить Telegram',
-      };
-  const needsRepair = connected && !state?.webhookActive;
+function telegramActionError(error, connected) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  if (/токен/i.test(message) && !/шифрован/i.test(message)) return message;
+  return connected
+    ? 'Не удалось отключить Telegram. Повторите действие.'
+    : 'Не удалось подключить Telegram. Проверьте токен и повторите действие.';
+}
 
-  layer.innerHTML = page([
-    workspaceHeaderContext({ title: 'Telegram', c }),
-    telegramMiniCard(state),
-    `<form class="form-grid" data-telegram-integration-form>
-      ${telegramDiagnostics(state)}
-      ${needsRepair ? button('Восстановить webhook', { type: 'button', data: 'data-telegram-repair' }) : ''}
-      ${field({
-        label: 'Токен бота',
-        name: 'telegramBotToken',
-        type: 'password',
-        placeholder: connected ? 'Telegram подключён' : 'Вставьте токен из BotFather',
-        disabled: connected,
-        autocomplete: 'off',
+function telegramXContent(state = {}) {
+  const connected = Boolean(state?.connected);
+  const bot = String(state?.botUsername || '').trim();
+  const unavailable = Boolean(state?.error);
+  const help = infoUI('', {
+    actionOnly: true,
+    aria: connected ? 'Информация о подключении Telegram' : 'Как подключить Telegram',
+    data: 'data-telegram-help',
+  });
+
+  if (unavailable) {
+    return `<div class="modal-title modal-title--action"><h2>Telegram</h2>${help}</div>
+      ${emptyState('Telegram временно недоступен', 'Не удалось проверить состояние подключения.')}`;
+  }
+
+  return `<div class="modal-title modal-title--action"><h2>Telegram</h2>${help}</div>
+    <form class="form-grid" data-telegram-integration-form>
+      ${connected
+        ? field({
+            label: 'Telegram-бот',
+            name: 'telegramBot',
+            value: bot || 'Telegram подключён',
+            disabled: true,
+          })
+        : field({
+            label: 'Токен Telegram-бота',
+            name: 'telegramBotToken',
+            type: 'password',
+            placeholder: 'Вставьте токен из BotFather',
+            autocomplete: 'off',
+          })}
+      ${button(connected ? 'Отключить' : 'Подключить', {
+        type: 'submit',
+        data: 'data-telegram-action',
+        variant: connected ? 'danger' : '',
+        disabled: !connected,
       })}
       <div class="muted" data-telegram-integration-status aria-live="polite"></div>
-    </form>`,
-  ]);
+    </form>`;
+}
+
+function bindTelegramX(layer, baseRoot, state = {}) {
+  const connected = Boolean(state?.connected);
+  const help = layer.querySelector('[data-telegram-help] [data-info-trigger]');
+  help?.addEventListener('click', () => {
+    const info = telegramInfoDocument(state);
+    openDocumentViewer({ title: info.title, content: info.content });
+  });
+
+  if (state?.error) return;
 
   const form = layer.querySelector('[data-telegram-integration-form]');
   const input = form?.querySelector('[name="telegramBotToken"]');
-  const primary = layer.querySelector('[data-telegram-primary]');
-  const status = layer.querySelector('[data-telegram-integration-status]');
+  const action = form?.querySelector('[data-telegram-action]');
+  const status = form?.querySelector('[data-telegram-integration-status]');
 
-  if (!connected) {
-    const sync = () => setPrimaryVisible(primary, Boolean(String(input?.value || '').trim()));
-    input?.addEventListener('input', sync);
-    input?.addEventListener('change', sync);
+  if (!connected && input && action) {
+    const sync = () => { action.disabled = !String(input.value || '').trim(); };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
     sync();
   }
 
-  layer.querySelector('[data-telegram-repair]')?.addEventListener('click', async (event) => {
-    const source = event.currentTarget;
-    source.disabled = true;
-    if (status) status.textContent = 'Восстанавливаем webhook…';
-    try {
-      const next = await repairTelegramBotConnection();
-      await renderIntegrations(baseRoot);
-      renderTelegramZ2(layer, baseRoot, next);
-    } catch (error) {
-      source.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось восстановить Telegram webhook';
-    }
-  });
-
-  primary?.addEventListener('click', async () => {
-    primary.disabled = true;
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!action) return;
+    action.disabled = true;
     if (status) status.textContent = '';
     try {
-      if (connected) {
-        const next = await disconnectTelegramBot();
-        await renderIntegrations(baseRoot);
-        renderTelegramZ2(layer, baseRoot, next);
-        return;
-      }
-      const token = String(input?.value || '').trim();
-      if (!token) {
-        primary.disabled = false;
-        setPrimaryVisible(primary, false);
-        return;
-      }
-      const next = await connectTelegramBot(token);
+      const next = connected
+        ? await disconnectTelegramBot()
+        : await connectTelegramBot(String(input?.value || '').trim());
       await renderIntegrations(baseRoot);
-      renderTelegramZ2(layer, baseRoot, next);
+      layer.v2Close?.();
+      openTelegram(baseRoot, next);
     } catch (error) {
-      primary.disabled = false;
-      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось изменить подключение Telegram';
+      action.disabled = false;
+      if (status) status.textContent = telegramActionError(error, connected);
     }
   });
-
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
 }
 
 function openTelegram(root, state = null) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'integration-telegram-layer' }), { stack: true });
+  const resolved = state || { error: 'Загрузка' };
+  const layer = mountModal(document.body, modal(telegramXContent(resolved), {
+    variant: 'x',
+    title: 'Telegram',
+    className: 'modal--form-sheet',
+    xRole: 'editor',
+  }));
   if (!layer) return null;
-  if (state && !state.error) {
-    renderTelegramZ2(layer, root, state);
-    return layer;
-  }
-  layer.innerHTML = page([
-    workspaceHeaderContext({ title: 'Telegram' }),
-    emptyState('Загрузка', 'Проверяем подключение Telegram.'),
-  ]);
+  bindTelegramX(layer, root, resolved);
+
+  if (state) return layer;
+
   void getTelegramBotConnection()
-    .then((next) => renderTelegramZ2(layer, root, next))
-    .catch((error) => {
-      layer.innerHTML = page([
-        workspaceHeaderContext({ title: 'Telegram' }),
-        emptyState('Интеграция недоступна', error instanceof Error ? error.message : 'Не удалось загрузить Telegram'),
-      ]);
-      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-    });
+    .then((next) => {
+      layer.v2Close?.();
+      openTelegram(root, next);
+    })
+    .catch(() => {});
   return layer;
 }
 
@@ -201,10 +239,10 @@ function renderEmailZ2(layer, state = {}) {
     workspaceHeaderContext({ title: 'Email' }),
     emailMiniCard(state),
     `<div class="form-grid">
-      <div class="muted">${escapeHtml(`Провайдер: ${provider}`)}</div>
-      <div class="muted">${escapeHtml(`Отправитель: ${state?.fromEmail || 'не настроен'}`)}</div>
-      <div class="muted">${escapeHtml(`SMTP: ${state?.transportReachable ? 'доступен' : 'недоступен'}`)}</div>
-      ${reason ? `<div class="muted">${escapeHtml(`Причина: ${reason}`)}</div>` : ''}
+      <div class="muted">Провайдер: ${provider}</div>
+      <div class="muted">Отправитель: ${state?.fromEmail || 'не настроен'}</div>
+      <div class="muted">SMTP: ${state?.transportReachable ? 'доступен' : 'недоступен'}</div>
+      ${reason ? `<div class="muted">Причина: ${reason}</div>` : ''}
     </div>`,
   ]);
   window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
