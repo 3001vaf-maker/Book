@@ -73,12 +73,10 @@ export function mountChatThread(root, {
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
   const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
-  const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${messageComposer({
-    attachments: true,
-    attachmentTrigger: 'external',
-    channelOptions,
-    channel,
-  })}`;
+  const composer = Array.isArray(channelOptions) && channelOptions.length
+    ? messageComposer({ attachments: true, attachmentTrigger: 'external', channelOptions, channel })
+    : messageComposer({ attachments: true, attachmentTrigger: 'external' });
+  const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
     mode: 'thread',
     title,
