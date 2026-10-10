@@ -18,7 +18,11 @@ const envExample = fs.readFileSync('server/.env.example', 'utf8');
 
 assert.match(communication, /async emailIdentity\(/);
 assert.match(communication, /person\.emails/);
-assert.match(communication, /AND "channel" = 'IN_APP'/);
+const accountThreadStart = communication.indexOf('async listThread(');
+const accountThreadEnd = communication.indexOf('async listThreads(', accountThreadStart);
+const accountThread = communication.slice(accountThreadStart, accountThreadEnd);
+assert.match(accountThread, /FROM "CommunicationMessage"/);
+assert.doesNotMatch(accountThread, /AND "channel" = 'IN_APP'/, 'End-user D chat must keep one conversation across Push, Telegram and Email channels.');
 assert.match(dispatch, /async availableChannels\(/);
 assert.doesNotMatch(dispatch, /private async availableChannels\(/);
 assert.match(dispatch, /const channels: string\[\] = \['PUSH'\]/);
