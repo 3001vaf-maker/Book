@@ -2,6 +2,8 @@ import fs from 'node:fs';
 
 const accountRuntime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
 const communicationService = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
+const telegramBot = fs.readFileSync('server/src/communication/telegram-bot.service.ts', 'utf8');
+const communicationHistory = fs.readFileSync('server/src/communication/communication-history.service.ts', 'utf8');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -39,6 +41,25 @@ expect(
   communicationService.includes('ORDER BY EXISTS (')
     && communicationService.includes('"primaryTelegram"."isPrimary" = TRUE'),
   'Outbound Telegram routing must prefer the canonical primary Telegram destination over a newer stale identity.',
+);
+expect(
+  telegramBot.includes("chat_id: telegramUserId")
+    && telegramBot.includes('identity.externalUserId')
+    && telegramBot.includes("direction: 'outbound'")
+    && telegramBot.includes("channel: 'TELEGRAM'"),
+  'A D-chat Telegram send must target the selected person Telegram id and persist as outbound Telegram history.',
+);
+expect(
+  telegramBot.includes("direction: 'inbound'")
+    && telegramBot.includes("channel: 'TELEGRAM'")
+    && telegramBot.includes('externalUserId')
+    && telegramBot.includes('processUpdate'),
+  'A Telegram reply must be mapped back to the linked person and persisted as inbound Telegram history.',
+);
+expect(
+  communicationHistory.includes('FROM "CommunicationMessage" m')
+    && !communicationHistory.match(/FROM "CommunicationMessage" m[\s\S]{0,400}m\."channel"\s*=\s*'IN_APP'/),
+  'D chat history must include Telegram messages, not only in-app messages.',
 );
 
 if (failures.length) {
