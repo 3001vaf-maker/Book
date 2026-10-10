@@ -30,7 +30,11 @@ assert.match(integrations, /label: 'Telegram-бот'/);
 assert.match(integrations, /disabled: true/);
 assert.match(integrations, /modal-title modal-title--action/);
 assert.match(modalCss, /\.modal-title--action\{display:flex;align-items:center;justify-content:space-between/);
+assert.match(integrations, /return 'Не подключён'/);
+assert.match(integrations, /return 'Подключён'/);
+assert.match(integrations, /Связь недоступна/);
 
+assert.doesNotMatch(integrations, /Требует внимания|Telegram требует внимания/);
 assert.doesNotMatch(integrations, /repairTelegramBotConnection|Восстановить webhook|telegramDiagnostics/);
 assert.doesNotMatch(integrations, /Ключ шифрования:|API для webhook:|Очередь Telegram:|Webhook: не работает|fetch failed/);
 assert.doesNotMatch(integrations, /integration-telegram-layer/);
