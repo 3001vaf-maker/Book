@@ -2,9 +2,9 @@ import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit 
 import { PrismaService } from '../prisma.service';
 import { ConsentPolicyService } from '../tenant-document-archive/consent-policy.service';
 import { NotificationService } from '../notification/notification.service';
-import { TransactionalEmailService } from '../transactional-email/transactional-email.service';
 import { CommunicationService } from './communication.service';
 import { normalizeMessagePurpose } from './message-purpose';
+import { ProfessionalEmailService } from './professional-email.service';
 
 function text(value: unknown) {
   return String(value ?? '').trim();
@@ -31,7 +31,7 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
     private readonly communications: CommunicationService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly notifications: NotificationService,
-    private readonly email: TransactionalEmailService,
+    private readonly professionalEmail: ProfessionalEmailService,
   ) {}
 
   onModuleInit() {
@@ -54,8 +54,8 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  integrationStatus() {
-    return this.email.getStatus();
+  isAvailable(tenantId: string) {
+    return this.professionalEmail.isConnected(tenantId);
   }
 
   async sendMessage(
@@ -80,10 +80,10 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Нет действующего рекламного согласия для Email');
     }
 
-    const subject = text(input?.subject) || (purpose === 'MARKETING' ? 'Сообщение' : 'Уведомление Book');
+    const subject = text(input?.subject) || (purpose === 'MARKETING' ? 'Сообщение' : 'Уведомление');
 
     try {
-      const sent = await this.email.send({
+      const sent = await this.professionalEmail.send(tenantId, {
         to: identity.externalUserId,
         subject,
         text: body,
@@ -150,9 +150,9 @@ export class EmailChannelService implements OnModuleInit, OnModuleDestroy {
               continue;
             }
 
-            await this.email.send({
+            await this.professionalEmail.send(tenantId, {
               to: delivery.recipientKey,
-              subject: delivery.title || 'Уведомление Book',
+              subject: delivery.title || 'Уведомление',
               text: delivery.body || delivery.title,
               html: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${escapeHtml(delivery.body || delivery.title)}</div>`,
               tag: `notification-${text(delivery.purpose).toLowerCase() || 'message'}`,

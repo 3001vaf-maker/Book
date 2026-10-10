@@ -8,8 +8,11 @@ const inputs = readFileSync(new URL('../ui/inputs/index.js', import.meta.url), '
 const modalCss = readFileSync(new URL('../ui/modals/modal.css', import.meta.url), 'utf8');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const telegramService = readFileSync(new URL('../server/src/communication/telegram-bot.service.ts', import.meta.url), 'utf8');
+const professionalEmail = readFileSync(new URL('../server/src/communication/professional-email.service.ts', import.meta.url), 'utf8');
+const emailChannel = readFileSync(new URL('../server/src/communication/email-channel.service.ts', import.meta.url), 'utf8');
 const transactionalEmail = readFileSync(new URL('../server/src/transactional-email/transactional-email.service.ts', import.meta.url), 'utf8');
 const communicationController = readFileSync(new URL('../server/src/communication/communication.controller.ts', import.meta.url), 'utf8');
+const emailMigration = readFileSync(new URL('../server/prisma/migrations/20261010115000_professional_email_connection/migration.sql', import.meta.url), 'utf8');
 
 assert.match(integrations, /workspaceHeaderContext\(\{ title: 'Интеграции' \}\)/);
 assert.match(integrations, /miniCardRail\(\[/);
@@ -17,6 +20,7 @@ assert.match(integrations, /telegramMiniCard\(telegramState/);
 assert.match(integrations, /emailMiniCard\(emailState/);
 
 assert.match(integrations, /modal\(telegramXContent\(resolved\)/);
+assert.match(integrations, /modal\(emailXContent\(resolved\)/);
 assert.match(integrations, /variant: 'x'/);
 assert.match(integrations, /xRole: 'editor'/);
 assert.match(integrations, /infoUI\('', \{/);
@@ -25,31 +29,56 @@ assert.match(integrations, /openDocumentViewer\(\{ title: info\.title, content: 
 assert.match(integrations, /@BotFather/);
 assert.match(integrations, /\/newbot/);
 assert.match(integrations, /Токен Telegram-бота/);
-assert.match(integrations, /button\(connected \? 'Отключить' : 'Подключить'/);
-assert.match(integrations, /label: 'Telegram-бот'/);
-assert.match(integrations, /disabled: true/);
+assert.match(integrations, /Рабочая почта/);
+assert.match(integrations, /1\. Вставьте рабочую почту/);
+assert.match(integrations, /2\. Нажмите «Подключить»/);
+assert.match(integrations, /3\. Подтвердите подключение в вашем почтовом сервисе/);
+assert.match(integrations, /4\. Готово/);
+assert.match(integrations, /data-email-action/);
+assert.match(integrations, /disconnectEmail/);
+assert.match(integrations, /beginEmailConnection/);
 assert.match(integrations, /modal-title modal-title--action/);
 assert.match(modalCss, /\.modal-title--action\{display:flex;align-items:center;justify-content:space-between/);
+assert.match(integrations, /return 'Не подключён'/);
+assert.match(integrations, /return 'Подключён'/);
+assert.match(integrations, /Связь недоступна/);
 
+assert.doesNotMatch(integrations, /Требует внимания|Telegram требует внимания/);
 assert.doesNotMatch(integrations, /repairTelegramBotConnection|Восстановить webhook|telegramDiagnostics/);
 assert.doesNotMatch(integrations, /Ключ шифрования:|API для webhook:|Очередь Telegram:|Webhook: не работает|fetch failed/);
-assert.doesNotMatch(integrations, /integration-telegram-layer/);
+assert.doesNotMatch(integrations, /integration-telegram-layer|integration-email-layer/);
+assert.doesNotMatch(integrations, /SMTP:|Yandex Cloud Postbox|Провайдер:|Отправитель:/);
+assert.doesNotMatch(integrations, /mountV2ZLayer|v2ZLayer/);
 assert.doesNotMatch(integrations, /workspaceHeaderContext\(\{ title: 'Telegram'/);
-assert.match(integrations, /integration-email-layer/);
-assert.match(integrations, /SMTP:/);
+assert.doesNotMatch(integrations, /workspaceHeaderContext\(\{ title: 'Email'/);
 assert.doesNotMatch(integrations, /Заменить токен|Новый токен бота|pageHeader|folderList|actionBlock/);
 
 assert.match(telegramCore, /integrations\/telegram\/repair/);
-assert.match(emailCore, /integrations\/email/);
+assert.match(emailCore, /integrations\/email\/connect/);
+assert.match(emailCore, /method: 'DELETE'/);
 assert.match(telegramService, /getWebhookInfo/);
 assert.match(telegramService, /repairConnection/);
 assert.match(telegramService, /configurationStatus/);
 assert.match(telegramService, /PUBLIC_API_URL/);
 assert.match(telegramService, /ACCOUNT_APP_URL/);
-assert.match(transactionalEmail, /configurationStatus/);
+
+assert.match(professionalEmail, /mail:smtp/);
+assert.match(professionalEmail, /smtp\.yandex\.com/);
+assert.match(professionalEmail, /PROFESSIONAL_EMAIL_CREDENTIALS_KEY/);
+assert.match(professionalEmail, /PROFESSIONAL_EMAIL_OAUTH_ENABLED/);
+assert.match(professionalEmail, /aes-256-gcm/);
+assert.match(professionalEmail, /replyTo: row\.email/);
+assert.doesNotMatch(professionalEmail, /mail:imap|imap\.yandex/);
+assert.match(emailChannel, /ProfessionalEmailService/);
+assert.doesNotMatch(emailChannel, /TransactionalEmailService/);
+assert.match(emailChannel, /hasActivePdnConsentForContact/);
+assert.match(emailChannel, /canSendMarketing/);
+assert.match(transactionalEmail, /yandex-postbox/);
 assert.match(transactionalEmail, /transporter\(\)\.verify\(\)/);
-assert.match(communicationController, /integrations\/email/);
-assert.match(communicationController, /integrations\/telegram\/repair/);
+assert.match(communicationController, /integrations\/email\/connect/);
+assert.match(communicationController, /integrations\/email\/oauth\/yandex\/callback/);
+assert.match(emailMigration, /ProfessionalEmailConnection/);
+assert.match(emailMigration, /ProfessionalEmailOAuthState/);
 
 assert.match(inputs, /disabled = false/);
 assert.match(inputs, /disabled \? ' disabled'/);
