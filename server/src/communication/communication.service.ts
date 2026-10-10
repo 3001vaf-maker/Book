@@ -138,8 +138,12 @@ export class CommunicationService {
 
   async resolveTelegramEntryAccount(tenantId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
-    const contact = await this.prisma.accountContact.findUnique({
-      where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
+    const contact = await this.prisma.accountContact.findFirst({
+      where: {
+        type: AccountContactType.TELEGRAM,
+        value: ticket.telegramUserId,
+        isPrimary: true,
+      },
       select: { accountId: true },
     });
     return contact
@@ -200,22 +204,40 @@ export class CommunicationService {
       `;
       if (!used) throw new ConflictException('Telegram-вход уже использован или истёк');
 
+      // One Account has one canonical Telegram destination. Rebinding is a
+      // replacement, not an additional route, so stale recipients cannot win.
+      await tx.accountContact.deleteMany({
+        where: {
+          accountId,
+          type: AccountContactType.TELEGRAM,
+          value: { not: ticket.telegramUserId },
+        },
+      });
       await tx.accountContact.upsert({
         where: { type_value: { type: AccountContactType.TELEGRAM, value: ticket.telegramUserId } },
         create: {
           accountId,
           type: AccountContactType.TELEGRAM,
           value: ticket.telegramUserId,
-          isPrimary: !text(account.telegramId),
+          isPrimary: true,
         },
-        update: {},
+        update: { isPrimary: true },
       });
-      if (!text(account.telegramId)) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: { telegramId: ticket.telegramUserId },
-        });
-      }
+      await tx.account.update({
+        where: { id: accountId },
+        data: { telegramId: ticket.telegramUserId },
+      });
+
+      await tx.$executeRaw`
+        DELETE FROM "CommunicationIdentity"
+        WHERE "tenantId" = ${tenantId}
+          AND "channel" = 'TELEGRAM'
+          AND "externalUserId" <> ${ticket.telegramUserId}
+          AND (
+            (${personPhone} <> '' AND "personPhone" = ${personPhone})
+            OR (${resolvedUei} <> '' AND "uei" = ${resolvedUei})
+          )
+      `;
 
       await tx.$executeRaw`
         INSERT INTO "CommunicationIdentity" (
@@ -273,7 +295,16 @@ export class CommunicationService {
       FROM "CommunicationIdentity"
       WHERE "tenantId" = ${tenantId} AND "channel" = 'TELEGRAM'
         AND ((${personPhone} <> '' AND "personPhone" = ${personPhone}) OR (${uei} <> '' AND "uei" = ${uei}))
-      ORDER BY "verifiedAt" DESC NULLS LAST, "updatedAt" DESC LIMIT 1
+      ORDER BY EXISTS (
+        SELECT 1
+        FROM "AccountContact" AS "primaryTelegram"
+        WHERE "primaryTelegram"."type" = 'TELEGRAM'
+          AND "primaryTelegram"."value" = "CommunicationIdentity"."externalUserId"
+          AND "primaryTelegram"."isPrimary" = TRUE
+      ) DESC,
+      "verifiedAt" DESC NULLS LAST,
+      "updatedAt" DESC
+      LIMIT 1
     `;
     return rows[0] || null;
   }
