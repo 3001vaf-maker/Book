@@ -54,10 +54,10 @@ BotFather попросит придумать уникальное имя пол
 После подключения приложение самостоятельно выполнит необходимые технические настройки Telegram. Дополнительно настраивать технические параметры не требуется.`;
 
 function telegramSubtitle(state = {}) {
-  if (state?.error) return 'Недоступен';
+  if (state?.error) return 'Связь недоступна';
   if (!state?.connected) return 'Не подключён';
-  if (state?.webhookActive && state?.configuration?.accountAppUrlConfigured) return 'Работает';
-  return 'Требует внимания';
+  if (state?.webhookActive && state?.configuration?.accountAppUrlConfigured) return 'Подключён';
+  return 'Связь недоступна';
 }
 
 function telegramMiniCard(state = {}, { interactive = false } = {}) {
@@ -94,8 +94,8 @@ function emailMiniCard(state = {}, { interactive = false } = {}) {
 function telegramInfoDocument(state = {}) {
   if (state?.error) {
     return {
-      title: 'Telegram временно недоступен',
-      content: 'Сейчас приложение не может проверить состояние Telegram. Повторно вводить токен не нужно.\n\nЗакройте это окно и попробуйте открыть интеграцию позже.',
+      title: 'Связь недоступна',
+      content: 'Сейчас приложение не может проверить состояние подключения. Повторно вводить токен не нужно.\n\nПопробуйте открыть интеграцию позже.',
     };
   }
 
@@ -110,14 +110,14 @@ function telegramInfoDocument(state = {}) {
   const works = Boolean(state?.webhookActive && state?.configuration?.accountAppUrlConfigured);
   if (works) {
     return {
-      title: 'Telegram подключён',
-      content: `${bot ? `Бот ${bot} подключён.` : 'Telegram-бот подключён.'}\n\nПриложение выполняет необходимые технические настройки автоматически. Дополнительных действий не требуется.\n\nЧтобы подключить другого бота, сначала отключите текущего.`,
+      title: 'Подключено',
+      content: `${bot ? `Бот ${bot} подключён.` : 'Бот подключён.'}\n\nПриложение выполняет необходимые технические настройки автоматически. Дополнительных действий не требуется.\n\nЧтобы подключить другого бота, сначала отключите текущего.`,
     };
   }
 
   return {
-    title: 'Telegram требует внимания',
-    content: `${bot ? `Бот ${bot} сохранён.` : 'Telegram-бот сохранён.'}\n\nСейчас приложение не может подтвердить связь с Telegram. Повторно вводить токен не нужно.\n\nОткройте интеграцию позже, чтобы приложение повторило проверку. Если состояние долго не меняется, отключите текущего бота и подключите его заново.`,
+    title: 'Связь недоступна',
+    content: `${bot ? `Бот ${bot} подключён, но сейчас не удаётся подтвердить связь.` : 'Бот подключён, но сейчас не удаётся подтвердить связь.'}\n\nПовторно вводить токен не нужно.\n\nЕсли связь долго не восстановится, отключите бота и подключите его заново.`,
   };
 }
 
@@ -141,7 +141,7 @@ function telegramXContent(state = {}) {
 
   if (unavailable) {
     return `<div class="modal-title modal-title--action"><h2>Telegram</h2>${help}</div>
-      ${emptyState('Telegram временно недоступен', 'Не удалось проверить состояние подключения.')}`;
+      ${emptyState('Связь недоступна', 'Не удалось проверить состояние подключения.')}`;
   }
 
   return `<div class="modal-title modal-title--action"><h2>Telegram</h2>${help}</div>
@@ -150,7 +150,7 @@ function telegramXContent(state = {}) {
         ? field({
             label: 'Telegram-бот',
             name: 'telegramBot',
-            value: bot || 'Telegram подключён',
+            value: bot || 'Бот подключён',
             disabled: true,
           })
         : field({
