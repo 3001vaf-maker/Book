@@ -20,7 +20,7 @@ export class CommunicationDispatchService {
     private readonly access: SaasAccessService,
   ) {}
 
-  private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
+  async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const channels: string[] = ['PUSH'];
     if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
     if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
