@@ -16,6 +16,11 @@ export async function getCommunicationThread({ phone = '', uei = '', limit = 300
   return jsonResponse(await apiRequest(`/communications/chat/thread?${query}`), 'Не удалось загрузить переписку');
 }
 
+export async function getCommunicationChannels({ phone = '', uei = '' } = {}) {
+  const query = new URLSearchParams({ phone: String(phone || ''), uei: String(uei || '') });
+  return jsonResponse(await apiRequest(`/communications/chat/channels?${query}`), 'Не удалось загрузить доступные каналы');
+}
+
 export async function getCommunicationPreferences({ phone = '', uei = '' } = {}) {
   const query = new URLSearchParams({ phone: String(phone || ''), uei: String(uei || '') });
   return jsonResponse(await apiRequest(`/communications/chat/preferences?${query}`), 'Не удалось загрузить настройки каналов');
