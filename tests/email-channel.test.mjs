@@ -31,6 +31,7 @@ assert.match(dispatch, /channel: 'IN_APP'/);
 assert.match(dispatch, /Вложения можно отправить только через Push/);
 assert.match(dispatch, /channel === 'EMAIL'/);
 assert.match(dispatch, /email\.sendMessage/);
+assert.doesNotMatch(dispatch, /hasActivePdnConsent/);
 assert.match(controller, /@Get\('chat\/channels'\)/);
 assert.match(controller, /dispatch\.availableChannels/);
 assert.match(coreChat, /getCommunicationChannels/);
@@ -38,7 +39,7 @@ assert.match(coreChat, /communications\/chat\/channels/);
 
 assert.match(emailChannel, /ProfessionalEmailService/);
 assert.doesNotMatch(emailChannel, /TransactionalEmailService/);
-assert.match(emailChannel, /hasActivePdnConsentForContact\(tenantId, 'EMAIL'/);
+assert.doesNotMatch(emailChannel, /hasActivePdnConsentForContact\(tenantId, 'EMAIL'/);
 assert.match(emailChannel, /purpose === 'MARKETING'/);
 assert.match(emailChannel, /canSendMarketing\(tenantId, 'EMAIL'/);
 assert.match(emailChannel, /pendingEmailDeliveries/);
@@ -62,14 +63,19 @@ assert.match(telegramBot, /private dispatchAllTenantsInBackground\(\)/);
 assert.match(telegramBot, /dispatchAllTenants\(\)\.catch/);
 assert.match(telegramBot, /private dispatchTenantInBackground\(tenantId: string\)/);
 assert.match(telegramBot, /dispatchTenant\(tenantId\)\.catch/);
+assert.doesNotMatch(telegramBot, /hasActivePdnConsentForContact\(tenantId, 'TELEGRAM'/);
 assert.doesNotMatch(telegramBot, /setInterval\(\(\) => void this\.dispatchAllTenants\(\)/);
 assert.doesNotMatch(telegramBot, /void this\.dispatchTenant\(tenantId\);/);
 
 assert.match(notification, /ACTIVE_EXTERNAL_CHANNELS = new Set\(\['TELEGRAM', 'EMAIL'\]\)/);
+assert.match(notification, /purpose !== 'MARKETING'\) return true/);
+assert.doesNotMatch(notification, /hasActivePdnConsent\(tenantId, identity\.accountId\)/);
 assert.match(notification, /pendingEmailDeliveries/);
 assert.match(notification, /canSendEmailDelivery/);
 
 assert.match(broadcast, /channel === 'EMAIL'/);
+assert.match(broadcast, /canSendMarketing\(tenantId, channel, destination\)/);
+assert.doesNotMatch(broadcast, /hasActivePdnConsentFor(?:Contact|Identity)\(/);
 assert.match(broadcast, /\['TELEGRAM', 'EMAIL'\]\.includes\(preview\.channel\)/);
 assert.match(compose, /DIRECT_CHANNEL_LABELS/);
 assert.match(compose, /getCommunicationChannels/);
