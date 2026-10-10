@@ -1,6 +1,6 @@
 import { text, dataAttributes } from './html.js';
 
-function headerControl(slot = {}, role = '', { column = '' } = {}) {
+function headerControl(slot = {}, role = '') {
   if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
   const aria = text(slot.aria || slot.label || role);
@@ -31,8 +31,7 @@ function headerControl(slot = {}, role = '', { column = '' } = {}) {
   } else if (kind === 'back') {
     body = '<span class="v2-header__back" aria-hidden="true">‹</span>';
   }
-  const columnStyle = column ? ` style="grid-column:${column}"` : '';
-  return `<div class="v2-header__slot v2-header__slot--${role}"${columnStyle}><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
+  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
@@ -41,16 +40,14 @@ export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
   const title = b && typeof b === 'object'
     ? `<button type="button" class="v2-header__title v2-header__title-control"${dataAttributes(b.data)} aria-label="${text(b.aria || b.label || '')}">${text(b.label || '')}</button>`
     : `<h1 class="v2-header__title">${text(b)}</h1>`;
-  const headerClasses = ['v2-header', cVisible ? 'has-c' : '', dVisible ? 'has-d' : ''].filter(Boolean).join(' ');
-  const layout = cVisible && dVisible
+  const headerClasses = ['v2-header', c && !c.hidden ? 'has-c' : '', d && !d.hidden ? 'has-d' : ''].filter(Boolean).join(' ');
+  const layout = cVisible
     ? '52px minmax(0,1fr) auto 46px'
-    : (cVisible
-        ? '52px minmax(0,1fr) auto'
-        : (dVisible ? '52px minmax(0,1fr) 46px' : '52px minmax(0,1fr)'));
+    : (dVisible ? '52px minmax(0,1fr) 0 46px' : '52px minmax(0,1fr)');
   return `<header class="${headerClasses}" data-v2-header style="grid-template-columns:${layout}">
     ${headerControl(a, 'a')}
     ${title}
-    ${headerControl(c, 'c', { column: '3' })}
-    ${headerControl(d, 'd', { column: cVisible ? '4' : '3' })}
+    ${headerControl(c, 'c')}
+    ${headerControl(d, 'd')}
   </header>`;
 }
