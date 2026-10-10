@@ -28,9 +28,6 @@ CREATE INDEX "ProfessionalEmailConnection_platformAccountId_idx"
 ALTER TABLE "ProfessionalEmailConnection"
     ADD CONSTRAINT "ProfessionalEmailConnection_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "ProfessionalEmailConnection"
-    ADD CONSTRAINT "ProfessionalEmailConnection_platformAccountId_fkey"
-    FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE TABLE "ProfessionalEmailOAuthState" (
     "id" TEXT NOT NULL,
@@ -57,6 +54,19 @@ CREATE INDEX "ProfessionalEmailOAuthState_expiresAt_idx"
 ALTER TABLE "ProfessionalEmailOAuthState"
     ADD CONSTRAINT "ProfessionalEmailOAuthState_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "ProfessionalEmailOAuthState"
-    ADD CONSTRAINT "ProfessionalEmailOAuthState_platformAccountId_fkey"
-    FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Some upgrade guards intentionally replay the pre-profile migration chain without
+-- PlatformAccount present yet. Production/full-chain installs have it by this point,
+-- so keep the account foreign keys when the relation exists without making those
+-- guarded historical replays fail.
+DO $$
+BEGIN
+    IF to_regclass('"PlatformAccount"') IS NOT NULL THEN
+        ALTER TABLE "ProfessionalEmailConnection"
+            ADD CONSTRAINT "ProfessionalEmailConnection_platformAccountId_fkey"
+            FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        ALTER TABLE "ProfessionalEmailOAuthState"
+            ADD CONSTRAINT "ProfessionalEmailOAuthState_platformAccountId_fkey"
+            FOREIGN KEY ("platformAccountId") REFERENCES "PlatformAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
