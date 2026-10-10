@@ -232,7 +232,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   async disconnect(tenantId: string) {
     const row = await this.rowForTenant(tenantId); if (!row) return { connected: false };
     try { await this.telegramApi(this.decryptToken(row), 'deleteWebhook', { drop_pending_updates: false }); } catch {}
-    await this.prisma.$queryRaw`DELETE FROM "TelegramBotConnection" WHERE "tenantId" = ${tenantId}`;
+    await this.prisma.$executeRaw`DELETE FROM "TelegramBotConnection" WHERE "tenantId" = ${tenantId}`;
     return { connected: false, status: 'disconnected', webhookActive: false, configuration: this.configurationStatus() };
   }
 
@@ -344,7 +344,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           { inline_keyboard: [[launchButton]] },
         );
         this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} send-start-reply ok`);
-        if (!identity) return { ok: true, linked: false };
+        if (!identity) {
+          this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} completed-unlinked ${Date.now() - startedAt}ms`);
+          return { ok: true, linked: false };
+        }
       }
       if (messageBody && !isStart) {
         await this.communications.recordMessage(connection.tenantId, { phone: identity!.personPhone, uei: identity!.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
