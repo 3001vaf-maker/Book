@@ -92,6 +92,13 @@ function emailMiniCard(state = {}, { interactive = false } = {}) {
 }
 
 function telegramInfoDocument(state = {}) {
+  if (state?.error) {
+    return {
+      title: 'Telegram временно недоступен',
+      content: 'Сейчас приложение не может проверить состояние Telegram. Повторно вводить токен не нужно.\n\nЗакройте это окно и попробуйте открыть интеграцию позже.',
+    };
+  }
+
   if (!state?.connected) {
     return {
       title: 'Как подключить Telegram',
