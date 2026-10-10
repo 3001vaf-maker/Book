@@ -43,7 +43,7 @@ const Z_BODY_SECTION_STYLE = [
 
 const Z_BODY_KINDS = new Set(['content', 'full', 'list']);
 
-function surfaceHeader(content = '', { kind = 'z', dismiss = false } = {}) {
+function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   return `<div ${data} style="${Z_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${Z_HEADER_CONTENT_STYLE}">${content}</div></div>`;
@@ -55,7 +55,7 @@ function surfaceBody(content = '', { kind = 'z' } = {}) {
 }
 
 export function v2ZHeader(content = '') {
-  return surfaceHeader(content, { kind: 'z', dismiss: true });
+  return surfaceHeader(content, { kind: 'z' });
 }
 
 export function v2ZBody(content = '') {
@@ -63,7 +63,7 @@ export function v2ZBody(content = '') {
 }
 
 export function v2QHeader(content = '') {
-  return surfaceHeader(content, { kind: 'q', dismiss: false });
+  return surfaceHeader(content, { kind: 'q' });
 }
 
 export function v2QBody(content = '') {
@@ -93,8 +93,7 @@ export function v2ZFrame(content = '', { header = '' } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  const qHeader = String(header || '').trim() ? v2QHeader(header) : '';
-  return `${qHeader}${v2QBody(content)}`;
+  return `${v2QHeader(header)}${v2QBody(content)}`;
 }
 
 function resolveZSurface(root) {

@@ -14,7 +14,7 @@ export function v2Shell({
 } = {}) {
   const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', eDeck ? 'has-e-deck' : '', deckOpen ? 'is-deck-open' : '', deckOpen && eOpen && eDeck ? 'is-e-open' : '', zEnter && !deckOpen ? 'is-z-entering' : '', className].filter(Boolean).join(' ');
   const feDeck = deck || eDeck ? `<div class="v2-fe-deck" data-v2-fe>${deck}${eDeck}</div>` : '';
-  return `<section class="${classes}" data-v2-app>
+  return `<section class="${classes}" data-v2-app style="--v2-base:#000000">
     ${header}
     <div class="v2-app__stage">
       ${feDeck}

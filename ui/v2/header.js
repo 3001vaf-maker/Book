@@ -1,7 +1,7 @@
 import { text, dataAttributes } from './html.js';
 
 function headerControl(slot = {}, role = '') {
-  if (!slot || slot.hidden) return `<div class="v2-header__slot v2-header__slot--${role} is-empty"></div>`;
+  if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
   const aria = text(slot.aria || slot.label || role);
   const badge = Number(slot.badge || 0) > 0 ? `<span class="v2-header__badge">${Math.min(99, Number(slot.badge || 0))}</span>` : '';
@@ -35,11 +35,16 @@ function headerControl(slot = {}, role = '') {
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
+  const cVisible = Boolean(c && !c.hidden);
+  const dVisible = Boolean(d && !d.hidden);
   const title = b && typeof b === 'object'
     ? `<button type="button" class="v2-header__title v2-header__title-control"${dataAttributes(b.data)} aria-label="${text(b.aria || b.label || '')}">${text(b.label || '')}</button>`
     : `<h1 class="v2-header__title">${text(b)}</h1>`;
   const headerClasses = ['v2-header', c && !c.hidden ? 'has-c' : '', d && !d.hidden ? 'has-d' : ''].filter(Boolean).join(' ');
-  return `<header class="${headerClasses}" data-v2-header>
+  const layout = cVisible
+    ? '52px minmax(0,1fr) auto 46px'
+    : (dVisible ? '52px minmax(0,1fr) 0 46px' : '52px minmax(0,1fr)');
+  return `<header class="${headerClasses}" data-v2-header style="grid-template-columns:${layout}">
     ${headerControl(a, 'a')}
     ${title}
     ${headerControl(c, 'c')}
