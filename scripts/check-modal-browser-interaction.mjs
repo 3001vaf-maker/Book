@@ -157,13 +157,16 @@ for (const [name, engine, contextOptions] of [
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through X veil`);
 
-    // Q owns only Header C outside its sheet.
+    // Q keeps its contextual Header C and D active; other Header zones remain veil-dismiss targets.
     await tapOrClick(page.locator('[data-test-open-q]'));
     await page.locator('[data-test-q-content]').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
     await activateSelector('[data-test-header-c]');
     assert.equal(await page.locator('[data-test-header-c-count]').textContent(), '1', `${name}: Q-owned Header C did not fire`);
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q-owned Header C dismissed Q`);
+    await activateSelector('[data-test-header-d]');
+    assert.equal(await page.locator('[data-test-header-d-count]').textContent(), '1', `${name}: Q-owned Header D did not fire`);
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q-owned Header D dismissed Q`);
     await activateSelector('[data-test-header-a]');
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
@@ -204,7 +207,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (X action→editor→picker contract, Journal time discard/save, selectors, veil, Q, 10 sheet variants)`);
+    console.log(`${name}: PASS (X action→editor→picker contract, Journal time discard/save, selectors, veil, Q C/D, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
