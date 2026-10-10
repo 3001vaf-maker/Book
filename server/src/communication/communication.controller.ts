@@ -1,19 +1,33 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
-import type { Request } from 'express';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
-import { EmailChannelService } from './email-channel.service';
+import { ProfessionalEmailService } from './professional-email.service';
 import { TelegramBotService } from './telegram-bot.service';
 
 type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: string; role: string } };
+
+function accountAppOrigin() {
+  try { return new URL(String(process.env.ACCOUNT_APP_URL || '')).origin; } catch { return ''; }
+}
+
+function emailOAuthPage(success: boolean) {
+  const origin = accountAppOrigin();
+  const payload = JSON.stringify({ type: 'va-tools:email-integration', connected: success });
+  const target = JSON.stringify(origin);
+  const title = success ? 'Почта подключена' : 'Не удалось подключить почту';
+  const text = success ? 'Почта подключена. Вернитесь в приложение.' : 'Подключение не завершено. Вернитесь в приложение и попробуйте ещё раз.';
+  const notify = origin ? `if (window.opener) window.opener.postMessage(${payload}, ${target});` : '';
+  return `<!doctype html><html lang="ru"><meta charset="utf-8"><title>${title}</title><body><p>${text}</p><script>${notify}${success ? 'setTimeout(() => window.close(), 120);' : ''}</script></body></html>`;
+}
 
 @Controller('communications')
 export class CommunicationController {
   constructor(
     private readonly telegramBots: TelegramBotService,
-    private readonly emailChannel: EmailChannelService,
+    private readonly professionalEmail: ProfessionalEmailService,
     private readonly history: CommunicationHistoryService,
     private readonly dispatch: CommunicationDispatchService,
     private readonly broadcasts: CommunicationBroadcastService,
@@ -21,7 +35,36 @@ export class CommunicationController {
 
   @UseGuards(JwtAuthGuard)
   @Get('integrations/email')
-  emailConnection() { return this.emailChannel.integrationStatus(); }
+  emailConnection(@Req() request: OwnerRequest) {
+    return this.professionalEmail.connectionStatus(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('integrations/email/connect')
+  connectEmail(@Req() request: OwnerRequest, @Body() body: { email?: unknown }) {
+    return this.professionalEmail.beginConnection(request.auth!.tenantId, request.auth!.platformAccountId, body?.email);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('integrations/email')
+  disconnectEmail(@Req() request: OwnerRequest) {
+    return this.professionalEmail.disconnect(request.auth!.tenantId, request.auth!.platformAccountId);
+  }
+
+  @Get('integrations/email/oauth/yandex/callback')
+  async emailOAuthCallback(
+    @Query('state') state: string,
+    @Query('code') code: string,
+    @Query('error') error: string,
+    @Res() response: Response,
+  ) {
+    let success = false;
+    try {
+      await this.professionalEmail.completeYandexConnection(state, code, error);
+      success = true;
+    } catch {}
+    response.status(success ? 200 : 400).type('html').send(emailOAuthPage(success));
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('integrations/telegram')

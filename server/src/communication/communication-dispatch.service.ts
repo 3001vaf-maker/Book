@@ -23,7 +23,7 @@ export class CommunicationDispatchService {
   private async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
     const channels: string[] = [];
     if (await this.communications.telegramIdentity(tenantId, input || {})) channels.push('TELEGRAM');
-    if (await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
+    if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
   }
 
