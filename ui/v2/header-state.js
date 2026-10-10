@@ -66,6 +66,7 @@ export function setV2MenuHeaderState(root, open) {
   if (!app || !header) return Boolean(open);
 
   if (open) {
+    if (header.dataset.v2MenuHeader === 'true' && menuHeaderState.has(header)) return true;
     if (!menuHeaderState.has(header)) menuHeaderState.set(header, captureHeader(header));
     applyMenuHeader(header, menuHeaderState.get(header));
     header.dataset.v2MenuHeader = 'true';
@@ -77,4 +78,27 @@ export function setV2MenuHeaderState(root, open) {
   menuHeaderState.delete(header);
   delete header.dataset.v2MenuHeader;
   return false;
+}
+
+export function bindV2MenuHeaderState(root) {
+  const app = rootApp(root);
+  if (!app || typeof MutationObserver !== 'function') return () => {};
+  let queued = false;
+  const sync = () => {
+    queued = false;
+    if (!app.isConnected || !app.classList.contains('is-deck-open')) return;
+    const header = app.querySelector(':scope > [data-v2-header]');
+    if (!header || header.dataset.v2MenuHeader === 'true') return;
+    setV2MenuHeaderState(app, true);
+  };
+  const observer = new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    queueMicrotask(sync);
+  });
+  observer.observe(app, { childList: true, subtree: true });
+  return () => {
+    observer.disconnect();
+    setV2MenuHeaderState(app, false);
+  };
 }
