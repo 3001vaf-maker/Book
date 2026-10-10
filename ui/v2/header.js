@@ -50,7 +50,7 @@ export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
   return `<header class="${headerClasses}" data-v2-header style="grid-template-columns:${layout}">
     ${headerControl(a, 'a')}
     ${title}
-    ${headerControl(c, 'c')}
+    ${headerControl(c, 'c', { column: '3' })}
     ${headerControl(d, 'd', { column: cVisible ? '4' : '3' })}
   </header>`;
 }
