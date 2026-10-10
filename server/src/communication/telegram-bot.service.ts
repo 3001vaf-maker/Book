@@ -30,6 +30,7 @@ function canonicalPhone(value: unknown) {
 }
 function sha256(value: string) { return createHash('sha256').update(value).digest('hex'); }
 function telegramUsername(value: unknown) { const clean = text(value).replace(/^@+/, ''); return clean ? `@${clean}` : ''; }
+function errorMessage(error: unknown) { return error instanceof Error ? error.message : String(error || ''); }
 
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
@@ -53,7 +54,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   private dispatchAllTenantsInBackground() {
     void this.dispatchAllTenants().catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       const stack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`Telegram delivery polling failed: ${message}`, stack);
     });
@@ -61,10 +62,24 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   private dispatchTenantInBackground(tenantId: string) {
     void this.dispatchTenant(tenantId).catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       const stack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`Telegram delivery dispatch failed for tenant ${tenantId}: ${message}`, stack);
     });
+  }
+
+  private configurationStatus() {
+    const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+    const accountAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
+    const credentialsKeyConfigured = Boolean(text(process.env.TELEGRAM_CREDENTIALS_KEY));
+    const publicApiUrlConfigured = /^https:\/\//i.test(publicApiUrl);
+    const accountAppUrlConfigured = /^https:\/\//i.test(accountAppUrl);
+    return {
+      credentialsKeyConfigured,
+      publicApiUrlConfigured,
+      accountAppUrlConfigured,
+      ready: credentialsKeyConfigured && publicApiUrlConfigured && accountAppUrlConfigured,
+    };
   }
 
   private encryptionKey() {
@@ -90,7 +105,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
   private publicConnection(row: TelegramBotRow | null) {
     if (!row) return { connected: false };
-    return { connected: true, botId: row.botId, botUsername: telegramUsername(row.botUsername), status: row.status, webhookActive: row.status === 'active', connectedAt: row.connectedAt, updatedAt: row.updatedAt };
+    return { connected: true, botId: row.botId, botUsername: telegramUsername(row.botUsername), storedStatus: row.status, connectedAt: row.connectedAt, updatedAt: row.updatedAt };
+  }
+  private expectedWebhookUrl(row: TelegramBotRow) {
+    const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+    return publicApiUrl ? `${publicApiUrl}/communications/telegram/webhook/${row.webhookKey}` : '';
   }
   private async rowForTenant(tenantId: string) {
     const rows = await this.prisma.$queryRaw<TelegramBotRow[]>`
@@ -99,9 +118,46 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     `;
     return rows[0] || null;
   }
-  async getConnection(tenantId: string) { return this.publicConnection(await this.rowForTenant(tenantId)); }
+
+  async getConnection(tenantId: string) {
+    const configuration = this.configurationStatus();
+    const row = await this.rowForTenant(tenantId);
+    if (!row) return { connected: false, status: 'disconnected', webhookActive: false, configuration };
+    const base = this.publicConnection(row);
+    if (!configuration.credentialsKeyConfigured) {
+      return { ...base, status: 'error', webhookActive: false, webhookError: 'Не настроен ключ шифрования Telegram', webhookPendingUpdateCount: 0, configuration };
+    }
+    if (!configuration.publicApiUrlConfigured) {
+      return { ...base, status: 'error', webhookActive: false, webhookError: 'Не настроен PUBLIC_API_URL', webhookPendingUpdateCount: 0, configuration };
+    }
+    try {
+      const info = await this.telegramApi(this.decryptToken(row), 'getWebhookInfo') as Record<string, any>;
+      const expectedUrl = this.expectedWebhookUrl(row);
+      const actualUrl = text(info?.url);
+      const webhookError = text(info?.last_error_message);
+      const webhookPendingUpdateCount = Math.max(0, Number(info?.pending_update_count || 0));
+      const webhookUrlMatches = Boolean(actualUrl && expectedUrl && actualUrl === expectedUrl);
+      const webhookActive = webhookUrlMatches && !webhookError;
+      const linkReady = webhookActive && configuration.accountAppUrlConfigured;
+      return {
+        ...base,
+        status: linkReady ? 'active' : webhookActive ? 'link_unconfigured' : 'error',
+        webhookActive,
+        webhookUrlMatches,
+        webhookError: webhookError || (!webhookUrlMatches ? 'Webhook Telegram не совпадает с адресом приложения' : '') || (!configuration.accountAppUrlConfigured ? 'Не настроен ACCOUNT_APP_URL' : ''),
+        webhookPendingUpdateCount,
+        configuration,
+      };
+    } catch (error) {
+      return { ...base, status: 'error', webhookActive: false, webhookError: errorMessage(error) || 'Не удалось проверить webhook Telegram', webhookPendingUpdateCount: 0, configuration };
+    }
+  }
 
   async connect(tenantId: string, rawToken: unknown) {
+    const configuration = this.configurationStatus();
+    if (!configuration.credentialsKeyConfigured) throw new ServiceUnavailableException('Не настроен ключ шифрования Telegram');
+    if (!configuration.publicApiUrlConfigured) throw new ServiceUnavailableException('Не настроен PUBLIC_API_URL для Telegram webhook');
+    if (!configuration.accountAppUrlConfigured) throw new ServiceUnavailableException('Не настроен ACCOUNT_APP_URL для Telegram-входа');
     const token = text(rawToken);
     if (!/^\d{5,}:[A-Za-z0-9_-]{20,}$/.test(token)) throw new BadRequestException('Некорректный токен Telegram-бота');
     if (await this.rowForTenant(tenantId)) {
@@ -111,25 +167,43 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!bot?.id || !bot?.is_bot) throw new BadRequestException('Токен не принадлежит Telegram-боту');
     const botId = String(bot.id); const botUsername = telegramUsername(bot.username);
     const ownership = await this.prisma.$queryRaw<Array<{ tenantId: string }>>`SELECT "tenantId" FROM "TelegramBotConnection" WHERE "botId" = ${botId} LIMIT 1`;
-    if (ownership[0] && ownership[0].tenantId !== tenantId) throw new ConflictException('Этот Telegram-бот уже подключён к другому аккаунту Book');
+    if (ownership[0] && ownership[0].tenantId !== tenantId) throw new ConflictException('Этот Telegram-бот уже подключён к другому аккаунту');
     const encrypted = this.encryptToken(token); const webhookKey = randomBytes(24).toString('base64url'); const webhookSecret = randomBytes(24).toString('base64url');
-    let status = 'connected'; const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
-    if (publicApiUrl) {
-      await this.telegramApi(token, 'setWebhook', { url: `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
-      status = 'active';
-    }
+    const publicApiUrl = text(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+    await this.telegramApi(token, 'setWebhook', { url: `${publicApiUrl}/communications/telegram/webhook/${webhookKey}`, secret_token: webhookSecret, allowed_updates: ['message'], drop_pending_updates: false });
     const inserted = await this.prisma.$executeRaw`
       INSERT INTO "TelegramBotConnection" ("id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt")
-      VALUES (${randomUUID()}, ${tenantId}, ${botId}, ${botUsername}, ${encrypted.encryptedToken}, ${encrypted.tokenIv}, ${encrypted.tokenTag}, ${webhookKey}, ${sha256(webhookSecret)}, ${status}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (${randomUUID()}, ${tenantId}, ${botId}, ${botUsername}, ${encrypted.encryptedToken}, ${encrypted.tokenIv}, ${encrypted.tokenTag}, ${webhookKey}, ${sha256(webhookSecret)}, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT ("tenantId") DO NOTHING
     `;
     if (!inserted) {
-      if (publicApiUrl) {
-        try { await this.telegramApi(token, 'deleteWebhook', { drop_pending_updates: false }); } catch {}
-      }
+      try { await this.telegramApi(token, 'deleteWebhook', { drop_pending_updates: false }); } catch {}
       throw new ConflictException('Telegram-бот уже подключён. Сначала отключите его.');
     }
     this.dispatchTenantInBackground(tenantId);
+    return this.getConnection(tenantId);
+  }
+
+  async repairConnection(tenantId: string) {
+    const configuration = this.configurationStatus();
+    if (!configuration.credentialsKeyConfigured) throw new ServiceUnavailableException('Не настроен ключ шифрования Telegram');
+    if (!configuration.publicApiUrlConfigured) throw new ServiceUnavailableException('Не настроен PUBLIC_API_URL для Telegram webhook');
+    if (!configuration.accountAppUrlConfigured) throw new ServiceUnavailableException('Не настроен ACCOUNT_APP_URL для Telegram-входа');
+    const row = await this.rowForTenant(tenantId);
+    if (!row) throw new NotFoundException('Telegram-бот не подключён');
+    const token = this.decryptToken(row);
+    const webhookSecret = randomBytes(24).toString('base64url');
+    await this.telegramApi(token, 'setWebhook', {
+      url: this.expectedWebhookUrl(row),
+      secret_token: webhookSecret,
+      allowed_updates: ['message'],
+      drop_pending_updates: false,
+    });
+    await this.prisma.$executeRaw`
+      UPDATE "TelegramBotConnection"
+      SET "webhookSecretHash" = ${sha256(webhookSecret)}, "status" = 'active', "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "tenantId" = ${tenantId}
+    `;
     return this.getConnection(tenantId);
   }
 
@@ -137,7 +211,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const row = await this.rowForTenant(tenantId); if (!row) return { connected: false };
     try { await this.telegramApi(this.decryptToken(row), 'deleteWebhook', { drop_pending_updates: false }); } catch {}
     await this.prisma.$executeRaw`DELETE FROM "TelegramBotConnection" WHERE "tenantId" = ${tenantId}`;
-    return { connected: false };
+    return { connected: false, status: 'disconnected', webhookActive: false, configuration: this.configurationStatus() };
   }
 
   async sendMessage(tenantId: string, telegramUserId: string, body: string) {
@@ -174,7 +248,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const result = await this.sendMessage(tenantId, identity.externalUserId, body);
       return this.communications.recordMessage(tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, externalMessageId: String(result?.message_id || ''), externalThreadId: String(result?.chat?.id || identity.externalUserId), status: 'sent' });
     } catch (error) {
-      await this.communications.recordMessage(tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+      await this.communications.recordMessage(tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'outbound', kind: 'message', purpose, channel: 'TELEGRAM', body, status: 'failed', error: errorMessage(error) });
       throw error;
     }
   }
@@ -195,7 +269,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           if (!allowed) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, 'Отправка запрещена для purpose/канала'); failed += 1; continue; }
           await this.telegramApi(token, 'sendMessage', { chat_id: delivery.recipientKey, text: delivery.body || delivery.title });
           await this.notifications.markTelegramSent(tenantId, delivery.deliveryId); sent += 1;
-        } catch (error) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, error instanceof Error ? error.message : String(error)); failed += 1; }
+        } catch (error) { await this.notifications.markTelegramFailed(tenantId, delivery.deliveryId, errorMessage(error)); failed += 1; }
       }
       return { busy: false, sent, failed };
     } finally { this.dispatching.delete(tenantId); }
