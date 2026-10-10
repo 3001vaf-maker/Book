@@ -313,14 +313,14 @@ export class OnlineBookingController {
     return this.notifications.markReadForAccount(tenantId, request.accountAuth!.accountId, notificationId);
   }
 
-  @UseGuards(AccountGuard, BookingPdnConsentGuard)
+  @UseGuards(AccountGuard)
   @Get(':tenantId/account/chat')
   async accountChat(@Param('tenantId') tenantId: string, @Req() request: AccountRequest) {
     const context = await this.booking.accountTenantContactContext(tenantId, request.accountAuth!.accountId);
     return this.communications.listThread(tenantId, context, 500);
   }
 
-  @UseGuards(AccountGuard, BookingPdnConsentGuard)
+  @UseGuards(AccountGuard)
   @Post(':tenantId/account/chat/messages')
   async sendAccountChatMessage(
     @Param('tenantId') tenantId: string,
