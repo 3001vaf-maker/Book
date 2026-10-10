@@ -21,6 +21,7 @@ type TelegramBotRow = {
   webhookKey: string; webhookSecretHash: string; status: string; connectedAt: Date; updatedAt: Date;
 };
 type TelegramIdentityRow = { personPhone: string; uei: string };
+const TELEGRAM_API_TIMEOUT_MS = 10_000;
 function text(value: unknown) { return String(value ?? '').trim(); }
 function canonicalPhone(value: unknown) {
   const digits = text(value).replace(/\D/g, '');
@@ -98,10 +99,24 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return Buffer.concat([decipher.update(Buffer.from(row.encryptedToken, 'base64url')), decipher.final()]).toString('utf8');
   }
   private async telegramApi(token: string, method: string, payload: Record<string, any> = {}) {
-    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const data = await response.json().catch(() => ({})) as Record<string, any>;
-    if (!response.ok || !data.ok) throw new BadRequestException(text(data?.description) || 'Telegram отклонил запрос');
-    return data.result;
+    const startedAt = Date.now();
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(TELEGRAM_API_TIMEOUT_MS),
+      });
+      const data = await response.json().catch(() => ({})) as Record<string, any>;
+      if (!response.ok || !data.ok) throw new BadRequestException(text(data?.description) || 'Telegram отклонил запрос');
+      this.logger.log(`[telegram-api] ${method} ok ${Date.now() - startedAt}ms`);
+      return data.result;
+    } catch (error) {
+      const message = errorMessage(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[telegram-api] ${method} failed ${Date.now() - startedAt}ms: ${message}`, stack);
+      throw error;
+    }
   }
   private publicConnection(row: TelegramBotRow | null) {
     if (!row) return { connected: false };
@@ -131,6 +146,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       return { ...base, status: 'error', webhookActive: false, webhookError: 'Не настроен PUBLIC_API_URL', webhookPendingUpdateCount: 0, configuration };
     }
     try {
+      this.logger.log(`[telegram-health] checking tenant=${tenantId} bot=${row.botUsername}`);
       const info = await this.telegramApi(this.decryptToken(row), 'getWebhookInfo') as Record<string, any>;
       const expectedUrl = this.expectedWebhookUrl(row);
       const actualUrl = text(info?.url);
@@ -139,6 +155,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const webhookUrlMatches = Boolean(actualUrl && expectedUrl && actualUrl === expectedUrl);
       const webhookActive = webhookUrlMatches && !webhookError;
       const linkReady = webhookActive && configuration.accountAppUrlConfigured;
+      this.logger.log(`[telegram-health] tenant=${tenantId} active=${webhookActive} urlMatches=${webhookUrlMatches} pending=${webhookPendingUpdateCount} telegramError=${Boolean(webhookError)}`);
       return {
         ...base,
         status: linkReady ? 'active' : webhookActive ? 'link_unconfigured' : 'error',
@@ -149,7 +166,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         configuration,
       };
     } catch (error) {
-      return { ...base, status: 'error', webhookActive: false, webhookError: errorMessage(error) || 'Не удалось проверить webhook Telegram', webhookPendingUpdateCount: 0, configuration };
+      const message = errorMessage(error) || 'Не удалось проверить webhook Telegram';
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[telegram-health] tenant=${tenantId} failed: ${message}`, stack);
+      return { ...base, status: 'error', webhookActive: false, webhookError: message, webhookPendingUpdateCount: 0, configuration };
     }
   }
 
@@ -193,6 +213,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!row) throw new NotFoundException('Telegram-бот не подключён');
     const token = this.decryptToken(row);
     const webhookSecret = randomBytes(24).toString('base64url');
+    this.logger.log(`[telegram-repair] tenant=${tenantId} setWebhook start`);
     await this.telegramApi(token, 'setWebhook', {
       url: this.expectedWebhookUrl(row),
       secret_token: webhookSecret,
@@ -204,6 +225,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       SET "webhookSecretHash" = ${sha256(webhookSecret)}, "status" = 'active', "updatedAt" = CURRENT_TIMESTAMP
       WHERE "tenantId" = ${tenantId}
     `;
+    this.logger.log(`[telegram-repair] tenant=${tenantId} setWebhook stored`);
     return this.getConnection(tenantId);
   }
 
@@ -273,36 +295,71 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleWebhook(webhookKey: string, secretToken: unknown, update: Record<string, any>) {
-    const rows = await this.prisma.$queryRaw<TelegramBotRow[]>`
-      SELECT "id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt"
-      FROM "TelegramBotConnection" WHERE "webhookKey" = ${webhookKey} LIMIT 1
-    `;
-    const connection = rows[0]; if (!connection) throw new NotFoundException('Telegram webhook не найден');
-    if (sha256(text(secretToken)) !== connection.webhookSecretHash) throw new UnauthorizedException('Некорректный Telegram webhook secret');
-    const message = update?.message; if (!message?.from?.id || !message?.chat?.id) return { ok: true };
-    const telegramUserId = String(message.from.id); const username = telegramUsername(message.from.username); const messageBody = text(message.text || message.caption);
-    const identities = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
-      SELECT "personPhone", "uei" FROM "CommunicationIdentity"
-      WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
-    `;
-    const identity = identities[0] || null;
-    if (!identity || messageBody === '/start') {
-      const entry = await this.communications.createTelegramEntry(connection.tenantId, { telegramUserId, username });
-      const accountAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
-      if (accountAppUrl) {
+    const updateId = text(update?.update_id) || 'unknown';
+    const startedAt = Date.now();
+    this.logger.log(`[telegram-webhook] received update=${updateId}`);
+    try {
+      const rows = await this.prisma.$queryRaw<TelegramBotRow[]>`
+        SELECT "id", "tenantId", "botId", "botUsername", "encryptedToken", "tokenIv", "tokenTag", "webhookKey", "webhookSecretHash", "status", "connectedAt", "updatedAt"
+        FROM "TelegramBotConnection" WHERE "webhookKey" = ${webhookKey} LIMIT 1
+      `;
+      const connection = rows[0];
+      if (!connection) {
+        this.logger.warn(`[telegram-webhook] update=${updateId} connection-not-found`);
+        throw new NotFoundException('Telegram webhook не найден');
+      }
+      if (sha256(text(secretToken)) !== connection.webhookSecretHash) {
+        this.logger.warn(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} secret-mismatch`);
+        throw new UnauthorizedException('Некорректный Telegram webhook secret');
+      }
+      const message = update?.message;
+      if (!message?.from?.id || !message?.chat?.id) {
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} ignored-non-message`);
+        return { ok: true };
+      }
+      const telegramUserId = String(message.from.id); const username = telegramUsername(message.from.username); const messageBody = text(message.text || message.caption);
+      const isStart = /^\/start(?:@\w+)?(?:\s|$)/i.test(messageBody);
+      this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} message-received start=${isStart}`);
+      const identities = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
+        SELECT "personPhone", "uei" FROM "CommunicationIdentity"
+        WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
+      `;
+      const identity = identities[0] || null;
+      this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} identity-found=${Boolean(identity)}`);
+      if (!identity || isStart) {
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} create-entry start`);
+        const entry = await this.communications.createTelegramEntry(connection.tenantId, { telegramUserId, username });
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} create-entry ok`);
+        const accountAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
+        if (!accountAppUrl) throw new ServiceUnavailableException('Не настроен ACCOUNT_APP_URL для Telegram-входа');
         const url = new URL(accountAppUrl); url.searchParams.set('booking', connection.tenantId); url.searchParams.set('tg_entry', entry.token);
+        const launchButton = message.chat.type === 'private'
+          ? { text: 'Открыть приложение', web_app: { url: url.toString() } }
+          : { text: 'Открыть приложение', url: url.toString() };
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} send-start-reply start`);
         await this.sendSystemMessage(
           connection,
           message.chat.id,
-          'Откройте Book, чтобы продолжить.',
-          { inline_keyboard: [[{ text: 'Открыть Book', url: url.toString() }]] },
+          'Откройте приложение, чтобы продолжить.',
+          { inline_keyboard: [[launchButton]] },
         );
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} send-start-reply ok`);
+        if (!identity) {
+          this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} completed-unlinked ${Date.now() - startedAt}ms`);
+          return { ok: true, linked: false };
+        }
       }
-      if (!identity) return { ok: true, linked: false };
+      if (messageBody && !isStart) {
+        await this.communications.recordMessage(connection.tenantId, { phone: identity!.personPhone, uei: identity!.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
+        this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} inbound-recorded`);
+      }
+      this.logger.log(`[telegram-webhook] update=${updateId} tenant=${connection.tenantId} completed ${Date.now() - startedAt}ms`);
+      return { ok: true, linked: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[telegram-webhook] update=${updateId} failed ${Date.now() - startedAt}ms: ${message}`, stack);
+      throw error;
     }
-    if (messageBody && messageBody !== '/start') {
-      await this.communications.recordMessage(connection.tenantId, { phone: identity.personPhone, uei: identity.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
-    }
-    return { ok: true, linked: true };
   }
 }
