@@ -66,7 +66,7 @@ assert.match(compose, /value: 'PUSH', label: 'Push'/);
 assert.match(compose, /value: 'TELEGRAM', label: 'Telegram'/);
 assert.match(compose, /value: 'EMAIL', label: 'Email'/);
 assert.match(compose, /channelOptions: DIRECT_CHANNEL_OPTIONS/);
-assert.match(compose, /sendCommunicationMessage\(\{ channel/);
+assert.match(compose, /sendCommunicationMessage\(\{\s*channel:/);
 assert.match(chatRuntime, /channelOptions = \[\]/);
 assert.match(chatRuntime, /formData\.get\('messageChannel'\)/);
 assert.match(sharedChat, /name: 'messageChannel'/);
