@@ -266,6 +266,58 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async isExternalThreadAvailable(tenantId: string, externalThreadId: unknown) {
+    const threadId = text(externalThreadId);
+    if (!/^-?\d+$/.test(threadId) || !(await this.rowForTenant(tenantId))) return false;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "CommunicationIdentity"
+      WHERE "tenantId" = ${tenantId}
+        AND "channel" = 'TELEGRAM'
+        AND "externalUserId" = ${threadId}
+        AND "personPhone" = ''
+        AND "uei" = ''
+      LIMIT 1
+    `;
+    return Boolean(rows[0]);
+  }
+
+  async sendExternalThreadMessage(tenantId: string, input: { externalThreadId?: unknown; body?: unknown; purpose?: unknown }) {
+    const externalThreadId = text(input?.externalThreadId);
+    const body = text(input?.body);
+    const purpose = normalizeMessagePurpose(input?.purpose);
+    if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
+    if (purpose !== 'DIRECT') throw new BadRequestException('Внешний Telegram-диалог доступен только для прямых сообщений');
+    if (!body) throw new BadRequestException('Пустое сообщение');
+    if (!(await this.isExternalThreadAvailable(tenantId, externalThreadId))) {
+      throw new NotFoundException('Telegram-диалог недоступен');
+    }
+    try {
+      const result = await this.sendMessage(tenantId, externalThreadId, body);
+      return this.communications.recordMessage(tenantId, {
+        direction: 'outbound',
+        kind: 'message',
+        purpose,
+        channel: 'TELEGRAM',
+        body,
+        externalMessageId: String(result?.message_id || ''),
+        externalThreadId,
+        status: 'sent',
+      });
+    } catch (error) {
+      await this.communications.recordMessage(tenantId, {
+        direction: 'outbound',
+        kind: 'message',
+        purpose,
+        channel: 'TELEGRAM',
+        body,
+        externalThreadId,
+        status: 'failed',
+        error: errorMessage(error),
+      });
+      throw error;
+    }
+  }
+
   async sendChatMessage(tenantId: string, input: { phone?: unknown; uei?: unknown; body?: unknown; purpose?: unknown }) {
     const body = text(input?.body); if (!body) throw new BadRequestException('Пустое сообщение');
     const purpose = normalizeMessagePurpose(input?.purpose); if (!purpose) throw new BadRequestException('Не указан purpose сообщения');
@@ -363,8 +415,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       SELECT "personPhone", "uei" FROM "CommunicationIdentity"
       WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
     `;
-    const identity = identities[0] || null;
-    this.logger.log(`[telegram-${source}] update=${updateId} tenant=${connection.tenantId} identity-found=${Boolean(identity)}`);
+    let identity = identities[0] || null;
+    if (!identity && message.chat.type === 'private') {
+      identity = await this.communications.ensureTelegramInboundIdentity(connection.tenantId, { telegramUserId, username });
+    }
+    const linkedIdentity = Boolean(identity && (canonicalPhone(identity.personPhone) || text(identity.uei)));
+    this.logger.log(`[telegram-${source}] update=${updateId} tenant=${connection.tenantId} identity-found=${Boolean(identity)} linked=${linkedIdentity}`);
     if (!identity || isStart) {
       const entry = await this.communications.createTelegramEntry(connection.tenantId, { telegramUserId, username });
       const accountAppUrl = text(process.env.ACCOUNT_APP_URL).replace(/\/$/, '');
@@ -386,10 +442,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
     if (messageBody && !isStart) {
       await this.communications.recordMessage(connection.tenantId, { phone: identity!.personPhone, uei: identity!.uei, direction: 'inbound', kind: 'message', purpose: 'DIRECT', channel: 'TELEGRAM', body: messageBody, externalMessageId: String(message.message_id || ''), externalThreadId: String(message.chat.id), status: 'delivered' });
-      this.logger.log(`[telegram-${source}] update=${updateId} tenant=${connection.tenantId} inbound-recorded`);
+      this.logger.log(`[telegram-${source}] update=${updateId} tenant=${connection.tenantId} inbound-recorded linked=${linkedIdentity}`);
     }
     this.logger.log(`[telegram-${source}] update=${updateId} tenant=${connection.tenantId} completed ${Date.now() - startedAt}ms`);
-    return { ok: true, linked: true };
+    return { ok: true, linked: linkedIdentity };
   }
 
   async handleWebhook(webhookKey: string, secretToken: unknown, update: Record<string, any>) {
