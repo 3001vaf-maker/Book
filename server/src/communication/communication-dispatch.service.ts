@@ -25,26 +25,35 @@ export class CommunicationDispatchService {
     private readonly access: SaasAccessService,
   ) {}
 
-  async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown }) {
+  async availableChannels(tenantId: string, input: { phone?: unknown; uei?: unknown; externalThreadId?: unknown }) {
+    const externalThreadId = text(input?.externalThreadId);
+    if (externalThreadId) {
+      return await this.telegram.isExternalThreadAvailable(tenantId, externalThreadId) ? ['TELEGRAM'] : [];
+    }
     const channels: string[] = ['PUSH'];
     if (await this.communications.telegramIdentity(tenantId, telegramRecipient(input || {}))) channels.push('TELEGRAM');
     if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
   }
 
-  async resolveChannel(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown }) {
+  async resolveChannel(tenantId: string, input: { phone?: unknown; uei?: unknown; externalThreadId?: unknown; channel?: unknown }) {
     const requested = text(input?.channel).toUpperCase();
+    const externalThreadId = text(input?.externalThreadId);
     const available = await this.availableChannels(tenantId, input || {});
     if (requested) {
       if (!available.includes(requested)) throw new NotFoundException(`Канал ${requested} у человека недоступен`);
       return requested;
+    }
+    if (externalThreadId) {
+      if (!available.includes('TELEGRAM')) throw new NotFoundException('Telegram-диалог недоступен');
+      return 'TELEGRAM';
     }
     const preferences = await this.history.getPreferences(tenantId, input || {});
     const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
     return preferred || available[0];
   }
 
-  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
+  async send(tenantId: string, input: { phone?: unknown; uei?: unknown; externalThreadId?: unknown; channel?: unknown; subject?: unknown; body?: unknown; attachments?: unknown; purpose: MessagePurpose }) {
     await this.access.assertRealOperationsAllowed(tenantId);
     const body = text(input?.body);
     const attachments = Array.isArray(input?.attachments) ? input.attachments : [];
@@ -68,6 +77,10 @@ export class CommunicationDispatchService {
       });
     }
     if (channel === 'TELEGRAM') {
+      const externalThreadId = text(input?.externalThreadId);
+      if (externalThreadId) {
+        return this.telegram.sendExternalThreadMessage(tenantId, { externalThreadId, body, purpose: input.purpose });
+      }
       const recipient = telegramRecipient(input || {});
       return this.telegram.sendChatMessage(tenantId, { ...recipient, body, purpose: input.purpose });
     }
