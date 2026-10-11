@@ -153,6 +153,24 @@ export class CommunicationService {
       : { exists: false, accountId: '' };
   }
 
+  async ensureTelegramInboundIdentity(tenantId: string, input: { telegramUserId?: unknown; username?: unknown }) {
+    const externalUserId = text(input?.telegramUserId);
+    if (!/^\d+$/.test(externalUserId)) throw new BadRequestException('Некорректный Telegram ID');
+    const display = telegramUsername(input?.username);
+    const rows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
+      INSERT INTO "CommunicationIdentity" (
+        "id", "tenantId", "personPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
+      ) VALUES (
+        ${randomUUID()}, ${tenantId}, '', '', 'TELEGRAM', ${externalUserId}, ${display}, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
+      SET "display" = CASE WHEN EXCLUDED."display" <> '' THEN EXCLUDED."display" ELSE "CommunicationIdentity"."display" END,
+          "updatedAt" = CURRENT_TIMESTAMP
+      RETURNING "id", "personPhone", "uei", "externalUserId", "display"
+    `;
+    return rows[0] || null;
+  }
+
   async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {
     const ticket = await this.telegramEntry(tenantId, entryToken);
     const account = await this.prisma.account.findUnique({ where: { id: accountId }, select: { phone: true, telegramId: true } });
@@ -175,6 +193,7 @@ export class CommunicationService {
       LIMIT 1
     `;
     const existingTelegram = telegramRows[0] || null;
+    const provisionalTelegram = Boolean(existingTelegram && !canonicalPhone(existingTelegram.personPhone) && !text(existingTelegram.uei));
     const samePhone = Boolean(existingTelegram && canonicalPhone(existingTelegram.personPhone) === personPhone);
 
     const business = await this.businessState.get(tenantId);
@@ -188,13 +207,13 @@ export class CommunicationService {
     const uei = text(identity?.uei);
     const display = telegramUsername(ticket.username);
 
-    if (existingTelegram) {
+    if (existingTelegram && !provisionalTelegram) {
       if (!samePhone) throw new ConflictException('Этот Telegram уже связан с другой Person');
       if (existingTelegram.uei && uei && existingTelegram.uei !== uei) {
         throw new ConflictException('Этот Telegram уже связан с другим UEI');
       }
     }
-    const resolvedUei = uei || text(existingTelegram?.uei);
+    const resolvedUei = uei || (provisionalTelegram ? '' : text(existingTelegram?.uei));
 
     await this.prisma.$transaction(async (tx) => {
       const used = await tx.$executeRaw`
@@ -248,9 +267,21 @@ export class CommunicationService {
           ${randomUUID()}, ${tenantId}, ${personPhone}, ${resolvedUei}, 'TELEGRAM', ${ticket.telegramUserId}, ${display}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
-        SET "display" = EXCLUDED."display",
+        SET "personPhone" = EXCLUDED."personPhone",
+            "uei" = EXCLUDED."uei",
+            "display" = EXCLUDED."display",
             "verifiedAt" = CURRENT_TIMESTAMP,
             "updatedAt" = CURRENT_TIMESTAMP
+      `;
+
+      await tx.$executeRaw`
+        UPDATE "CommunicationMessage"
+        SET "personPhone" = ${personPhone}, "uei" = ${resolvedUei}
+        WHERE "tenantId" = ${tenantId}
+          AND "channel" = 'TELEGRAM'
+          AND "externalThreadId" = ${ticket.telegramUserId}
+          AND "personPhone" = ''
+          AND "uei" = ''
       `;
     });
 
@@ -329,7 +360,8 @@ export class CommunicationService {
     const externalMessageId = text(input?.externalMessageId);
     const externalThreadId = text(input?.externalThreadId);
     const error = text(input?.error).slice(0, 2000);
-    if (!personPhone && !uei) throw new BadRequestException('Не указан человек');
+    const telegramExternalThread = channel === 'TELEGRAM' && /^-?\d+$/.test(externalThreadId);
+    if (!personPhone && !uei && !telegramExternalThread) throw new BadRequestException('Не указан человек');
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
     const id = randomUUID();
     const now = new Date();
@@ -354,6 +386,7 @@ export class CommunicationService {
           phone: personPhone,
           uei,
           channel,
+          externalThreadId,
         },
       }).catch(() => ({ sent: 0, failed: 0 }));
     }
@@ -383,6 +416,7 @@ export class CommunicationService {
              "externalMessageId", "externalThreadId", "status", "createdAt", "sentAt", "deliveredAt", "readAt", "failedAt", "error"
       FROM "CommunicationMessage"
       WHERE "tenantId" = ${tenantId}
+        AND ("uei" <> '' OR "personPhone" <> '')
       ORDER BY COALESCE(NULLIF("uei", ''), "personPhone"), "createdAt" DESC, "id" DESC
       LIMIT ${safeLimit}
     `;

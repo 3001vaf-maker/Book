@@ -40,10 +40,11 @@ const DIRECT_CHANNEL_LABELS = Object.freeze({
   EMAIL: 'Email',
 });
 
-function directChannelOptions(channels = []) {
-  const available = new Set(['PUSH', ...(Array.isArray(channels) ? channels : [])]
+function directChannelOptions(channels = [], { defaultPush = true } = {}) {
+  const normalized = (Array.isArray(channels) ? channels : [])
     .map((value) => String(value || '').trim().toUpperCase())
-    .filter((value) => DIRECT_CHANNEL_LABELS[value]));
+    .filter((value) => DIRECT_CHANNEL_LABELS[value]);
+  const available = new Set(normalized.length ? normalized : (defaultPush ? ['PUSH'] : []));
   return ['PUSH', 'TELEGRAM', 'EMAIL']
     .filter((value) => available.has(value))
     .map((value) => ({ value, label: DIRECT_CHANNEL_LABELS[value] }));
@@ -54,6 +55,21 @@ function personNameByPhone(phone, uei = '') {
   const person = people.find((item) => !uei || String(item.uei || '') === String(uei)) || people[0];
   const name = [person?.name, person?.surname].filter(Boolean).join(' ').trim();
   return name || String(phone || 'Человек');
+}
+
+function threadTitle(thread = {}) {
+  const phone = String(thread?.personPhone || '').trim();
+  const uei = String(thread?.uei || '').trim();
+  if (phone) return personNameByPhone(phone, uei);
+  if (uei) {
+    const person = getAllPeople().find((item) => String(item?.uei || '') === uei);
+    const name = [person?.name, person?.surname].filter(Boolean).join(' ').trim();
+    if (name) return name;
+  }
+  const display = String(thread?.display || '').trim();
+  if (display) return display;
+  if (String(thread?.channel || '').trim().toUpperCase() === 'TELEGRAM' && String(thread?.externalThreadId || '').trim()) return 'Telegram';
+  return 'Человек';
 }
 
 function personName(person = {}) {
@@ -404,7 +420,8 @@ async function openThread(root, state, thread) {
   state.thread = thread;
   const phone = String(thread?.personPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
-  const title = personNameByPhone(phone, uei);
+  const externalThreadId = String(thread?.externalThreadId || '').trim();
+  const title = threadTitle(thread);
 
   renderChatSurface(root, {
     title,
@@ -414,12 +431,14 @@ async function openThread(root, state, thread) {
 
   try {
     const [messages, channelState] = await Promise.all([
-      getCommunicationThread({ phone, uei }),
-      getCommunicationChannels({ phone, uei }).catch(() => ({ channels: ['PUSH'] })),
+      getCommunicationThread({ phone, uei, externalThreadId }),
+      getCommunicationChannels({ phone, uei, externalThreadId }).catch(() => ({ channels: externalThreadId ? [] : ['PUSH'] })),
     ]);
-    const channelOptions = directChannelOptions(channelState?.channels);
+    const channelOptions = directChannelOptions(channelState?.channels, { defaultPush: !externalThreadId });
     const previousChannel = lastDirectChannel(messages);
-    const channel = channelOptions.some((option) => option.value === previousChannel) ? previousChannel : 'PUSH';
+    const channel = channelOptions.some((option) => option.value === previousChannel)
+      ? previousChannel
+      : (channelOptions[0]?.value || '');
     mountChatThread(root, {
       title,
       messages,
@@ -430,7 +449,7 @@ async function openThread(root, state, thread) {
       channelOptions,
       channel,
       onSend: async ({ body, attachments, channel: selectedChannel }) => {
-        await sendCommunicationMessage({ channel: selectedChannel, phone, uei, body, attachments });
+        await sendCommunicationMessage({ channel: selectedChannel, phone, uei, externalThreadId, body, attachments });
         await openThread(root, state, thread);
       },
     });
@@ -469,7 +488,7 @@ async function renderThreads(root, state) {
       onSettings: () => openProfileChatSettings(root, state),
       onContacts: () => openProfessionalContacts(root, state),
       onOpenThread: (thread) => void openThread(root, state, thread),
-      threadTitle: (thread) => personNameByPhone(thread.personPhone, thread.uei),
+      threadTitle: (thread) => threadTitle(thread),
       threadSubtitle: (thread) => thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : 'Открыть диалог'),
       threadTime: (thread) => messageTime(thread.createdAt),
       emptyTitle: 'Чат пока пуст',

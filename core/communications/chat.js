@@ -11,13 +11,22 @@ export async function getCommunicationThreads(limit = 200) {
   return jsonResponse(await apiRequest(`/communications/chat/threads?${query}`), 'Не удалось загрузить чаты');
 }
 
-export async function getCommunicationThread({ phone = '', uei = '', limit = 300 } = {}) {
-  const query = new URLSearchParams({ phone: String(phone || ''), uei: String(uei || ''), limit: String(limit) });
+export async function getCommunicationThread({ phone = '', uei = '', externalThreadId = '', limit = 300 } = {}) {
+  const query = new URLSearchParams({
+    phone: String(phone || ''),
+    uei: String(uei || ''),
+    externalThreadId: String(externalThreadId || ''),
+    limit: String(limit),
+  });
   return jsonResponse(await apiRequest(`/communications/chat/thread?${query}`), 'Не удалось загрузить переписку');
 }
 
-export async function getCommunicationChannels({ phone = '', uei = '' } = {}) {
-  const query = new URLSearchParams({ phone: String(phone || ''), uei: String(uei || '') });
+export async function getCommunicationChannels({ phone = '', uei = '', externalThreadId = '' } = {}) {
+  const query = new URLSearchParams({
+    phone: String(phone || ''),
+    uei: String(uei || ''),
+    externalThreadId: String(externalThreadId || ''),
+  });
   return jsonResponse(await apiRequest(`/communications/chat/channels?${query}`), 'Не удалось загрузить доступные каналы');
 }
 
@@ -32,8 +41,8 @@ export async function saveCommunicationPreferences({ phone = '', uei = '', prefe
   }), 'Не удалось сохранить настройки каналов');
 }
 
-export async function sendCommunicationMessage({ channel = '', phone = '', uei = '', body = '', attachments = [] } = {}) {
+export async function sendCommunicationMessage({ channel = '', phone = '', uei = '', externalThreadId = '', body = '', attachments = [] } = {}) {
   return jsonResponse(await apiRequest('/communications/chat/messages', {
-    method: 'POST', body: JSON.stringify({ channel, phone, uei, body, attachments }),
+    method: 'POST', body: JSON.stringify({ channel, phone, uei, externalThreadId, body, attachments }),
   }), 'Не удалось отправить сообщение');
 }
