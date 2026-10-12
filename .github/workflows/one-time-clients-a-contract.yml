@@ -1,0 +1,39 @@
+name: One-time Clients A contract fix
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-clients-a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Keep client photo A on shared settings manifestation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('core/people/people.js')
+          source = path.read_text()
+          old = """      initials: initials(person),
+      data: 'data-person-consents',"""
+          new = """      initials: initials(person),
+      settingsTag: true,
+      data: 'data-person-consents',"""
+          if old not in source:
+              if new in source:
+                  raise SystemExit(0)
+              raise SystemExit('client A context not found')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          if git diff --quiet -- core/people/people.js; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add core/people/people.js
+          git commit -m "Keep client photo A on shared settings manifestation"
+          git push origin HEAD:staging
