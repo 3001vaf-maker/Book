@@ -327,13 +327,13 @@ export async function buildPersonRelationshipSections(person = {}) {
   const finance = personFinanceEntities(person);
 
   const programCards = [
-    personalAccountVisualCard({
+    ...(account ? [personalAccountVisualCard({
       person,
-      balance: account?.balance || 0,
-      debt: account?.debtTotal || 0,
+      balance: account.balance || 0,
+      debt: account.debtTotal || 0,
       data: 'data-person-program="personal-account"',
       aria: 'Открыть Личный счёт',
-    }),
+    })] : []),
     ...deposits.map(depositCard),
     ...certificates.map(certificateCard),
     ...subscriptions.map(subscriptionCard),
@@ -347,7 +347,7 @@ export async function buildPersonRelationshipSections(person = {}) {
   ];
 
   const detailByKey = new Map([
-    ['personal-account', { title: 'Личный счёт', body: personalAccountDetail(account, accountError) }],
+    ...(account ? [['personal-account', { title: 'Личный счёт', body: personalAccountDetail(account, accountError) }]] : []),
     ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, { title: item.programName || 'Депозит', body: depositDetail(item) }]),
     ...certificates.map((item) => [`certificate:${item.instance?.id}`, { title: item.program?.name || 'Сертификат', body: certificateDetail(item) }]),
     ...subscriptions.map((item) => [`subscription:${item.instance?.id}`, { title: item.program?.name || 'Абонемент', body: subscriptionDetail(item) }]),
@@ -357,7 +357,7 @@ export async function buildPersonRelationshipSections(person = {}) {
     ...finance.loans.map((item) => [`loan:${item.id}`, { title: item.name || 'Займ', body: financeDetail(item, 'loan') }]),
   ]);
 
-  const markup = `${v2Section('Программы', entityCardRail(programCards))}${financeCards.length ? v2Section('Инвестиции / Займы', entityCardRail(financeCards)) : ''}`;
+  const markup = `${programCards.length ? v2Section('Программы', entityCardRail(programCards)) : ''}${financeCards.length ? v2Section('Инвестиции / Займы', entityCardRail(financeCards)) : ''}`;
 
   return {
     markup,
