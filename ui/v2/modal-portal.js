@@ -138,6 +138,7 @@ function applicationLayerKey(layer) {
   }
   const kind = String(layer.dataset.v2LayerKind || '').trim();
   const label = String(layer.querySelector(':scope > .v2-layer')?.getAttribute('aria-label') || '').trim();
+  if (kind === 'bottom') return label ? `${kind}:${xLayerRole(layer)}:${label}` : '';
   return label ? `${kind}:${label}` : '';
 }
 
