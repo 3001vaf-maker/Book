@@ -26,10 +26,16 @@ import { renderGlobalClient, renderOnlineBooking } from './online-booking/bookin
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
+import { LEGACY_ACCOUNT_APP_ORIGIN, USER_ORIGIN } from './core/environment.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
 configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
+
+const END_USER_APP_HOSTS = new Set([
+  new URL(USER_ORIGIN).hostname,
+  new URL(LEGACY_ACCOUNT_APP_ORIGIN).hostname,
+]);
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
@@ -183,7 +189,7 @@ async function renderPublicBooking(route) {
 
 function isEndUserAppHost() {
   const host = String(location.hostname || '').toLowerCase();
-  return host === 'client.va-tools.ru' || host.startsWith('client.');
+  return END_USER_APP_HOSTS.has(host);
 }
 
 async function renderGlobalClientRoot(initial = {}) {
@@ -247,7 +253,6 @@ function defaultSection() {
 function normalizeRequestedSection(section) {
   return String(section || '').trim();
 }
-
 function activeRootSection() {
   return state.activeSection === 'chat' ? state.lastRootSection : state.activeSection;
 }
