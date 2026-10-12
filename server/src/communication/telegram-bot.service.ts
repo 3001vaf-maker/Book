@@ -41,6 +41,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private inboundPollTimer: NodeJS.Timeout | null = null;
   private readonly dispatching = new Set<string>();
   private readonly inboundPolling = new Set<string>();
+  private readonly pollingActivated = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -62,6 +63,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (this.inboundPollTimer) clearInterval(this.inboundPollTimer);
     this.deliveryPollTimer = null;
     this.inboundPollTimer = null;
+    this.pollingActivated.clear();
   }
 
   private dispatchAllTenantsInBackground() {
@@ -154,16 +156,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async activatePolling(row: TelegramBotRow) {
-    if (row.status === 'polling') return row;
+    if (this.pollingActivated.has(row.tenantId)) return row;
     const token = this.decryptToken(row);
-    this.logger.log(`[telegram-polling] tenant=${row.tenantId} switching from webhook to polling`);
+    this.logger.log(`[telegram-polling] tenant=${row.tenantId} ensuring polling transport storedStatus=${row.status}`);
     await this.telegramApi(token, 'deleteWebhook', { drop_pending_updates: false });
-    await this.prisma.$executeRaw`
-      UPDATE "TelegramBotConnection"
-      SET "status" = 'polling', "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "tenantId" = ${row.tenantId}
-    `;
-    row.status = 'polling';
+    if (row.status !== 'polling') {
+      await this.prisma.$executeRaw`
+        UPDATE "TelegramBotConnection"
+        SET "status" = 'polling', "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "tenantId" = ${row.tenantId}
+      `;
+      row.status = 'polling';
+    }
+    this.pollingActivated.add(row.tenantId);
     return row;
   }
 
@@ -223,6 +228,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       ON CONFLICT ("tenantId") DO NOTHING
     `;
     if (!inserted) throw new ConflictException('Telegram-бот уже подключён. Сначала отключите его.');
+    this.pollingActivated.add(tenantId);
     this.dispatchTenantInBackground(tenantId);
     this.pollTenantInBackground(tenantId);
     return this.getConnection(tenantId);
@@ -234,6 +240,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!configuration.accountAppUrlConfigured) throw new ServiceUnavailableException('Не настроен ACCOUNT_APP_URL для Telegram-входа');
     const row = await this.rowForTenant(tenantId);
     if (!row) throw new NotFoundException('Telegram-бот не подключён');
+    this.pollingActivated.delete(tenantId);
     await this.activatePolling(row);
     this.pollTenantInBackground(tenantId);
     return this.getConnection(tenantId);
@@ -243,6 +250,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const row = await this.rowForTenant(tenantId); if (!row) return { connected: false };
     try { await this.telegramApi(this.decryptToken(row), 'deleteWebhook', { drop_pending_updates: false }); } catch {}
     await this.prisma.$executeRaw`DELETE FROM "TelegramBotConnection" WHERE "tenantId" = ${tenantId}`;
+    this.pollingActivated.delete(tenantId);
     return { connected: false, status: 'disconnected', inboundActive: false, transport: 'polling', webhookActive: false, configuration: this.configurationStatus() };
   }
 

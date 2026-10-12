@@ -67,6 +67,12 @@ assert.match(telegramService, /repairConnection/);
 assert.match(telegramService, /configurationStatus/);
 assert.match(telegramService, /PUBLIC_API_URL/);
 assert.match(telegramService, /ACCOUNT_APP_URL/);
+assert.match(telegramService, /pollingActivated = new Set<string>\(\)/);
+assert.match(telegramService, /if \(this\.pollingActivated\.has\(row\.tenantId\)\) return row/);
+assert.match(telegramService, /ensuring polling transport storedStatus=\$\{row\.status\}/);
+assert.match(telegramService, /this\.pollingActivated\.add\(row\.tenantId\)/);
+assert.match(telegramService, /this\.pollingActivated\.delete\(tenantId\)/);
+assert.doesNotMatch(telegramService, /if \(row\.status === 'polling'\) return row/);
 
 assert.match(professionalEmail, /mail:smtp/);
 assert.match(professionalEmail, /smtp\.yandex\.com/);
