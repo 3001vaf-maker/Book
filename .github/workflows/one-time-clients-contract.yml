@@ -1,0 +1,639 @@
+name: One-time Clients contract patch
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-clients:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply Clients contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(source, old, new, label):
+              if old not in source:
+                  if new in source:
+                      return source
+                  raise SystemExit(f'missing source block: {label}')
+              return source.replace(old, new, 1)
+
+          def sub_once(source, pattern, replacement, label):
+              result, count = re.subn(pattern, replacement, source, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'expected one match for {label}, got {count}')
+              return result
+
+          # Public, read-only assignment projections for the existing loyalty modules.
+          loyalty_exports = {
+              'core/loyalty/certificate/index.js': ("export async function renderCertificate(root) {", """export function getCertificateAssignmentsForPerson(personKey = '') {
+            const key = String(personKey || '');
+            return instances
+              .filter((instance) => String(instance?.ownerKey || '') === key)
+              .map((instance) => ({
+                instance: { ...instance },
+                program: { ...(programs.find((program) => program.id === instance.programId) || {}) },
+              }));
+          }
+
+          export async function renderCertificate(root) {"""),
+              'core/loyalty/subscription/index.js': ("export async function renderSubscription(root) {", """export function getSubscriptionAssignmentsForPerson(personKey = '') {
+            const key = String(personKey || '');
+            return instances
+              .filter((instance) => String(instance?.personKey || '') === key)
+              .map((instance) => ({
+                instance: { ...instance },
+                program: { ...(programs.find((program) => program.id === instance.programId) || {}) },
+              }));
+          }
+
+          export async function renderSubscription(root) {"""),
+              'core/loyalty/referral/index.js': ("export async function renderReferral(root) {", """export function getReferralAssignmentsForPerson(personKey = '') {
+            const key = String(personKey || '');
+            return programs
+              .filter((program) => program?.status === 'active')
+              .map((program) => {
+                const relation = relations.find((item) => String(item?.programId || '') === String(program.id)
+                  && [item?.inviterKey, item?.inviteeKey, item?.personKey].some((value) => String(value || '') === key)) || null;
+                if (program.assignment !== 'all' && !relation) return null;
+                return { program: { ...program }, relation: relation ? { ...relation } : null };
+              })
+              .filter(Boolean);
+          }
+
+          export async function renderReferral(root) {"""),
+              'core/loyalty/bonus/index.js': ("export async function renderBonus(root) {", """export function getBonusAssignmentsForPerson(personKey = '') {
+            const key = String(personKey || '');
+            return programs
+              .filter((program) => program?.status === 'active')
+              .map((program) => {
+                const participant = participants.find((item) => String(item?.programId || '') === String(program.id)
+                  && String(item?.personKey || '') === key) || null;
+                if (program.assignment !== 'all' && !participant) return null;
+                return { program: { ...program }, participant: participant ? { ...participant } : null };
+              })
+              .filter(Boolean);
+          }
+
+          export async function renderBonus(root) {"""),
+          }
+          for filename, (marker, insertion) in loyalty_exports.items():
+              path = Path(filename)
+              source = path.read_text()
+              if insertion.splitlines()[0] not in source:
+                  source = replace_once(source, marker, insertion, filename)
+                  path.write_text(source)
+
+          # Clients view state: UEI sorting + persistent shared-filter values.
+          Path('core/people/view-state.js').write_text("""const SORT_KEY = 'book.people.sort';
+          const FILTER_KEY = 'book.people.filters';
+          const DEFAULT_SORT = 'nameAsc';
+          const SORT_MODES = new Set(['nameAsc', 'nameDesc', 'ueiAsc', 'ueiDesc', 'lastAsc', 'lastDesc']);
+          const DEFAULT_FILTERS = Object.freeze({
+            gender: '',
+            birthday: '',
+            tag: '',
+            tagColor: '',
+            noEmail: '',
+            noVisits: '',
+          });
+
+          export function getPeopleSortMode() {
+            const value = localStorage.getItem(SORT_KEY) || DEFAULT_SORT;
+            return SORT_MODES.has(value) ? value : DEFAULT_SORT;
+          }
+
+          export function setPeopleSortMode(value) {
+            const mode = SORT_MODES.has(value) ? value : DEFAULT_SORT;
+            localStorage.setItem(SORT_KEY, mode);
+            return mode;
+          }
+
+          export function getPeopleFilters() {
+            try {
+              const value = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}');
+              return { ...DEFAULT_FILTERS, ...(value && typeof value === 'object' ? value : {}) };
+            } catch {
+              return { ...DEFAULT_FILTERS };
+            }
+          }
+
+          export function setPeopleFilters(value = {}) {
+            const next = Object.fromEntries(Object.keys(DEFAULT_FILTERS).map((key) => [key, String(value?.[key] || '')]));
+            localStorage.setItem(FILTER_KEY, JSON.stringify(next));
+            return next;
+          }
+          """.replace('\n          ', '\n').lstrip())
+
+          path = Path('core/people/people.js')
+          source = path.read_text()
+
+          source = replace_once(source,
+            "  button,\n  collectLinks,",
+            "  button,\n  collectLinks,\n  details,",
+            'people details import')
+          source = replace_once(source,
+            "import { getPersonHistory } from './history.js';\nimport { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';\nimport { getPeopleSortMode, setPeopleSortMode } from './view-state.js';\nimport { canUseRealPersonalData } from '../access.js';\nimport { openDepositForPerson } from '../loyalty/deposit/index.js';",
+            "import { getPersonHistory } from './history.js';\nimport { getPersonMetadata } from './metadata.js';\nimport { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';\nimport { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';\nimport { buildPersonRelationshipSections } from './programs.js';\nimport { canUseRealPersonalData } from '../access.js';",
+            'people local imports')
+          source = source.replace("  openSharedProfileSettingsMenu,\n", "")
+
+          source = sub_once(source, r"function sortItems\(items, mode\) \{.*?\n\}\n\nfunction sortOptions\(\) \{.*?\n\}", """function sortItems(items, mode) {
+            return [...items].sort((a, b) => {
+              if (mode.startsWith('name')) {
+                const compared = name(a).localeCompare(name(b), 'ru');
+                return mode === 'nameDesc' ? -compared : compared;
+              }
+              if (mode.startsWith('uei')) {
+                const compared = String(personDisplay(a).uei || '').localeCompare(String(personDisplay(b).uei || ''), 'ru', { numeric: true });
+                return mode === 'ueiDesc' ? -compared : compared;
+              }
+              const av = getPersonMetadata(a.key).lastVisit ? Date.parse(getPersonMetadata(a.key).lastVisit) : 0;
+              const bv = getPersonMetadata(b.key).lastVisit ? Date.parse(getPersonMetadata(b.key).lastVisit) : 0;
+              return mode === 'lastDesc' ? bv - av : av - bv;
+            });
+          }
+
+          function sortOptions() {
+            return [
+              ['nameAsc', 'Имя ↑'],
+              ['nameDesc', 'Имя ↓'],
+              ['ueiAsc', 'UEI ↑'],
+              ['ueiDesc', 'UEI ↓'],
+              ['lastAsc', 'Последнее посещение ↑'],
+              ['lastDesc', 'Последнее посещение ↓'],
+            ].map(([value, label]) => ({ value, label }));
+          }""".replace('\n          ', '\n'), 'sort functions')
+
+          source = sub_once(source, r"function personHistoryMarkup\(person\) \{.*?\n\}\n\nfunction openPersonHistoryQ\(root, person\) \{.*?\n\}", """function historyItems(person, mode = 'all') {
+            const items = getPersonHistory(person.key);
+            return mode === 'record' ? items.filter((item) => item.kind === 'record')
+              : mode === 'finance' ? items.filter((item) => item.kind === 'finance')
+              : items;
+          }
+
+          function personHistoryMarkup(person, mode = 'all') {
+            const items = historyItems(person, mode);
+            if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся записи, продажи и связанные события.');
+            return v2ListEntries(items.map((item, index) => v2ListEntry({
+              overline: item.kind === 'finance' ? 'Продажа / операция' : 'Запись',
+              title: item.title || (item.kind === 'finance' ? 'Финансовая операция' : 'Запись'),
+              subtitle: item.subtitle || '',
+              rightTop: item.amount == null ? shortDateTime(item.occurredAt, '') : money(item.amount),
+              rightBottom: item.amount == null ? '' : shortDateTime(item.occurredAt, ''),
+              interactive: true,
+              initial: '',
+              data: `data-person-history-item=\"${index}\"`,
+              aria: `Открыть ${item.title || 'событие'}`,
+            })));
+          }
+
+          function personQContext(person, { c = null } = {}) {
+            return workspaceHeaderContext({
+              title: name(person),
+              a: {
+                kind: 'avatar',
+                image: person.photo || '',
+                initials: initials(person),
+                data: 'data-person-consents',
+                aria: `Согласия ${name(person)}`,
+              },
+              c,
+              d: {
+                kind: 'chat',
+                data: 'data-person-direct-chat',
+                aria: `Чат с ${name(person)}`,
+              },
+            });
+          }
+
+          function openPersonHistoryItemQ(root, person, item, options = {}) {
+            const layer = mountModal(root, modal(`${personQContext(person)}${details([
+              { label: 'Тип', value: item.kind === 'finance' ? 'Продажа / операция' : 'Запись' },
+              { label: 'Событие', value: item.title || '—' },
+              { label: 'Описание', value: item.subtitle || '—' },
+              { label: 'Дата / время', value: shortDateTime(item.occurredAt, '—') },
+              ...(item.amount == null ? [] : [{ label: 'Сумма', value: money(item.amount) }]),
+            ])}`, {
+              title: name(person),
+              variant: 'q',
+              surface: 'app',
+              className: 'people-history-q',
+            }));
+            if (layer) bindPersonContext(layer, person, options);
+            return layer;
+          }
+
+          function bindPersonHistorySection(scope, person, options = {}) {
+            const picker = scope.querySelector('[data-person-history-filter]');
+            const host = scope.querySelector('[data-person-history-host]');
+            const bindRows = () => {
+              const items = historyItems(person, picker?.value || 'all');
+              host?.querySelectorAll('[data-person-history-item]').forEach((node) => {
+                node.addEventListener('click', () => {
+                  const item = items[Number(node.dataset.personHistoryItem)];
+                  if (item) openPersonHistoryItemQ(scope, person, item, options);
+                });
+              });
+            };
+            picker?.addEventListener('change', () => {
+              if (!host) return;
+              host.innerHTML = personHistoryMarkup(person, picker.value || 'all');
+              bindRows();
+            });
+            bindRows();
+          }""".replace('\n          ', '\n'), 'history functions')
+
+          filter_insert = """
+          function birthMonth(value = '') {
+            const match = String(value || '').match(/^(?:\\d{4}-)?(\\d{2})-(\\d{2})$/);
+            return match ? Number(match[1]) : 0;
+          }
+
+          function applyPeopleFilters(items = [], filters = getPeopleFilters()) {
+            const tagsById = new Map(getTags().map((item) => [String(item.id), item]));
+            const currentMonth = new Date().getMonth() + 1;
+            return items.filter((person) => {
+              if (filters.gender === 'none' && person.gender) return false;
+              if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
+              if (filters.birthday === 'none' && person.birthDate) return false;
+              if (filters.birthday === 'has' && !person.birthDate) return false;
+              if (filters.birthday === 'month' && birthMonth(person.birthDate) !== currentMonth) return false;
+              if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
+              if (filters.tagColor && !(person.tags || []).some((id) => tagsById.get(String(id))?.color === filters.tagColor)) return false;
+              if (filters.noEmail === 'yes' && (person.emails || []).some((value) => String(value || '').trim())) return false;
+              if (filters.noVisits === 'yes' && getPersonMetadata(person.key).recordCount > 0) return false;
+              return true;
+            });
+          }
+
+          function tagFilterOptions() {
+            return [{ value: '', label: 'Все ярлыки' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
+          }
+
+          function tagColorOptions() {
+            const byColor = new Map();
+            for (const tag of getTags()) {
+              const color = String(tag.color || '').trim();
+              if (!color) continue;
+              const names = byColor.get(color) || [];
+              names.push(tag.name);
+              byColor.set(color, names);
+            }
+            return [{ value: '', label: 'Любая окраска' }, ...[...byColor.entries()].map(([value, names]) => ({
+              value,
+              label: names.join(' · '),
+            }))];
+          }
+          """.replace('\n          ', '\n')
+          source = replace_once(source, "function filterPeople(items, query = '') {", filter_insert + "\nfunction filterPeople(items, query = '') {", 'people filters insert')
+
+          source = replace_once(source,
+            "  const items = filterPeople(sortItems(getPeople(), getPeopleSortMode()), query);",
+            "  const items = filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);",
+            'filtered list source')
+
+          source = sub_once(source, r"function listContext\(count\) \{.*?\n\}", """function listContext() {
+            return workspaceHeaderContext({
+              title: 'Клиенты',
+              a: {
+                kind: 'settings',
+                data: 'data-people-list-settings',
+                aria: 'Настройки клиентов',
+              },
+            });
+          }""".replace('\n          ', '\n'), 'list context')
+          source = source.replace("  const count = getPeople().length;\n", "")
+          source = source.replace("    listContext(count),", "    listContext(),")
+
+          source = sub_once(source, r"function openListSettings\(root, options = \{\}\) \{.*?\n\}\n\nfunction openPeopleAppearanceQ", """function openSortSettings(root) {
+            const layer = mountModal(root, modal(`<div class=\"form-grid\">${select({
+              label: 'Сортировка',
+              value: getPeopleSortMode(),
+              options: sortOptions(),
+              aria: 'Сортировка клиентов',
+              data: 'data-people-sort-settings',
+            })}</div>`, { title: 'Сортировка', variant: 'x', surface: 'app' }));
+            layer?.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
+              setPeopleSortMode(event.target.value);
+              refreshPeopleList(root);
+            });
+            return layer;
+          }
+
+          function openFilterSettings(root) {
+            const filters = getPeopleFilters();
+            const content = `<div class=\"form-grid\">
+              ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
+                { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
+              ] })}
+              ${select({ label: 'День рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
+                { value: '', label: 'Любой' }, { value: 'month', label: 'В этом месяце' }, { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
+              ] })}
+              ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions(), searchable: true })}
+              ${select({ label: 'Окраска ярлыка', name: 'peopleTagColorFilter', value: filters.tagColor, options: tagColorOptions() })}
+              ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
+              ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
+            </div>`;
+            const layer = mountModal(root, modal(content, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+            if (!layer) return null;
+            const sync = () => {
+              setPeopleFilters({
+                gender: layer.querySelector('[name=\"peopleGenderFilter\"]')?.value || '',
+                birthday: layer.querySelector('[name=\"peopleBirthdayFilter\"]')?.value || '',
+                tag: layer.querySelector('[name=\"peopleTagFilter\"]')?.value || '',
+                tagColor: layer.querySelector('[name=\"peopleTagColorFilter\"]')?.value || '',
+                noEmail: layer.querySelector('[name=\"peopleNoEmailFilter\"]')?.value || '',
+                noVisits: layer.querySelector('[name=\"peopleNoVisitsFilter\"]')?.value || '',
+              });
+              refreshPeopleList(root);
+            };
+            layer.querySelectorAll('select, input').forEach((node) => node.addEventListener('change', sync));
+            return layer;
+          }
+
+          function openExcelSettings(root, options = {}) {
+            const allowReal = canUseRealPersonalData();
+            const layer = mountModal(root, modal(`<div class=\"modal-actions\">
+              ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
+              ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
+              ${button('Шаблон', { variant: 'secondary', data: 'data-template' })}
+              <input class=\"file-input\" type=\"file\" accept=\".csv,text/csv\" data-file>
+              ${allowReal ? '' : '<p class=\"muted\">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
+            </div>`, { title: 'Excel', variant: 'x', surface: 'app' }));
+            if (!layer) return null;
+            layer.querySelector('[data-export]')?.addEventListener('click', () => downloadCsv(false));
+            layer.querySelector('[data-template]')?.addEventListener('click', () => downloadCsv(true));
+            layer.querySelector('[data-import]')?.addEventListener('click', () => layer.querySelector('[data-file]')?.click());
+            layer.querySelector('[data-file]')?.addEventListener('change', (event) => {
+              importCsv(event.target.files?.[0], () => {
+                layer.v2Close?.();
+                renderPeople(root, options);
+              });
+            });
+            return layer;
+          }
+
+          function openListSettings(root, options = {}) {
+            const layer = mountModal(root, modal(`<div class=\"modal-actions\">
+              ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
+              ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
+              ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
+              ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
+            </div>`, { title: 'Клиенты', variant: 'x', surface: 'app' }));
+            if (!layer) return null;
+            layer.querySelector('[data-people-sort]')?.addEventListener('click', () => { layer.v2Close?.(); openSortSettings(root); });
+            layer.querySelector('[data-people-filter]')?.addEventListener('click', () => { layer.v2Close?.(); openFilterSettings(root); });
+            layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
+            layer.querySelector('[data-people-excel]')?.addEventListener('click', () => { layer.v2Close?.(); openExcelSettings(root, options); });
+            return layer;
+          }
+
+          function openPeopleAppearanceQ""".replace('\n          ', '\n'), 'list settings')
+
+          source = sub_once(source, r"function openAddMenu\(root, options = \{\}\) \{.*?\n\}\n\nfunction openCreateZ2\(root, options = \{\}, preset = \{\}\) \{.*?\n\}", """function openAddMenu(root, options = {}) {
+            const allowReal = canUseRealPersonalData();
+            const layer = mountModal(root, modal(`<div class=\"modal-actions\">
+              ${button('Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
+              ${button('Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
+            </div><div class=\"form-error\" data-add-choice-error></div>`, {
+              title: 'Добавить клиента',
+              variant: 'x',
+              surface: 'app',
+            }));
+            if (!layer) return null;
+
+            layer.querySelector('[data-add-manual]')?.addEventListener('click', () => {
+              layer.v2Close?.();
+              openCreateX(root, options);
+            });
+            layer.querySelector('[data-add-from-contacts]')?.addEventListener('click', async () => {
+              const error = layer.querySelector('[data-add-choice-error]');
+              if (!allowReal) {
+                if (error) error.textContent = 'Добавление реальных контактов недоступно в текущем режиме.';
+                return;
+              }
+              if (!navigator.contacts?.select) {
+                if (error) error.textContent = 'Доступ к системным контактам не поддерживается этим браузером.';
+                return;
+              }
+              try {
+                const contact = (await navigator.contacts.select(['name', 'tel'], { multiple: false }))[0];
+                if (!contact) return;
+                layer.v2Close?.();
+                openCreateX(root, options, {
+                  name: contact.name?.[0] || '',
+                  phone: contact.tel?.[0] || '',
+                });
+              } catch {}
+            });
+            return layer;
+          }
+
+          function openCreateX(root, options = {}, preset = {}) {
+            const layer = mountModal(root, modal(personCreateForm(preset), {
+              title: 'Внести вручную',
+              variant: 'x',
+              surface: 'app',
+              className: 'people-create-x',
+            }));
+            if (!layer) return null;
+            bindPersonCreateForm(layer, {
+              onCreated: (person) => {
+                layer.v2Close?.();
+                renderPeople(root, options);
+                openPersonOverview(root, person.key, options);
+              },
+            });
+            return layer;
+          }""".replace('\n          ', '\n'), 'add/create')
+
+          source = sub_once(source, r"function personContext\(person\) \{.*?\n\}\n\nfunction bindPersonContext\(root, person, options = \{\}, \{ onIdentityChange = null \} = \{\}\) \{.*?\n\}", """function personContext(person) {
+            return personQContext(person);
+          }
+
+          function bindPersonContext(root, person, options = {}) {
+            root.querySelector('[data-person-consents]')?.addEventListener('click', () => {
+              openPersonDocuments(root, person);
+            });
+            root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
+              options.onDirectChat?.(person.key);
+            });
+          }""".replace('\n          ', '\n'), 'person context')
+
+          source = sub_once(source, r"function renderPersonOverview\(layer, baseRoot, key, options = \{\}\) \{.*?\n\}\n\nfunction openPersonOverview", """async function renderPersonOverview(layer, baseRoot, key, options = {}) {
+            const person = getAllPeople().find((item) => item.key === key);
+            if (!person) {
+              layer.v2Close?.();
+              renderPeople(baseRoot, options);
+              return;
+            }
+            const relationships = await buildPersonRelationshipSections(person);
+            layer.innerHTML = page([
+              personContext(person),
+              `<section class=\"people-overview-card\">${overviewCard(person)}</section>`,
+              relationships.markup,
+              v2Section('История', `<div class=\"form-grid\">
+                ${select({ label: 'Фильтр истории', value: 'all', options: [
+                  { value: 'all', label: 'Вся история' },
+                  { value: 'record', label: 'Записи' },
+                  { value: 'finance', label: 'Продажи / операции' },
+                ], data: 'data-person-history-filter' })}
+                <div data-person-history-host>${personHistoryMarkup(person)}</div>
+              </div>`),
+            ]);
+            bindPersonContext(layer, person, options);
+            relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
+            bindPersonHistorySection(layer, person, options);
+            layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
+              openPersonEdit(layer, baseRoot, person.key, options, {
+                onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
+                onDeleted: () => {
+                  layer.v2Close?.();
+                  renderPeople(baseRoot, options);
+                },
+              });
+            });
+            notifyContext();
+          }
+
+          function openPersonRelationshipQ(root, person, detail, options = {}) {
+            const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
+              title: detail?.title || name(person),
+              variant: 'q',
+              surface: 'app',
+              className: 'people-program-q',
+            }));
+            if (layer) bindPersonContext(layer, person, options);
+            return layer;
+          }
+
+          function openPersonOverview""".replace('\n          ', '\n'), 'overview render')
+          source = source.replace("  renderPersonOverview(layer, root, key, options);", "  void renderPersonOverview(layer, root, key, options);")
+
+          source = sub_once(source, r"function openPersonSettings\(root, key, \{ onIdentityChange = null \} = \{\}\) \{.*?\n\}\n\nfunction openPersonUeiQuick\(root, key, onChanged = \(\) => \{\}\) \{.*?\n\}\n\nfunction personDataFields", "function personDataFields", 'remove client A menu/UEI quick')
+
+          source = replace_once(source,
+            "function personDataFields(person, all) {\n  return [\n    v2Section('Персональные данные'",
+            "function personDataFields(person, all) {\n  return [\n    `<div class=\"form-grid people-uei-editor\">${uei(ueiData(person, all))}</div>`,\n    v2Section('Персональные данные'",
+            'inline UEI editor')
+
+          save_uei = """
+          function savePersonUei(root, key) {
+            const all = getAllPeople();
+            const person = all.find((item) => item.key === key);
+            if (!person) return key;
+            const current = person.uei || getUEI('person', person.key) || '';
+            const value = String(root.querySelector('[name=\"uei\"]')?.value || '').trim();
+            const linkValue = String(root.querySelector('[name=\"ueiLink\"]')?.value || '').trim();
+            const detachValue = String(root.querySelector('[name=\"ueiDetach\"]')?.value || '').trim();
+            const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
+
+            if (detachValue && current) {
+              detachUEI({ entityType: 'person', entityId: detachValue, uei: current, explicit: true });
+              savePeople(all);
+              return key;
+            }
+            if (linkValue) {
+              if (!hasContact(person)) {
+                const targetMembers = getMembers(linkValue);
+                const targetOwner = targetMembers[0]?.startsWith('person:') ? targetMembers[0].slice(7) : targetMembers[0];
+                savePeople(all.filter((item) => item.key !== person.key));
+                return targetOwner || key;
+              }
+              applyUEI({ entityType: 'person', entityId: key, currentUEI: current, value, linkValue, identifiers });
+              savePeople(all);
+              return key;
+            }
+            if (value && value !== current) {
+              applyUEI({ entityType: 'person', entityId: key, currentUEI: current, value, linkValue: '', identifiers });
+              savePeople(all);
+            }
+            return key;
+          }
+
+          """.replace('\n          ', '\n')
+          source = replace_once(source, "function savePersonData(root, key) {", save_uei + "function savePersonData(root, key) {", 'save inline UEI')
+
+          source = sub_once(source, r"function openPersonEdit\(parentLayer, baseRoot, key, options = \{\}, callbacks = \{\}\) \{.*?\n\}", """function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}) {
+            const person = getAllPeople().find((item) => item.key === key);
+            if (!person) return null;
+            const all = getAllPeople();
+            const layer = mountModal(baseRoot, modal(`${personQContext(person, {
+              c: { label: 'Сохранить', data: 'data-person-q-save', aria: 'Сохранить изменения' },
+            })}<form data-person-edit-form>
+              ${personDataFields(person, all)}
+              ${button('Удалить клиента', { type: 'button', variant: 'danger', data: 'data-person-delete' })}
+              <div class=\"form-error\" data-person-edit-error></div>
+            </form>`, {
+              title: name(person),
+              variant: 'q',
+              surface: 'app',
+              className: 'people-edit-q',
+            }));
+            if (!layer) return null;
+
+            initMonthDayPickers(layer);
+            initLinks(layer);
+            initTags(layer);
+            initRepeatedFields(layer);
+            initUEI(layer);
+
+            const form = layer.querySelector('[data-person-edit-form]');
+            const action = layer.querySelector('[data-person-q-save]');
+            const initialState = formSnapshot(form);
+            const isDirty = () => formSnapshot(form) !== initialState;
+            const syncAction = () => {
+              if (!action) return;
+              action.hidden = !isDirty();
+              notifyContext();
+            };
+            const save = () => {
+              if (!isDirty()) return;
+              try {
+                savePersonData(layer, key);
+                const nextKey = savePersonUei(layer, key);
+                layer.v2Close?.();
+                callbacks.onSaved?.(nextKey || key);
+              } catch (error) {
+                const node = layer.querySelector('[data-person-edit-error]');
+                if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+              }
+            };
+
+            action?.addEventListener('click', save);
+            layer.querySelector('[data-person-delete]')?.addEventListener('click', () => {
+              confirmDelete(layer, person, () => {
+                layer.v2Close?.();
+                callbacks.onDeleted?.();
+              });
+            });
+            form?.addEventListener('input', syncAction);
+            form?.addEventListener('change', syncAction);
+            form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
+            bindPersonContext(layer, person, options);
+            syncAction();
+            return layer;
+          }""".replace('\n          ', '\n'), 'person editor Q')
+
+          source = source.replace('hideD: true,', '')
+          path.write_text(source)
+          PY
+
+          if git diff --quiet -- core/people core/loyalty; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add core/people core/loyalty
+          git commit -m "Align Clients surfaces with shared Q X S contract"
+          git push origin HEAD:staging
