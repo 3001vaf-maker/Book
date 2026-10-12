@@ -8,7 +8,7 @@ const Z_DISMISS_STYLE = [
   'height:24px',
   'min-height:24px',
   'max-height:24px',
-  'margin:20px 0 0 18px',
+  'margin:8px 0 4px 18px',
   'padding:0',
   'border:0',
   'border-radius:0',
