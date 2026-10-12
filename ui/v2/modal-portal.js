@@ -208,6 +208,10 @@ export function mountV2Layer(html, { root = null } = {}) {
   let disposeGesture = () => {};
   let veilDismissTimer = 0;
   let veilDismissing = false;
+  let veilPointerId = null;
+  let veilPointerX = 0;
+  let veilPointerY = 0;
+  let veilPointerMoved = false;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -228,12 +232,23 @@ export function mountV2Layer(html, { root = null } = {}) {
     return Boolean(qHeaderAction && app?.contains?.(qHeaderAction));
   };
 
+  const resetVeilPointer = () => {
+    veilPointerId = null;
+    veilPointerX = 0;
+    veilPointerY = 0;
+    veilPointerMoved = false;
+  };
+
   const close = () => {
     if (closed) return;
     closed = true;
     if (veilDismissTimer) window.clearTimeout(veilDismissTimer);
     veilDismissTimer = 0;
+    resetVeilPointer();
     document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.removeEventListener('pointermove', handleOutsidePointerMove, true);
+    document.removeEventListener('pointerup', handleOutsidePointerUp, true);
+    document.removeEventListener('pointercancel', handleOutsidePointerCancel, true);
     document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
     if (node.isConnected) nativeRemove();
@@ -266,9 +281,35 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   const handleOutsidePointerDown = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
-    // The veil owns the whole pointer sequence. Do not remove it on pointerdown:
-    // the underlying Z/Header must remain inaccessible until the dismissing tap
-    // has been fully consumed and the modal dismissal animation has completed.
+    veilPointerId = event.pointerId;
+    veilPointerX = event.clientX;
+    veilPointerY = event.clientY;
+    veilPointerMoved = false;
+    // The veil owns the complete pointer sequence. The modal remains mounted and
+    // the underlying stage remains inert until pointerup/click have been consumed.
+    event.stopImmediatePropagation();
+  };
+
+  const handleOutsidePointerMove = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    const dx = event.clientX - veilPointerX;
+    const dy = event.clientY - veilPointerY;
+    if ((dx * dx) + (dy * dy) > 100) veilPointerMoved = true;
+    event.stopImmediatePropagation();
+  };
+
+  const handleOutsidePointerUp = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    const shouldDismiss = !veilPointerMoved;
+    resetVeilPointer();
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (shouldDismiss) dismissThroughVeil();
+  };
+
+  const handleOutsidePointerCancel = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    resetVeilPointer();
     event.stopImmediatePropagation();
   };
 
@@ -282,6 +323,9 @@ export function mountV2Layer(html, { root = null } = {}) {
   node.v2Close = close;
   node.remove = close;
   document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+  document.addEventListener('pointermove', handleOutsidePointerMove, true);
+  document.addEventListener('pointerup', handleOutsidePointerUp, true);
+  document.addEventListener('pointercancel', handleOutsidePointerCancel, true);
   document.addEventListener('click', handleOutsideClick, true);
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,
