@@ -8,6 +8,7 @@ const API_HOST = 'api.va-tools.ru';
 const ADMIN_HOST = 'admin.va-tools.ru';
 const BOOK_HOST = 'book.va-tools.ru';
 const ACCOUNT_HOST = 'client.va-tools.ru';
+const TEMP_APP_HOST = 'va-app-temp-volokovykh.msk1.amvera.tech';
 
 function normalizeOrigin(value: string) {
   try {
@@ -87,7 +88,7 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === BOOK_HOST) {
+    if (host === BOOK_HOST || host === TEMP_APP_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
