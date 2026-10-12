@@ -20,11 +20,8 @@ jobs:
           from pathlib import Path
           path = Path('core/people/people.js')
           source = path.read_text()
-          old = """      initials: initials(person),
-      data: 'data-person-consents',"""
-          new = """      initials: initials(person),
-      settingsTag: true,
-      data: 'data-person-consents',"""
+          old = "      initials: initials(person),\n      data: 'data-person-consents',"
+          new = "      initials: initials(person),\n      settingsTag: true,\n      data: 'data-person-consents',"
           if old not in source:
               if new in source:
                   raise SystemExit(0)
