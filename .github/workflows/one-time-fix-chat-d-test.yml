@@ -1,0 +1,39 @@
+name: One-time Chat D test contract fix
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-chat-d-runtime-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Replace stale Q/D browser expectation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/professional-core-runtime-browser.html')
+          source = path.read_text()
+          old = """ok(!shell()?.querySelector('[data-v2-workspace-chat]'),
+            'Cash View Q must hide Chat D');"""
+          new = """const cashChatD = shell()?.querySelector('[data-v2-workspace-chat]');
+          ok(Boolean(cashChatD) && !cashChatD.disabled,
+            'Cash View Q must keep global Chat D visible and clickable');"""
+          if old not in source:
+              raise SystemExit(0)
+          path.write_text(source.replace(old, new, 1))
+          PY
+          if git diff --quiet -- tests/professional-core-runtime-browser.html; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/professional-core-runtime-browser.html
+          git commit -m "Keep Chat D clickable in Q runtime test"
+          git push origin HEAD:staging
