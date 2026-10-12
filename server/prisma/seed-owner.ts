@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 async function main() {
   const email = String(process.env.OWNER_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.OWNER_PASSWORD || '');
-  const tenantName = String(process.env.OWNER_TENANT_NAME || 'Book').trim() || 'Book';
+  const tenantName = String(process.env.OWNER_TENANT_NAME || 'VA').trim() || 'VA';
 
-  if (!email || password.length < 10) {
-    throw new Error('OWNER_EMAIL and OWNER_PASSWORD (minimum 10 characters) are required');
+  if (!email) {
+    throw new Error('OWNER_EMAIL is required');
   }
 
   const existing = await prisma.platformAccount.findUnique({
@@ -17,23 +17,33 @@ async function main() {
     include: { memberships: { orderBy: { createdAt: 'asc' } } },
   });
 
-  const passwordHash = await hash(password, 12);
-
   if (existing?.memberships?.[0]) {
+    await prisma.tenantAccess.upsert({
+      where: { tenantId: existing.memberships[0].tenantId },
+      create: {
+        tenantId: existing.memberships[0].tenantId,
+        status: 'ACTIVE',
+        isOwnerBook: true,
+        commercialMode: 'LIVE',
+      },
+      update: {
+        status: 'ACTIVE',
+        isOwnerBook: true,
+        commercialMode: 'LIVE',
+      },
+    });
+    return;
+  }
+
+  if (existing) {
     await prisma.$transaction(async (tx) => {
-      await tx.platformAccount.update({
-        where: { id: existing.id },
-        data: { passwordHash },
+      const tenant = await tx.tenant.create({ data: { name: tenantName } });
+      await tx.membership.create({
+        data: { tenantId: tenant.id, platformAccountId: existing.id, role: MembershipRole.OWNER },
       });
-      await tx.tenantAccess.upsert({
-        where: { tenantId: existing.memberships[0].tenantId },
-        create: {
-          tenantId: existing.memberships[0].tenantId,
-          status: 'ACTIVE',
-          isOwnerBook: true,
-          commercialMode: 'LIVE',
-        },
-        update: {
+      await tx.tenantAccess.create({
+        data: {
+          tenantId: tenant.id,
           status: 'ACTIVE',
           isOwnerBook: true,
           commercialMode: 'LIVE',
@@ -43,6 +53,11 @@ async function main() {
     return;
   }
 
+  if (password.length < 10) {
+    throw new Error('OWNER_PASSWORD (minimum 10 characters) is required for initial owner creation');
+  }
+
+  const passwordHash = await hash(password, 12);
   await prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({ data: { name: tenantName } });
     const account = await tx.platformAccount.create({
