@@ -1,6 +1,7 @@
 import {
   button,
   collectLinks,
+  details,
   collectRepeatedEntries,
   collectTags,
   emptyState,
@@ -32,7 +33,6 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
   openEntityCardAppearanceQ,
-  openSharedProfileSettingsMenu,
 } from '../../ui/ui.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../uei.js';
 import { getTags } from '../../settings/tags/data.js';
@@ -43,10 +43,11 @@ import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getPersonHistory } from './history.js';
+import { getPersonMetadata } from './metadata.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
-import { getPeopleSortMode, setPeopleSortMode } from './view-state.js';
+import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
+import { buildPersonRelationshipSections } from './programs.js';
 import { canUseRealPersonalData } from '../access.js';
-import { openDepositForPerson } from '../loyalty/deposit/index.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
 const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
@@ -62,8 +63,12 @@ function sortItems(items, mode) {
       const compared = name(a).localeCompare(name(b), 'ru');
       return mode === 'nameDesc' ? -compared : compared;
     }
-    const av = a.lastVisit ? Date.parse(a.lastVisit) : 0;
-    const bv = b.lastVisit ? Date.parse(b.lastVisit) : 0;
+    if (mode.startsWith('uei')) {
+      const compared = String(personDisplay(a).uei || '').localeCompare(String(personDisplay(b).uei || ''), 'ru', { numeric: true });
+      return mode === 'ueiDesc' ? -compared : compared;
+    }
+    const av = getPersonMetadata(a.key).lastVisit ? Date.parse(getPersonMetadata(a.key).lastVisit) : 0;
+    const bv = getPersonMetadata(b.key).lastVisit ? Date.parse(getPersonMetadata(b.key).lastVisit) : 0;
     return mode === 'lastDesc' ? bv - av : av - bv;
   });
 }
@@ -72,6 +77,8 @@ function sortOptions() {
   return [
     ['nameAsc', 'Имя ↑'],
     ['nameDesc', 'Имя ↓'],
+    ['ueiAsc', 'UEI ↑'],
+    ['ueiDesc', 'UEI ↓'],
     ['lastAsc', 'Последнее посещение ↑'],
     ['lastDesc', 'Последнее посещение ↓'],
   ].map(([value, label]) => ({ value, label }));
@@ -217,27 +224,125 @@ function openPersonDocuments(root, person) {
   return layer;
 }
 
-function personHistoryMarkup(person) {
+function historyItems(person, mode = 'all') {
   const items = getPersonHistory(person.key);
+  return mode === 'record' ? items.filter((item) => item.kind === 'record')
+    : mode === 'finance' ? items.filter((item) => item.kind === 'finance')
+    : items;
+}
+
+function personHistoryMarkup(person, mode = 'all') {
+  const items = historyItems(person, mode);
   if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся записи, продажи и связанные события.');
-  return v2ListEntries(items.map((item) => v2ListEntry({
+  return v2ListEntries(items.map((item, index) => v2ListEntry({
     overline: item.kind === 'finance' ? 'Продажа / операция' : 'Запись',
     title: item.title || (item.kind === 'finance' ? 'Финансовая операция' : 'Запись'),
     subtitle: item.subtitle || '',
     rightTop: item.amount == null ? shortDateTime(item.occurredAt, '') : money(item.amount),
     rightBottom: item.amount == null ? '' : shortDateTime(item.occurredAt, ''),
-    interactive: false,
+    interactive: true,
     initial: '',
+    data: `data-person-history-item="${index}"`,
+    aria: `Открыть ${item.title || 'событие'}`,
   })));
 }
 
-function openPersonHistoryQ(root, person) {
-  return mountModal(root, modal(`${workspaceHeaderContext({ title: 'История', hideD: true })}<section data-person-history>${personHistoryMarkup(person)}</section>`, {
-    title: 'История',
+function personQContext(person, { c = null } = {}) {
+  return workspaceHeaderContext({
+    title: name(person),
+    a: {
+      kind: 'avatar',
+      image: person.photo || '',
+      initials: initials(person),
+      data: 'data-person-consents',
+      aria: `Согласия ${name(person)}`,
+    },
+    c,
+    d: {
+      kind: 'chat',
+      data: 'data-person-direct-chat',
+      aria: `Чат с ${name(person)}`,
+    },
+  });
+}
+
+function openPersonHistoryItemQ(root, person, item, options = {}) {
+  const layer = mountModal(root, modal(`${personQContext(person)}${details([
+    { label: 'Тип', value: item.kind === 'finance' ? 'Продажа / операция' : 'Запись' },
+    { label: 'Событие', value: item.title || '—' },
+    { label: 'Описание', value: item.subtitle || '—' },
+    { label: 'Дата / время', value: shortDateTime(item.occurredAt, '—') },
+    ...(item.amount == null ? [] : [{ label: 'Сумма', value: money(item.amount) }]),
+  ])}`, {
+    title: name(person),
     variant: 'q',
     surface: 'app',
     className: 'people-history-q',
   }));
+  if (layer) bindPersonContext(layer, person, options);
+  return layer;
+}
+
+function bindPersonHistorySection(scope, person, options = {}) {
+  const picker = scope.querySelector('[data-person-history-filter]');
+  const host = scope.querySelector('[data-person-history-host]');
+  const bindRows = () => {
+    const items = historyItems(person, picker?.value || 'all');
+    host?.querySelectorAll('[data-person-history-item]').forEach((node) => {
+      node.addEventListener('click', () => {
+        const item = items[Number(node.dataset.personHistoryItem)];
+        if (item) openPersonHistoryItemQ(scope, person, item, options);
+      });
+    });
+  };
+  picker?.addEventListener('change', () => {
+    if (!host) return;
+    host.innerHTML = personHistoryMarkup(person, picker.value || 'all');
+    bindRows();
+  });
+  bindRows();
+}
+
+
+function birthMonth(value = '') {
+  const match = String(value || '').match(/^(?:\d{4}-)?(\d{2})-(\d{2})$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function applyPeopleFilters(items = [], filters = getPeopleFilters()) {
+  const tagsById = new Map(getTags().map((item) => [String(item.id), item]));
+  const currentMonth = new Date().getMonth() + 1;
+  return items.filter((person) => {
+    if (filters.gender === 'none' && person.gender) return false;
+    if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
+    if (filters.birthday === 'none' && person.birthDate) return false;
+    if (filters.birthday === 'has' && !person.birthDate) return false;
+    if (filters.birthday === 'month' && birthMonth(person.birthDate) !== currentMonth) return false;
+    if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
+    if (filters.tagColor && !(person.tags || []).some((id) => tagsById.get(String(id))?.color === filters.tagColor)) return false;
+    if (filters.noEmail === 'yes' && (person.emails || []).some((value) => String(value || '').trim())) return false;
+    if (filters.noVisits === 'yes' && getPersonMetadata(person.key).recordCount > 0) return false;
+    return true;
+  });
+}
+
+function tagFilterOptions() {
+  return [{ value: '', label: 'Все ярлыки' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
+}
+
+function tagColorOptions() {
+  const byColor = new Map();
+  for (const tag of getTags()) {
+    const color = String(tag.color || '').trim();
+    if (!color) continue;
+    const names = byColor.get(color) || [];
+    names.push(tag.name);
+    byColor.set(color, names);
+  }
+  return [{ value: '', label: 'Любая окраска' }, ...[...byColor.entries()].map(([value, names]) => ({
+    value,
+    label: names.join(' · '),
+  }))];
 }
 
 function filterPeople(items, query = '') {
@@ -275,31 +380,28 @@ function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
   const query = root.querySelector('[data-people-search]')?.value || '';
-  const items = filterPeople(sortItems(getPeople(), getPeopleSortMode()), query);
+  const items = filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
   host.innerHTML = listMarkup(items, query);
   host.querySelectorAll('[data-person]').forEach((node) => {
     node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
   });
 }
 
-function listContext(count) {
+function listContext() {
   return workspaceHeaderContext({
     title: 'Клиенты',
     a: {
-      kind: 'text',
-      label: String(count),
-      settingsTag: true,
+      kind: 'settings',
       data: 'data-people-list-settings',
-      aria: `Клиентов: ${count}. Сортировка и Excel`,
+      aria: 'Настройки клиентов',
     },
   });
 }
 
 export function renderPeople(root, options = {}) {
   root.peopleOptions = options;
-  const count = getPeople().length;
   root.innerHTML = page([
-    listContext(count),
+    listContext(),
     `<section>
       <div class="people-search ui-search-field">
         ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
@@ -319,29 +421,62 @@ export function renderPeople(root, options = {}) {
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
 }
 
-function openListSettings(root, options = {}) {
-  const allowReal = canUseRealPersonalData();
-  const content = `<div class="form-grid">
-    ${select({ label: 'Сортировка', value: getPeopleSortMode(), options: sortOptions(), aria: 'Сортировка', data: 'data-people-sort-settings' })}
-    <div class="modal-actions">
-      ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
-      ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
-      ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
-      ${button('Шаблон', { variant: 'secondary', data: 'data-template' })}
-      <input class="file-input" type="file" accept=".csv,text/csv" data-file>
-    </div>
-    ${allowReal ? '' : '<p class="muted">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
-  </div>`;
-  const layer = mountModal(root, modal(content, { title: 'Клиенты', variant: 'x', surface: 'app' }));
-  if (!layer) return;
-  layer.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
+function openSortSettings(root) {
+  const layer = mountModal(root, modal(`<div class="form-grid">${select({
+    label: 'Сортировка',
+    value: getPeopleSortMode(),
+    options: sortOptions(),
+    aria: 'Сортировка клиентов',
+    data: 'data-people-sort-settings',
+  })}</div>`, { title: 'Сортировка', variant: 'x', surface: 'app' }));
+  layer?.querySelector('[data-people-sort-settings]')?.addEventListener('change', (event) => {
     setPeopleSortMode(event.target.value);
     refreshPeopleList(root);
   });
-  layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openPeopleAppearanceQ(root, options);
-  });
+  return layer;
+}
+
+function openFilterSettings(root) {
+  const filters = getPeopleFilters();
+  const content = `<div class="form-grid">
+    ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
+      { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
+    ] })}
+    ${select({ label: 'День рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
+      { value: '', label: 'Любой' }, { value: 'month', label: 'В этом месяце' }, { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
+    ] })}
+    ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions(), searchable: true })}
+    ${select({ label: 'Окраска ярлыка', name: 'peopleTagColorFilter', value: filters.tagColor, options: tagColorOptions() })}
+    ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
+    ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
+  </div>`;
+  const layer = mountModal(root, modal(content, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+  if (!layer) return null;
+  const sync = () => {
+    setPeopleFilters({
+      gender: layer.querySelector('[name="peopleGenderFilter"]')?.value || '',
+      birthday: layer.querySelector('[name="peopleBirthdayFilter"]')?.value || '',
+      tag: layer.querySelector('[name="peopleTagFilter"]')?.value || '',
+      tagColor: layer.querySelector('[name="peopleTagColorFilter"]')?.value || '',
+      noEmail: layer.querySelector('[name="peopleNoEmailFilter"]')?.value || '',
+      noVisits: layer.querySelector('[name="peopleNoVisitsFilter"]')?.value || '',
+    });
+    refreshPeopleList(root);
+  };
+  layer.querySelectorAll('select, input').forEach((node) => node.addEventListener('change', sync));
+  return layer;
+}
+
+function openExcelSettings(root, options = {}) {
+  const allowReal = canUseRealPersonalData();
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
+    ${button('Загрузить', { variant: 'secondary', data: 'data-import', disabled: !allowReal })}
+    ${button('Шаблон', { variant: 'secondary', data: 'data-template' })}
+    <input class="file-input" type="file" accept=".csv,text/csv" data-file>
+    ${allowReal ? '' : '<p class="muted">Импорт реальных персональных данных недоступен в текущем режиме.</p>'}
+  </div>`, { title: 'Excel', variant: 'x', surface: 'app' }));
+  if (!layer) return null;
   layer.querySelector('[data-export]')?.addEventListener('click', () => downloadCsv(false));
   layer.querySelector('[data-template]')?.addEventListener('click', () => downloadCsv(true));
   layer.querySelector('[data-import]')?.addEventListener('click', () => layer.querySelector('[data-file]')?.click());
@@ -351,6 +486,22 @@ function openListSettings(root, options = {}) {
       renderPeople(root, options);
     });
   });
+  return layer;
+}
+
+function openListSettings(root, options = {}) {
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
+    ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
+    ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
+    ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
+  </div>`, { title: 'Клиенты', variant: 'x', surface: 'app' }));
+  if (!layer) return null;
+  layer.querySelector('[data-people-sort]')?.addEventListener('click', () => { layer.v2Close?.(); openSortSettings(root); });
+  layer.querySelector('[data-people-filter]')?.addEventListener('click', () => { layer.v2Close?.(); openFilterSettings(root); });
+  layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
+  layer.querySelector('[data-people-excel]')?.addEventListener('click', () => { layer.v2Close?.(); openExcelSettings(root, options); });
+  return layer;
 }
 
 function openPeopleAppearanceQ(root, options = {}) {
@@ -417,12 +568,10 @@ function importCsv(file, onDone) {
 
 function openAddMenu(root, options = {}) {
   const allowReal = canUseRealPersonalData();
-  const layer = mountModal(root, modal(`<div class="modal-title"><h2>Добавить клиента</h2></div>
-    <div class="modal-actions">
-      ${button('Из контактов', { variant: 'secondary', data: 'data-add-from-contacts' })}
-      ${button('Ввести вручную', { variant: 'secondary', data: 'data-add-manual' })}
-    </div>
-    <div class="form-error" data-add-choice-error></div>`, {
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
+    ${button('Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
+  </div><div class="form-error" data-add-choice-error></div>`, {
     title: 'Добавить клиента',
     variant: 'x',
     surface: 'app',
@@ -431,7 +580,7 @@ function openAddMenu(root, options = {}) {
 
   layer.querySelector('[data-add-manual]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    openCreateZ2(root, options);
+    openCreateX(root, options);
   });
   layer.querySelector('[data-add-from-contacts]')?.addEventListener('click', async () => {
     const error = layer.querySelector('[data-add-choice-error]');
@@ -447,7 +596,7 @@ function openAddMenu(root, options = {}) {
       const contact = (await navigator.contacts.select(['name', 'tel'], { multiple: false }))[0];
       if (!contact) return;
       layer.v2Close?.();
-      openCreateZ2(root, options, {
+      openCreateX(root, options, {
         name: contact.name?.[0] || '',
         phone: contact.tel?.[0] || '',
       });
@@ -456,18 +605,14 @@ function openAddMenu(root, options = {}) {
   return layer;
 }
 
-function openCreateZ2(root, options = {}, preset = {}) {
-  const layer = mountV2ZLayer(root, v2ZLayer(page([
-    workspaceHeaderContext({ title: 'Новый клиент', hideD: true }),
-    personCreateForm(preset),
-  ]), { className: '' }), { stack: true });
+function openCreateX(root, options = {}, preset = {}) {
+  const layer = mountModal(root, modal(personCreateForm(preset), {
+    title: 'Внести вручную',
+    variant: 'x',
+    surface: 'app',
+    className: 'people-create-x',
+  }));
   if (!layer) return null;
-  const submit = layer.querySelector('[data-person-create-form] button[type="submit"]');
-  if (submit) {
-    submit.classList.add('v2-primary-source-only');
-    submit.dataset.v2PrimaryAction = '';
-    submit.dataset.v2PrimaryLabel = 'Сохранить';
-  }
   bindPersonCreateForm(layer, {
     onCreated: (person) => {
       layer.v2Close?.();
@@ -475,34 +620,16 @@ function openCreateZ2(root, options = {}, preset = {}) {
       openPersonOverview(root, person.key, options);
     },
   });
-  notifyContext();
   return layer;
 }
 
 function personContext(person) {
-  return workspaceHeaderContext({
-    title: name(person),
-    a: {
-      kind: 'avatar',
-      image: person.photo || '',
-      initials: initials(person),
-      settingsTag: true,
-      data: 'data-person-settings',
-      aria: `Настройки ${name(person)}`,
-    },
-    d: {
-      kind: 'chat',
-      data: 'data-person-direct-chat',
-      aria: `Чат с ${name(person)}`,
-    },
-  });
+  return personQContext(person);
 }
 
-function bindPersonContext(root, person, options = {}, { onIdentityChange = null } = {}) {
-  root.querySelector('[data-person-settings]')?.addEventListener('click', () => {
-    openPersonSettings(root, person.key, {
-      onIdentityChange: (nextKey) => onIdentityChange?.(nextKey),
-    });
+function bindPersonContext(root, person, options = {}) {
+  root.querySelector('[data-person-consents]')?.addEventListener('click', () => {
+    openPersonDocuments(root, person);
   });
   root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
     options.onDirectChat?.(person.key);
@@ -522,23 +649,33 @@ function overviewCard(person) {
   });
 }
 
-function renderPersonOverview(layer, baseRoot, key, options = {}) {
+async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) {
     layer.v2Close?.();
     renderPeople(baseRoot, options);
     return;
   }
+  const relationships = await buildPersonRelationshipSections(person);
   layer.innerHTML = page([
     personContext(person),
-    `<section>${overviewCard(person)}</section>`,
+    `<section class="people-overview-card">${overviewCard(person)}</section>`,
+    relationships.markup,
+    v2Section('История', `<div class="form-grid">
+      ${select({ label: 'Фильтр истории', value: 'all', options: [
+        { value: 'all', label: 'Вся история' },
+        { value: 'record', label: 'Записи' },
+        { value: 'finance', label: 'Продажи / операции' },
+      ], data: 'data-person-history-filter' })}
+      <div data-person-history-host>${personHistoryMarkup(person)}</div>
+    </div>`),
   ]);
-  bindPersonContext(layer, person, options, {
-    onIdentityChange: (nextKey) => renderPersonOverview(layer, baseRoot, nextKey || key, options),
-  });
+  bindPersonContext(layer, person, options);
+  relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
+  bindPersonHistorySection(layer, person, options);
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(layer, baseRoot, person.key, options, {
-      onSaved: () => renderPersonOverview(layer, baseRoot, person.key, options),
+      onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
       onDeleted: () => {
         layer.v2Close?.();
         renderPeople(baseRoot, options);
@@ -548,6 +685,17 @@ function renderPersonOverview(layer, baseRoot, key, options = {}) {
   notifyContext();
 }
 
+function openPersonRelationshipQ(root, person, detail, options = {}) {
+  const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
+    title: detail?.title || name(person),
+    variant: 'q',
+    surface: 'app',
+    className: 'people-program-q',
+  }));
+  if (layer) bindPersonContext(layer, person, options);
+  return layer;
+}
+
 function openPersonOverview(root, key, options = {}) {
   if (!key) return null;
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer' }), {
@@ -555,7 +703,7 @@ function openPersonOverview(root, key, options = {}) {
     onClose: options.onClose || null,
   });
   if (!layer) return null;
-  renderPersonOverview(layer, root, key, options);
+  void renderPersonOverview(layer, root, key, options);
   return layer;
 }
 
@@ -617,126 +765,9 @@ function ueiData(person, all) {
   };
 }
 
-function openPersonSettings(root, key, { onIdentityChange = null } = {}) {
-  const person = getAllPeople().find((item) => item.key === key);
-  if (!person) return null;
-  return openSharedProfileSettingsMenu({
-    title: name(person),
-    actions: [
-      { id: 'code', label: 'Код', onSelect: () => openPersonUeiQuick(root, person.key, (nextKey) => onIdentityChange?.(nextKey || person.key)) },
-      { id: 'deposit', label: 'Депозит', onSelect: () => openDepositForPerson(root, person) },
-      { id: 'documents', label: 'Документы / согласия', onSelect: () => openPersonDocuments(root, person) },
-      { id: 'history', label: 'История', onSelect: () => openPersonHistoryQ(root, person) },
-    ],
-    data: 'data-person-settings-menu',
-  });
-}
-
-function openPersonUeiQuick(root, key, onChanged = () => {}) {
-  const all = getAllPeople();
-  const person = all.find((item) => item.key === key);
-  if (!person) return;
-  const current = person.uei || getUEI('person', person.key) || '';
-  const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
-  const layer = mountModal(root, modal(`<div class="form-grid">${uei(ueiData(person, all))}<div class="form-error" data-uei-error></div></div>`, {
-    title: 'UEI',
-    variant: 'x',
-    surface: 'app',
-  }));
-  if (!layer) return;
-  initUEI(layer);
-  let committing = false;
-
-  const fail = (error) => {
-    committing = false;
-    const node = layer.querySelector('[data-uei-error]');
-    if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось изменить UEI';
-  };
-
-  const finish = (nextKey = key) => {
-    if (committing) return;
-    committing = true;
-    try {
-      savePeople(all);
-      layer.v2Close?.();
-      onChanged(nextKey);
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const assign = () => {
-    if (committing) return;
-    const value = String(layer.querySelector('[name="uei"]')?.value || '').trim();
-    if (!value) return;
-    try {
-      applyUEI({
-        entityType: 'person',
-        entityId: key,
-        currentUEI: current,
-        value,
-        linkValue: '',
-        identifiers,
-      });
-      finish(key);
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const link = (linkValue) => {
-    if (committing || !linkValue) return;
-    try {
-      if (!hasContact(person)) {
-        const targetMembers = getMembers(linkValue);
-        const targetOwner = targetMembers[0]?.startsWith('person:') ? targetMembers[0].slice(7) : targetMembers[0];
-        savePeople(all.filter((item) => item.key !== person.key));
-        committing = true;
-        layer.v2Close?.();
-        onChanged(targetOwner || key);
-        return;
-      }
-      applyUEI({
-        entityType: 'person',
-        entityId: key,
-        currentUEI: current,
-        value: String(layer.querySelector('[name="uei"]')?.value || ''),
-        linkValue,
-        identifiers,
-      });
-      finish(key);
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const detach = (entityId) => {
-    if (committing || !entityId) return;
-    try {
-      detachUEI({ entityType: 'person', entityId, uei: current, explicit: true });
-      finish(key);
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const valueInput = layer.querySelector('[name="uei"]');
-  valueInput?.addEventListener('input', () => {
-    if (String(valueInput.value || '').trim().length === 4) assign();
-  });
-  valueInput?.addEventListener('change', assign);
-  valueInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      assign();
-    }
-  });
-  layer.querySelector('[name="ueiLink"]')?.addEventListener('change', (event) => link(event.target.value));
-  layer.querySelector('[name="ueiDetach"]')?.addEventListener('change', (event) => detach(event.target.value));
-}
-
 function personDataFields(person, all) {
   return [
+    `<div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div>`,
     v2Section('Персональные данные', `<div class="form-grid">
       ${field({ label: 'Имя', name: 'name', value: person.name, required: true })}
       ${field({ label: 'Фамилия', name: 'surname', value: person.surname })}
@@ -773,6 +804,40 @@ function saveBusinessEntries(all, ownerKey, fieldName, entries, memberKeys) {
     const person = all.find((item) => item.key === key);
     if (person) person[fieldName] = valuesBySource.get(key) || [];
   }
+}
+
+
+function savePersonUei(root, key) {
+  const all = getAllPeople();
+  const person = all.find((item) => item.key === key);
+  if (!person) return key;
+  const current = person.uei || getUEI('person', person.key) || '';
+  const value = String(root.querySelector('[name="uei"]')?.value || '').trim();
+  const linkValue = String(root.querySelector('[name="ueiLink"]')?.value || '').trim();
+  const detachValue = String(root.querySelector('[name="ueiDetach"]')?.value || '').trim();
+  const identifiers = [...(person.phones || []), ...(person.telegrams || []), ...(person.emails || [])];
+
+  if (detachValue && current) {
+    detachUEI({ entityType: 'person', entityId: detachValue, uei: current, explicit: true });
+    savePeople(all);
+    return key;
+  }
+  if (linkValue) {
+    if (!hasContact(person)) {
+      const targetMembers = getMembers(linkValue);
+      const targetOwner = targetMembers[0]?.startsWith('person:') ? targetMembers[0].slice(7) : targetMembers[0];
+      savePeople(all.filter((item) => item.key !== person.key));
+      return targetOwner || key;
+    }
+    applyUEI({ entityType: 'person', entityId: key, currentUEI: current, value, linkValue, identifiers });
+    savePeople(all);
+    return key;
+  }
+  if (value && value !== current) {
+    applyUEI({ entityType: 'person', entityId: key, currentUEI: current, value, linkValue: '', identifiers });
+    savePeople(all);
+  }
+  return key;
 }
 
 function savePersonData(root, key) {
@@ -824,58 +889,50 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) return null;
   const all = getAllPeople();
-  const layer = mountV2ZLayer(parentLayer, v2ZLayer(page([
-    personContext(person),
-    `<form data-person-edit-form>
-      ${personDataFields(person, all)}
-      ${button('Удалить', {
-        type: 'button',
-        className: 'v2-primary-source-only ui-button--danger',
-        data: 'data-person-z3-action data-v2-primary-action data-v2-primary-variant="danger"',
-        aria: 'Удалить клиента',
-      })}
-      <div class="form-error" data-person-edit-error></div>
-    </form>`,
-  ]), { className: 'people-edit-layer' }), { stack: true });
+  const layer = mountModal(baseRoot, modal(`${personQContext(person, {
+    c: { label: 'Сохранить', data: 'data-person-q-save', aria: 'Сохранить изменения' },
+  })}<form data-person-edit-form>
+    ${personDataFields(person, all)}
+    ${button('Удалить клиента', { type: 'button', variant: 'danger', data: 'data-person-delete' })}
+    <div class="form-error" data-person-edit-error></div>
+  </form>`, {
+    title: name(person),
+    variant: 'q',
+    surface: 'app',
+    className: 'people-edit-q',
+  }));
   if (!layer) return null;
 
   initMonthDayPickers(layer);
   initLinks(layer);
   initTags(layer);
   initRepeatedFields(layer);
+  initUEI(layer);
 
   const form = layer.querySelector('[data-person-edit-form]');
-  const action = layer.querySelector('[data-person-z3-action]');
+  const action = layer.querySelector('[data-person-q-save]');
   const initialState = formSnapshot(form);
-
   const isDirty = () => formSnapshot(form) !== initialState;
   const syncAction = () => {
-    const dirty = isDirty();
     if (!action) return;
-    action.textContent = dirty ? 'Сохранить' : 'Удалить';
-    action.classList.toggle('ui-button--danger', !dirty);
-    action.dataset.v2PrimaryVariant = dirty ? '' : 'danger';
-    action.setAttribute('aria-label', dirty ? 'Сохранить изменения' : 'Удалить клиента');
+    action.hidden = !isDirty();
     notifyContext();
   };
-
   const save = () => {
     if (!isDirty()) return;
     try {
       savePersonData(layer, key);
+      const nextKey = savePersonUei(layer, key);
       layer.v2Close?.();
-      callbacks.onSaved?.();
+      callbacks.onSaved?.(nextKey || key);
     } catch (error) {
       const node = layer.querySelector('[data-person-edit-error]');
       if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
     }
   };
 
-  action?.addEventListener('click', () => {
-    if (isDirty()) {
-      save();
-      return;
-    }
+  action?.addEventListener('click', save);
+  layer.querySelector('[data-person-delete]')?.addEventListener('click', () => {
     confirmDelete(layer, person, () => {
       layer.v2Close?.();
       callbacks.onDeleted?.();
@@ -883,17 +940,8 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   });
   form?.addEventListener('input', syncAction);
   form?.addEventListener('change', syncAction);
-  form?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    save();
-  });
-  bindPersonContext(layer, person, options, {
-    onIdentityChange: (nextKey) => {
-      if (!nextKey || nextKey === key) return;
-      layer.v2Close?.();
-      renderPersonOverview(parentLayer, baseRoot, nextKey, options);
-    }
-  });
+  form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
+  bindPersonContext(layer, person, options);
   syncAction();
   return layer;
 }

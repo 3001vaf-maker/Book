@@ -380,6 +380,16 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
+export function getCertificateAssignmentsForPerson(personKey = '') {
+  const key = String(personKey || '');
+  return instances
+    .filter((instance) => String(instance?.ownerKey || '') === key)
+    .map((instance) => ({
+      instance: { ...instance },
+      program: { ...(programs.find((program) => program.id === instance.programId) || {}) },
+    }));
+}
+
 export async function renderCertificate(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {

@@ -494,6 +494,16 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
+export function getSubscriptionAssignmentsForPerson(personKey = '') {
+  const key = String(personKey || '');
+  return instances
+    .filter((instance) => String(instance?.personKey || '') === key)
+    .map((instance) => ({
+      instance: { ...instance },
+      program: { ...(programs.find((program) => program.id === instance.programId) || {}) },
+    }));
+}
+
 export async function renderSubscription(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
