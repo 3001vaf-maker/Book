@@ -458,6 +458,19 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
+export function getBonusAssignmentsForPerson(personKey = '') {
+  const key = String(personKey || '');
+  return programs
+    .filter((program) => program?.status === 'active')
+    .map((program) => {
+      const participant = participants.find((item) => String(item?.programId || '') === String(program.id)
+        && String(item?.personKey || '') === key) || null;
+      if (program.assignment !== 'all' && !participant) return null;
+      return { program: { ...program }, participant: participant ? { ...participant } : null };
+    })
+    .filter(Boolean);
+}
+
 export async function renderBonus(root) {
   const render = async () => {
     const cards = programs.length

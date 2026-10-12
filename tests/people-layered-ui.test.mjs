@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
+const programs = readFileSync(new URL('../core/people/programs.js', import.meta.url), 'utf8');
+const viewState = readFileSync(new URL('../core/people/view-state.js', import.meta.url), 'utf8');
 const v2 = ['z-stack.js','modal-portal.js','swipe.js','workspace-navigation.js'].map((file) => readFileSync(new URL(`../ui/v2/${file}`, import.meta.url), 'utf8')).join('\n');
 const v2Css = readFileSync(new URL('../ui/v2/v2.css', import.meta.url), 'utf8');
 const selectors = readFileSync(new URL('../ui/selectors/index.js', import.meta.url), 'utf8');
@@ -11,9 +13,11 @@ const core = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 const miniCard = readFileSync(new URL('../ui/cards/mini-card.js', import.meta.url), 'utf8');
 const miniCardCss = readFileSync(new URL('../ui/cards/mini-card.css', import.meta.url), 'utf8');
 
+// Clients Z1: one shared A/B/C/D contract, search by name/UEI and canonical list.
 assert.match(people, /title:\s*'Клиенты'/);
-assert.match(people, /Поиск по имени или UEI/);
+assert.match(people, /kind:\s*'settings'/);
 assert.match(people, /data-people-list-settings/);
+assert.match(people, /Поиск по имени или UEI/);
 assert.match(people, /return v2ListEntries\(items\.map/);
 assert.match(people, /v2ListEntry\(\{/);
 assert.match(people, /overline:\s*display\.uei/);
@@ -21,57 +25,116 @@ assert.match(people, /title:\s*display\.name/);
 assert.match(people, /subtitle:\s*display\.phone/);
 assert.match(people, /className:\s*'list-entry--record-person'/);
 
-assert.match(people, /Из контактов/);
-assert.match(people, /Ввести вручную/);
-assert.match(people, /navigator\.contacts\.select\(\['name', 'tel'\]/);
-assert.match(people, /button\('Из контактов', \{ variant: 'secondary'/);
-assert.match(people, /button\('Ввести вручную', \{ variant: 'secondary'/);
-assert.match(people, /personCreateForm\(preset\)/);
-
-assert.match(people, /variant:\s*'x'/);
+// A1: Sort / Filter / View / Excel. UEI sorting is a first-class option.
+assert.match(people, /button\('Сортировка'/);
+assert.match(people, /button\('Фильтр'/);
+assert.match(people, /button\('Вид'/);
+assert.match(people, /button\('Excel'/);
+assert.match(people, /\['ueiAsc', 'UEI ↑'\]/);
+assert.match(people, /\['ueiDesc', 'UEI ↓'\]/);
+assert.match(viewState, /'ueiAsc'/);
+assert.match(viewState, /'ueiDesc'/);
+assert.match(viewState, /gender:/);
+assert.match(viewState, /birthday:/);
+assert.match(viewState, /tag:/);
+assert.match(viewState, /tagColor:/);
+assert.match(viewState, /noEmail:/);
+assert.match(viewState, /noVisits:/);
+assert.match(people, /label: 'Пол'/);
+assert.match(people, /label: 'День рождения'/);
+assert.match(people, /label: 'Ярлык'/);
+assert.match(people, /label: 'Окраска ярлыка'/);
+assert.match(people, /label: 'Почта'/);
+assert.match(people, /label: 'Посещения'/);
 assert.match(people, /Выгрузить/);
 assert.match(people, /Загрузить/);
 assert.match(people, /Шаблон/);
 
+// C1: add from device contacts or quick manual X; never a create Z2.
+assert.match(people, /Из контакта/);
+assert.match(people, /Внести вручную/);
+assert.match(people, /navigator\.contacts\.select\(\['name', 'tel'\]/);
+assert.match(people, /button\('Из контакта', \{ variant: 'secondary'/);
+assert.match(people, /button\('Внести вручную', \{ variant: 'secondary'/);
+assert.match(people, /function openCreateX/);
+assert.match(people, /personCreateForm\(preset\)/);
+assert.doesNotMatch(people, /function openCreateZ2/);
+
+// Client overview stays Z2. A is the client photo/settings manifestation and opens only consents/documents X -> S.
 assert.match(people, /mountV2ZLayer\([\s\S]*stack:\s*true/);
 assert.match(people, /people-overview-layer/);
-assert.match(people, /people-edit-layer/);
-assert.match(people, /data-person-card/);
-assert.match(people, /data-person-z3-action/);
-assert.match(people, /dirty \? 'Сохранить' : 'Удалить'/);
-assert.match(people, /layer\.v2Close\?\.\(\);[\s\S]*callbacks\.onSaved/);
-assert.doesNotMatch(people, /data-workspace-back-source/);
-
-assert.match(people, /openSharedProfileSettingsMenu\(\{/);
-assert.match(people, /id: 'code', label: 'Код'/);
-assert.match(people, /id: 'documents', label: 'Документы \/ согласия'/);
-assert.match(people, /id: 'history', label: 'История'/);
-assert.match(people, /variant: 'x'/);
-assert.match(people, /variant: 'q'/);
-assert.match(people, /documentTiles\(documents\.map/);
+assert.match(people, /kind:\s*'avatar'/);
+assert.match(people, /settingsTag:\s*true/);
+assert.match(people, /data-person-consents/);
+assert.match(people, /title: 'Документы \/ согласия', variant: 'x'/);
 assert.match(people, /variant: 's'/);
+assert.doesNotMatch(people, /openSharedProfileSettingsMenu\(/);
+assert.doesNotMatch(people, /id: 'code', label: 'Код'/);
+assert.doesNotMatch(people, /id: 'history', label: 'История'/);
+
+// Client card is canonical; its configured appearance is not duplicated in the client A menu.
+assert.match(people, /data-person-card/);
+assert.match(people, /entityVisualCard\(\{/);
+assert.match(people, /personCardAppearance\(person\)/);
 assert.match(people, /openEntityCardAppearanceQ\(root/);
 assert.match(people, /allowPhoto: false/);
-assert.match(people, /entityVisualCard\(\{/);
 assert.doesNotMatch(people, /openPersonPhotoEditor/);
-assert.doesNotMatch(people, /data-person-photo-card/);
 assert.doesNotMatch(people, /metricRail\(/);
-assert.match(people, /showApply:\s*false/);
-assert.match(people, /data-person-direct-chat/);
 
+// Z2 sections: programs, optional linked finance, and vertical history with built-in filter.
+assert.match(programs, /v2Section\('Программы', entityCardRail\(programCards\)\)/);
+assert.match(programs, /personalAccountVisualCard\(/);
+assert.match(programs, /\.\.\.deposits\.map\(depositCard\)/);
+assert.match(programs, /\.\.\.certificates\.map\(certificateCard\)/);
+assert.match(programs, /\.\.\.subscriptions\.map\(subscriptionCard\)/);
+assert.match(programs, /\.\.\.referrals\.map\(referralCard\)/);
+assert.match(programs, /\.\.\.bonuses\.map\(bonusCard\)/);
+assert.match(programs, /financeCards\.length \? v2Section\('Инвестиции \/ Займы'/);
+assert.match(programs, /cashEntityCardAppearance\(/);
+assert.match(programs, /cashEntityCardPhoto\(/);
+assert.match(people, /v2Section\('История'/);
+assert.match(people, /data-person-history-filter/);
+assert.match(people, /Вся история/);
+assert.match(people, /Продажи \/ операции/);
+assert.match(people, /people-history-q/);
+
+// Program/finance cards and client data open Q, not another stacked Z.
+assert.match(people, /function openPersonRelationshipQ/);
+assert.match(people, /people-program-q/);
+assert.match(people, /variant: 'q'/);
+assert.match(people, /people-edit-q/);
+assert.doesNotMatch(people, /people-edit-layer/);
+assert.doesNotMatch(people, /data-person-z3-action/);
+
+// Client Q editor: UEI at the top, existing data sections retained, Save only when dirty, Delete only in body.
 const dataFieldsStart = people.indexOf('function personDataFields');
 const dataFieldsEnd = people.indexOf('function formSnapshot', dataFieldsStart);
 const dataFields = people.slice(dataFieldsStart, dataFieldsEnd);
+assert.match(dataFields, /people-uei-editor/);
+assert.match(dataFields, /uei\(ueiData\(person, all\)\)/);
 assert.match(dataFields, /v2Section\('Персональные данные'/);
 assert.match(dataFields, /v2Section\('Контактные данные'/);
 assert.doesNotMatch(dataFields, /photoField\(/);
+assert.match(people, /data-person-q-save/);
+assert.match(people, /action\.hidden = !isDirty\(\)/);
+assert.match(people, /button\('Удалить клиента', \{ type: 'button', variant: 'danger'/);
+assert.doesNotMatch(people, /dirty \? 'Сохранить' : 'Удалить'/);
+assert.match(people, /layer\.v2Close\?\.\(\);[\s\S]*callbacks\.onSaved/);
+assert.doesNotMatch(people, /data-workspace-back-source/);
+
+// D is always direct chat with the selected client and is never hidden by a client Q.
+assert.match(people, /data-person-direct-chat/);
+assert.doesNotMatch(people, /hideD/);
+assert.match(core, /chatPersonKey/);
+assert.match(core, /onDirectChat/);
+assert.match(core, /data-workspace-d-action/);
 
 const saveStart = people.indexOf('function savePersonData');
 const saveEnd = people.indexOf('function deletePersonByKey', saveStart);
 const saveBlock = people.slice(saveStart, saveEnd);
 assert.doesNotMatch(saveBlock, /person\.photo\s*=/);
 
-
+// Existing shared UI owners remain the only geometry/interaction owners.
 assert.match(miniCard, /export function miniCardRail/);
 assert.match(miniCardCss, /--mini-card-width:238px/);
 assert.match(miniCardCss, /--mini-card-height:144px/);
@@ -104,9 +167,5 @@ assert.match(v2, /stopPointerPropagation/);
 assert.match(v2, /resolved === 'technical'/);
 assert.match(v2Css, /--v2-z-layer-shift/);
 assert.match(calendar, /modalRoot\.v2Close\?\.\(\)/);
-
-assert.match(core, /chatPersonKey/);
-assert.match(core, /onDirectChat/);
-assert.match(core, /data-workspace-d-action/);
 
 console.log('People layered UI architecture: OK');

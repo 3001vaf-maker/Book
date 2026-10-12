@@ -57,6 +57,7 @@ export {
 export {
   cashEntityCardAppearance,
   cashEntityCardFields,
+  cashEntityCardPhoto,
 } from './cash/card-presentation.js';
 
 export {

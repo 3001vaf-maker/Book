@@ -358,6 +358,19 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
+export function getReferralAssignmentsForPerson(personKey = '') {
+  const key = String(personKey || '');
+  return programs
+    .filter((program) => program?.status === 'active')
+    .map((program) => {
+      const relation = relations.find((item) => String(item?.programId || '') === String(program.id)
+        && [item?.inviterKey, item?.inviteeKey, item?.personKey].some((value) => String(value || '') === key)) || null;
+      if (program.assignment !== 'all' && !relation) return null;
+      return { program: { ...program }, relation: relation ? { ...relation } : null };
+    })
+    .filter(Boolean);
+}
+
 export async function renderReferral(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }))) : emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
