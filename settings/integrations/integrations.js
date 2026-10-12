@@ -252,10 +252,9 @@ function bindEmailX(layer, baseRoot, state = {}) {
     if (status) status.textContent = '';
     if (connected) {
       try {
-        const next = await disconnectEmail();
+        await disconnectEmail();
         await renderIntegrations(baseRoot);
         layer.v2Close?.();
-        openEmail(baseRoot, next);
       } catch (error) {
         action.disabled = false;
         if (status) status.textContent = emailActionError(error, true);
@@ -270,9 +269,13 @@ function bindEmailX(layer, baseRoot, state = {}) {
       return;
     }
     try {
+      try {
+        popup.document.title = 'Подключение Email';
+        popup.document.body.textContent = 'Открываем подключение почты…';
+      } catch {}
       const started = await beginEmailConnection(String(input?.value || '').trim());
       const onMessage = async (message) => {
-        if (message?.data?.type !== 'va-tools:email-integration') return;
+        if (message?.source !== popup || message?.data?.type !== 'va-tools:email-integration') return;
         window.removeEventListener('message', onMessage);
         if (!message.data.connected) {
           action.disabled = false;
@@ -280,9 +283,13 @@ function bindEmailX(layer, baseRoot, state = {}) {
           return;
         }
         const next = await getEmailConnection();
+        if (!next?.connected) {
+          action.disabled = false;
+          if (status) status.textContent = 'Подключение не завершено.';
+          return;
+        }
         await renderIntegrations(baseRoot);
         layer.v2Close?.();
-        openEmail(baseRoot, next);
       };
       window.addEventListener('message', onMessage);
       window.setTimeout(() => window.removeEventListener('message', onMessage), 10 * 60 * 1000);
