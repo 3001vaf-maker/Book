@@ -8,8 +8,6 @@ const API_HOST = 'api.va-tools.ru';
 const ADMIN_HOST = 'admin.va-tools.ru';
 const APP_HOST = 'app.va-tools.ru';
 const USER_HOST = 'user.va-tools.ru';
-const LEGACY_APP_HOST = 'book.va-tools.ru';
-const LEGACY_USER_HOST = 'client.va-tools.ru';
 const TEMP_APP_HOST = 'va-app-temp-volokovykh.msk1.amvera.tech';
 
 function normalizeOrigin(value: string) {
@@ -32,8 +30,6 @@ function allowedOrigins() {
       `https://${ADMIN_HOST}`,
       `https://${APP_HOST}`,
       `https://${USER_HOST}`,
-      `https://${LEGACY_APP_HOST}`,
-      `https://${LEGACY_USER_HOST}`,
       `https://${API_HOST}`,
     ];
   }
@@ -96,11 +92,11 @@ async function bootstrap() {
       return staticSite(request, response, next);
     }
 
-    if (host === APP_HOST || host === LEGACY_APP_HOST) {
+    if (host === APP_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
-    if (host === USER_HOST || host === LEGACY_USER_HOST) {
+    if (host === USER_HOST) {
       return staticSite(request, response, () => {
         const segments = request.path.split('/').filter(Boolean);
         const publicBookingPath = segments.length >= 1
