@@ -24,6 +24,7 @@ import {
   page,
   repeatedField,
   select,
+  setV2ZHeaderRows,
   shortDateTime,
   tags,
   uei,
@@ -660,17 +661,17 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   const relationships = await buildPersonRelationshipSections(person);
   layer.innerHTML = page([
     personContext(person),
-    `<section class="people-overview-card">${overviewCard(person)}</section>`,
     relationships.markup,
     v2Section('История', `<div class="form-grid">
-      ${select({ label: 'Фильтр истории', value: 'all', options: [
+      ${select({ value: 'all', options: [
         { value: 'all', label: 'Вся история' },
         { value: 'record', label: 'Записи' },
         { value: 'finance', label: 'Продажи / операции' },
-      ], data: 'data-person-history-filter' })}
+      ], aria: 'Фильтр истории', data: 'data-person-history-filter' })}
       <div data-person-history-host>${personHistoryMarkup(person)}</div>
     </div>`),
   ]);
+  setV2ZHeaderRows(layer, [overviewCard(person)]);
   bindPersonContext(layer, person, options);
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
   bindPersonHistorySection(layer, person, options);
