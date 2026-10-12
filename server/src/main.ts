@@ -88,7 +88,11 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === BOOK_HOST || host === TEMP_APP_HOST) {
+    if (host === TEMP_APP_HOST) {
+      return staticSite(request, response, next);
+    }
+
+    if (host === BOOK_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
