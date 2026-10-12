@@ -254,6 +254,7 @@ function personQContext(person, { c = null } = {}) {
       kind: 'avatar',
       image: person.photo || '',
       initials: initials(person),
+      settingsTag: true,
       data: 'data-person-consents',
       aria: `Согласия ${name(person)}`,
     },
