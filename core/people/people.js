@@ -381,7 +381,7 @@ function listMarkup(items, query = '') {
 function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
-  const query = root.querySelector('[data-people-search]')?.value || '';
+  const query = root.peopleSearchInput?.value || '';
   const items = filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
   host.innerHTML = listMarkup(items, query);
   host.querySelectorAll('[data-person]').forEach((node) => {
@@ -404,21 +404,20 @@ export function renderPeople(root, options = {}) {
   root.peopleOptions = options;
   root.innerHTML = page([
     listContext(),
-    `<section>
-      <div class="people-search ui-search-field">
-        ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
-      </div>
-      <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
-      <div data-people-list-host></div>
-    </section>`,
+    `<section><div data-people-list-host></div></section>`,
     button('+', {
       className: 'v2-primary-source-only',
       data: 'data-add data-v2-primary-action data-v2-primary-label="+"',
       aria: 'Добавить клиента',
     }),
   ]);
+  const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
+    ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
+    <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
+  </div>`]);
+  root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
   refreshPeopleList(root);
-  root.querySelector('[data-people-search]')?.addEventListener('input', () => refreshPeopleList(root));
+  root.peopleSearchInput?.addEventListener('input', () => refreshPeopleList(root));
   root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
 }
