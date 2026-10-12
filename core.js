@@ -26,7 +26,7 @@ import { renderGlobalClient, renderOnlineBooking } from './online-booking/bookin
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
-import { LEGACY_ACCOUNT_APP_ORIGIN, USER_ORIGIN } from './core/environment.js';
+import { USER_ORIGIN } from './core/environment.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -34,7 +34,6 @@ configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
 const END_USER_APP_HOSTS = new Set([
   new URL(USER_ORIGIN).hostname,
-  new URL(LEGACY_ACCOUNT_APP_ORIGIN).hostname,
 ]);
 
 const ROOT_SECTIONS = [
