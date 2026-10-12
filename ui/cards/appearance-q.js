@@ -42,7 +42,6 @@ export function openEntityCardAppearanceQ(root, {
 
     host.innerHTML = `${workspaceHeaderContext({
       title,
-      hideD: true,
       c: {
         label: 'Сохранить',
         data: 'data-card-q-save data-v2-primary-visible="false"',
