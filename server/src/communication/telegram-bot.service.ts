@@ -424,7 +424,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       WHERE "tenantId" = ${connection.tenantId} AND "channel" = 'TELEGRAM' AND "externalUserId" = ${telegramUserId} LIMIT 1
     `;
     let identity = identities[0] || null;
-    if (!identity && message.chat.type === 'private') {
+    const identityLinked = Boolean(identity && (canonicalPhone(identity.personPhone) || text(identity.uei)));
+    if (message.chat.type === 'private' && (!identity || !identityLinked)) {
       identity = await this.communications.ensureTelegramInboundIdentity(connection.tenantId, { telegramUserId, username });
     }
     const linkedIdentity = Boolean(identity && (canonicalPhone(identity.personPhone) || text(identity.uei)));
