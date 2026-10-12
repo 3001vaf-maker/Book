@@ -18,6 +18,7 @@ function captureHeader(header) {
     titleAria: title?.getAttribute('aria-label'),
     cSlot,
     cHidden: Boolean(cSlot?.hidden),
+    cDisplay: cSlot?.style.display ?? '',
     hadCClass: header.classList.contains('has-c'),
     gridTemplateColumns: header.style.gridTemplateColumns,
     dSlot,
@@ -26,6 +27,9 @@ function captureHeader(header) {
     aDisabled: Boolean(aControl?.disabled),
     dControl,
     dDisabled: Boolean(dControl?.disabled),
+    dClassName: dControl?.className || '',
+    dHtml: dControl?.innerHTML ?? '',
+    dAria: dControl?.getAttribute('aria-label'),
   };
 }
 
@@ -34,10 +38,18 @@ function applyMenuHeader(header, state) {
     state.title.textContent = 'Меню';
     if (state.title.matches('button')) state.title.setAttribute('aria-label', 'Меню');
   }
-  if (state.cSlot) state.cSlot.hidden = true;
+  if (state.cSlot) {
+    state.cSlot.hidden = true;
+    state.cSlot.style.display = 'none';
+  }
   header.classList.remove('has-c');
   if (state.aControl) state.aControl.disabled = true;
-  if (state.dControl) state.dControl.disabled = false;
+  if (state.dControl) {
+    state.dControl.disabled = false;
+    state.dControl.className = 'v2-header__control v2-header__control--chat';
+    state.dControl.setAttribute('aria-label', 'Чат');
+    state.dControl.innerHTML = '<span class="v2-header__icon v2-header__icon--chat" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4c-4.7 0-8 2.8-8 6.7 0 2.5 1.4 4.6 3.8 5.8L7.2 20l3.6-2.1c.4.1.8.1 1.2.1 4.7 0 8-2.8 8-7.3S16.7 4 12 4Z"></path></svg></span>';
+  }
 
   const hasD = Boolean(state.dSlot);
   header.style.gridTemplateColumns = hasD
@@ -52,12 +64,21 @@ function restoreHeader(header, state) {
     if (state.titleAria == null) state.title.removeAttribute('aria-label');
     else state.title.setAttribute('aria-label', state.titleAria);
   }
-  if (state.cSlot?.isConnected) state.cSlot.hidden = state.cHidden;
+  if (state.cSlot?.isConnected) {
+    state.cSlot.hidden = state.cHidden;
+    state.cSlot.style.display = state.cDisplay;
+  }
   header.classList.toggle('has-c', state.hadCClass);
   header.style.gridTemplateColumns = state.gridTemplateColumns;
   if (state.dSlot?.isConnected) state.dSlot.style.gridColumn = state.dGridColumn;
   if (state.aControl?.isConnected) state.aControl.disabled = state.aDisabled;
-  if (state.dControl?.isConnected) state.dControl.disabled = state.dDisabled;
+  if (state.dControl?.isConnected) {
+    state.dControl.disabled = state.dDisabled;
+    state.dControl.className = state.dClassName;
+    state.dControl.innerHTML = state.dHtml;
+    if (state.dAria == null) state.dControl.removeAttribute('aria-label');
+    else state.dControl.setAttribute('aria-label', state.dAria);
+  }
 }
 
 export function setV2MenuHeaderState(root, open) {

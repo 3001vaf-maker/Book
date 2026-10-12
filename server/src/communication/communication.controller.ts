@@ -11,7 +11,7 @@ type OwnerRequest = Request & { auth?: { platformAccountId: string; tenantId: st
 
 function professionalAppOrigin() {
   const fallback = process.env.NODE_ENV === 'production'
-    ? 'https://book.va-tools.ru'
+    ? 'https://app.va-tools.ru'
     : String(process.env.FRONTEND_ORIGIN || 'http://localhost:8080').trim();
   try { return new URL(fallback).origin; } catch { return ''; }
 }

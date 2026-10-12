@@ -1,15 +1,17 @@
 export const PRODUCTION_API_BASE = 'https://api.va-tools.ru';
 export const ADMIN_APP_ORIGIN = 'https://admin.va-tools.ru';
-export const BOOK_APP_ORIGIN = 'https://book.va-tools.ru';
-export const ACCOUNT_APP_ORIGIN = 'https://client.va-tools.ru';
+export const APP_ORIGIN = 'https://app.va-tools.ru';
+export const USER_ORIGIN = 'https://user.va-tools.ru';
+export const BOOK_APP_ORIGIN = APP_ORIGIN;
+export const ACCOUNT_APP_ORIGIN = USER_ORIGIN;
 export const LOCAL_STAGING_API_BASE = 'http://localhost:3000';
 export const CODESPACES_STAGING_API_BASE = '/api';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const PRODUCTION_HOSTS = new Set([
   new URL(ADMIN_APP_ORIGIN).hostname,
-  new URL(BOOK_APP_ORIGIN).hostname,
-  new URL(ACCOUNT_APP_ORIGIN).hostname,
+  new URL(APP_ORIGIN).hostname,
+  new URL(USER_ORIGIN).hostname,
   new URL(PRODUCTION_API_BASE).hostname,
 ]);
 const CODESPACES_SUFFIX = '.app.github.dev';

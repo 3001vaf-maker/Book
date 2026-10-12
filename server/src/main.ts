@@ -6,8 +6,9 @@ import { AppModule } from './app.module';
 
 const API_HOST = 'api.va-tools.ru';
 const ADMIN_HOST = 'admin.va-tools.ru';
-const BOOK_HOST = 'book.va-tools.ru';
-const ACCOUNT_HOST = 'client.va-tools.ru';
+const APP_HOST = 'app.va-tools.ru';
+const USER_HOST = 'user.va-tools.ru';
+const TEMP_APP_HOST = 'va-app-temp-volokovykh.msk1.amvera.tech';
 
 function normalizeOrigin(value: string) {
   try {
@@ -27,8 +28,8 @@ function allowedOrigins() {
   if (process.env.NODE_ENV === 'production') {
     return [
       `https://${ADMIN_HOST}`,
-      `https://${BOOK_HOST}`,
-      `https://${ACCOUNT_HOST}`,
+      `https://${APP_HOST}`,
+      `https://${USER_HOST}`,
       `https://${API_HOST}`,
     ];
   }
@@ -87,11 +88,15 @@ async function bootstrap() {
       return response.status(404).send('Not Found');
     }
 
-    if (host === BOOK_HOST) {
+    if (host === TEMP_APP_HOST) {
+      return staticSite(request, response, next);
+    }
+
+    if (host === APP_HOST) {
       return staticSite(request, response, () => response.status(404).send('Not Found'));
     }
 
-    if (host === ACCOUNT_HOST) {
+    if (host === USER_HOST) {
       return staticSite(request, response, () => {
         const segments = request.path.split('/').filter(Boolean);
         const publicBookingPath = segments.length >= 1

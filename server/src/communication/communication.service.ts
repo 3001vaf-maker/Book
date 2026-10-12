@@ -157,18 +157,56 @@ export class CommunicationService {
     const externalUserId = text(input?.telegramUserId);
     if (!/^\d+$/.test(externalUserId)) throw new BadRequestException('Некорректный Telegram ID');
     const display = telegramUsername(input?.username);
+
+    const contact = await this.prisma.accountContact.findUnique({
+      where: { type_value: { type: AccountContactType.TELEGRAM, value: externalUserId } },
+      select: { accountId: true },
+    });
+    const account = contact
+      ? await this.prisma.account.findUnique({ where: { id: contact.accountId }, select: { id: true, phone: true } })
+      : await this.prisma.account.findFirst({ where: { telegramId: externalUserId }, select: { id: true, phone: true } });
+
+    let personPhone = '';
+    let uei = '';
+    if (account) {
+      const identity = await this.businessState.bookingIdentityForAccount(tenantId, account.id).catch(() => null);
+      const personKey = text(identity?.person?.key || identity?.matchedPerson?.key);
+      if (personKey) {
+        personPhone = canonicalPhone(account.phone);
+        uei = text(identity?.uei);
+      }
+    }
+    const verifiedAt = personPhone || uei ? new Date() : null;
+
     const rows = await this.prisma.$queryRaw<TelegramIdentityRow[]>`
       INSERT INTO "CommunicationIdentity" (
         "id", "tenantId", "personPhone", "uei", "channel", "externalUserId", "display", "verifiedAt", "createdAt", "updatedAt"
       ) VALUES (
-        ${randomUUID()}, ${tenantId}, '', '', 'TELEGRAM', ${externalUserId}, ${display}, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ${randomUUID()}, ${tenantId}, ${personPhone}, ${uei}, 'TELEGRAM', ${externalUserId}, ${display}, ${verifiedAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("tenantId", "channel", "externalUserId") DO UPDATE
-      SET "display" = CASE WHEN EXCLUDED."display" <> '' THEN EXCLUDED."display" ELSE "CommunicationIdentity"."display" END,
+      SET "personPhone" = CASE WHEN EXCLUDED."personPhone" <> '' THEN EXCLUDED."personPhone" ELSE "CommunicationIdentity"."personPhone" END,
+          "uei" = CASE WHEN EXCLUDED."uei" <> '' THEN EXCLUDED."uei" ELSE "CommunicationIdentity"."uei" END,
+          "display" = CASE WHEN EXCLUDED."display" <> '' THEN EXCLUDED."display" ELSE "CommunicationIdentity"."display" END,
+          "verifiedAt" = COALESCE(EXCLUDED."verifiedAt", "CommunicationIdentity"."verifiedAt"),
           "updatedAt" = CURRENT_TIMESTAMP
       RETURNING "id", "personPhone", "uei", "externalUserId", "display"
     `;
-    return rows[0] || null;
+    const resolved = rows[0] || null;
+    const resolvedPhone = canonicalPhone(resolved?.personPhone);
+    const resolvedUei = text(resolved?.uei);
+    if (resolved && (resolvedPhone || resolvedUei)) {
+      await this.prisma.$executeRaw`
+        UPDATE "CommunicationMessage"
+        SET "personPhone" = ${resolvedPhone}, "uei" = ${resolvedUei}
+        WHERE "tenantId" = ${tenantId}
+          AND "channel" = 'TELEGRAM'
+          AND "externalThreadId" = ${externalUserId}
+          AND "personPhone" = ''
+          AND "uei" = ''
+      `;
+    }
+    return resolved;
   }
 
   async bindTelegramEntry(tenantId: string, accountId: string, entryToken: unknown) {

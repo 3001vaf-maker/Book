@@ -8,17 +8,22 @@ const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8'
 
 assert.match(environment, /https:\/\/api\.va-tools\.ru/);
 assert.match(environment, /https:\/\/admin\.va-tools\.ru/);
-assert.match(environment, /https:\/\/book\.va-tools\.ru/);
-assert.match(environment, /https:\/\/client\.va-tools\.ru/);
+assert.match(environment, /https:\/\/app\.va-tools\.ru/);
+assert.match(environment, /https:\/\/user\.va-tools\.ru/);
+assert.doesNotMatch(environment, /https:\/\/book\.va-tools\.ru/);
+assert.doesNotMatch(environment, /https:\/\/client\.va-tools\.ru/);
 assert.doesNotMatch(environment, /amvera\.io/);
 
 assert.match(serverMain, /api\.va-tools\.ru/);
 assert.match(serverMain, /admin\.va-tools\.ru/);
-assert.match(serverMain, /book\.va-tools\.ru/);
-assert.match(serverMain, /client\.va-tools\.ru/);
+assert.match(serverMain, /app\.va-tools\.ru/);
+assert.match(serverMain, /user\.va-tools\.ru/);
+assert.doesNotMatch(serverMain, /book\.va-tools\.ru/);
+assert.doesNotMatch(serverMain, /client\.va-tools\.ru/);
 assert.match(serverMain, /host === ADMIN_HOST/);
 assert.match(serverMain, /host === API_HOST/);
-assert.match(serverMain, /host === ACCOUNT_HOST/);
+assert.match(serverMain, /host === APP_HOST/);
+assert.match(serverMain, /host === USER_HOST/);
 assert.match(serverMain, /publicBookingPath/);
 assert.match(serverMain, /sendFile\(resolve\(siteRoot, 'index\.html'\)\)/);
 assert.match(indexHtml, /<base href="\/">/);

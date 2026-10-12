@@ -17,25 +17,31 @@ async function main() {
     include: { memberships: { orderBy: { createdAt: 'asc' } } },
   });
 
+  const passwordHash = await hash(password, 12);
+
   if (existing?.memberships?.[0]) {
-    await prisma.tenantAccess.upsert({
-      where: { tenantId: existing.memberships[0].tenantId },
-      create: {
-        tenantId: existing.memberships[0].tenantId,
-        status: 'ACTIVE',
-        isOwnerBook: true,
-        commercialMode: 'LIVE',
-      },
-      update: {
-        status: 'ACTIVE',
-        isOwnerBook: true,
-        commercialMode: 'LIVE',
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.platformAccount.update({
+        where: { id: existing.id },
+        data: { passwordHash },
+      });
+      await tx.tenantAccess.upsert({
+        where: { tenantId: existing.memberships[0].tenantId },
+        create: {
+          tenantId: existing.memberships[0].tenantId,
+          status: 'ACTIVE',
+          isOwnerBook: true,
+          commercialMode: 'LIVE',
+        },
+        update: {
+          status: 'ACTIVE',
+          isOwnerBook: true,
+          commercialMode: 'LIVE',
+        },
+      });
     });
     return;
   }
-
-  const passwordHash = await hash(password, 12);
 
   await prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({ data: { name: tenantName } });
