@@ -22,7 +22,7 @@ import {
   textareaField,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
-import { getWorkplaces } from '../profile/workplaces/data.js';
+import { getWorkplaces } from '../../core/profile/workplaces/data.js';
 
 let publicRouteState = { profileSlug: '', workplaces: [] };
 
