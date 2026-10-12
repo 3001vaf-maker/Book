@@ -33,13 +33,30 @@ export function openEntityCardAppearanceQ(root, {
     className: 'entity-card-appearance-q',
   }));
   const host = layer?.querySelector('[data-entity-card-appearance-q]');
+  const previewHost = layer?.querySelector('[data-v2-q-header-content]');
   if (!host) return layer;
 
   const render = () => {
     const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
     target = targets.length ? optionValue(targets, target) : '';
     const editor = resolve(type, target) || {};
+    const typeSelector = types.length > 1 ? select({
+      name: 'entityCardAppearanceType',
+      label: typeLabel,
+      value: type,
+      options: types,
+      data: 'data-entity-card-appearance-type',
+    }) : '';
+    const targetSelector = targets.length ? select({
+      name: 'entityCardAppearanceTarget',
+      label: targetLabel,
+      value: target,
+      options: targets,
+      data: 'data-entity-card-appearance-target',
+    }) : '';
+    const selectors = `${typeSelector}${targetSelector}`;
 
+    if (previewHost) previewHost.replaceChildren();
     host.innerHTML = `${workspaceHeaderContext({
       title,
       c: {
@@ -48,22 +65,7 @@ export function openEntityCardAppearanceQ(root, {
         aria: 'Сохранить вид карты',
       },
     })}
-      <div class="form-grid entity-card-appearance-q__selectors">
-        ${select({
-          name: 'entityCardAppearanceType',
-          label: typeLabel,
-          value: type,
-          options: types,
-          data: 'data-entity-card-appearance-type',
-        })}
-        ${targets.length ? select({
-          name: 'entityCardAppearanceTarget',
-          label: targetLabel,
-          value: target,
-          options: targets,
-          data: 'data-entity-card-appearance-target',
-        }) : ''}
-      </div>
+      ${selectors ? `<div class="form-grid entity-card-appearance-q__selectors">${selectors}</div>` : ''}
       <div data-entity-card-appearance-constructor></div>`;
 
     host.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
@@ -79,7 +81,15 @@ export function openEntityCardAppearanceQ(root, {
     const constructor = host.querySelector('[data-entity-card-appearance-constructor]');
     const saveSource = host.querySelector('[data-card-q-save]');
     let controller = null;
+    const syncHeaderPreview = () => {
+      if (!previewHost || !constructor) return;
+      const preview = constructor.querySelector('[data-card-preview]');
+      if (!preview) return;
+      previewHost.innerHTML = preview.innerHTML;
+      preview.hidden = true;
+    };
     const syncSaveSource = ({ dirty = false, saving = false } = {}) => {
+      syncHeaderPreview();
       if (!saveSource) return;
       saveSource.dataset.v2PrimaryVisible = dirty ? 'true' : 'false';
       saveSource.dataset.v2PrimaryLabel = 'Сохранить';
@@ -99,6 +109,7 @@ export function openEntityCardAppearanceQ(root, {
       },
       onStateChange: syncSaveSource,
     });
+    syncHeaderPreview();
     saveSource?.addEventListener('click', () => {
       void controller?.save?.();
     });
