@@ -18,6 +18,7 @@ function captureHeader(header) {
     titleAria: title?.getAttribute('aria-label'),
     cSlot,
     cHidden: Boolean(cSlot?.hidden),
+    cDisplay: cSlot?.style.display ?? '',
     hadCClass: header.classList.contains('has-c'),
     gridTemplateColumns: header.style.gridTemplateColumns,
     dSlot,
@@ -37,7 +38,10 @@ function applyMenuHeader(header, state) {
     state.title.textContent = 'Меню';
     if (state.title.matches('button')) state.title.setAttribute('aria-label', 'Меню');
   }
-  if (state.cSlot) state.cSlot.hidden = true;
+  if (state.cSlot) {
+    state.cSlot.hidden = true;
+    state.cSlot.style.display = 'none';
+  }
   header.classList.remove('has-c');
   if (state.aControl) state.aControl.disabled = true;
   if (state.dControl) {
@@ -60,7 +64,10 @@ function restoreHeader(header, state) {
     if (state.titleAria == null) state.title.removeAttribute('aria-label');
     else state.title.setAttribute('aria-label', state.titleAria);
   }
-  if (state.cSlot?.isConnected) state.cSlot.hidden = state.cHidden;
+  if (state.cSlot?.isConnected) {
+    state.cSlot.hidden = state.cHidden;
+    state.cSlot.style.display = state.cDisplay;
+  }
   header.classList.toggle('has-c', state.hadCClass);
   header.style.gridTemplateColumns = state.gridTemplateColumns;
   if (state.dSlot?.isConnected) state.dSlot.style.gridColumn = state.dGridColumn;

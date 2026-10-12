@@ -30,7 +30,13 @@ expect(alphabet.includes('Текущее выбранное значение в 
 
 expect(shell.includes('data-v2-app style="--v2-base:#000000"'), 'Shared H owner must keep the application background black.');
 expect(menuHeader.includes("state.title.textContent = 'Меню'"), 'Shared H owner must set B to Menu while the deck is open.');
-expect(menuHeader.includes('state.cSlot.hidden = true') && menuHeader.includes("header.classList.remove('has-c')"), 'Shared H owner must remove C from menu state.');
+expect(
+  menuHeader.includes('state.cSlot.hidden = true')
+    && menuHeader.includes("state.cSlot.style.display = 'none'")
+    && menuHeader.includes("header.classList.remove('has-c')"),
+  'Shared H owner must remove C from Menu visually and from layout geometry.',
+);
+expect(menuHeader.includes('state.cSlot.style.display = state.cDisplay'), 'Shared H owner must restore C display after leaving Menu.');
 expect(menuHeader.includes('state.aControl.disabled = true'), 'Shared H owner must keep A inactive in menu state.');
 expect(menuHeader.includes('state.dControl.disabled = false'), 'Shared H owner must keep D interactive in menu state.');
 expect(
