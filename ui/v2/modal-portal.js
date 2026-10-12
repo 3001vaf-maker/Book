@@ -138,6 +138,7 @@ function applicationLayerKey(layer) {
   }
   const kind = String(layer.dataset.v2LayerKind || '').trim();
   const label = String(layer.querySelector(':scope > .v2-layer')?.getAttribute('aria-label') || '').trim();
+  if (kind === 'bottom') return label ? `${kind}:${xLayerRole(layer)}:${label}` : '';
   return label ? `${kind}:${label}` : '';
 }
 
@@ -205,8 +206,12 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
 
   let disposeGesture = () => {};
-  let consumeClickTimer = 0;
-  let consumedPointerTarget = null;
+  let veilDismissTimer = 0;
+  let veilDismissing = false;
+  let veilPointerId = null;
+  let veilPointerX = 0;
+  let veilPointerY = 0;
+  let veilPointerMoved = false;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -227,34 +232,23 @@ export function mountV2Layer(html, { root = null } = {}) {
     return Boolean(qHeaderAction && app?.contains?.(qHeaderAction));
   };
 
-  const consumeFollowUpClick = (event) => {
-    if (!consumedPointerTarget) return;
-    const sameTarget = event.target === consumedPointerTarget
-      || consumedPointerTarget.contains?.(event.target);
-    if (!sameTarget) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    consumedPointerTarget = null;
-    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
-    consumeClickTimer = 0;
-    document.removeEventListener('click', consumeFollowUpClick, true);
-  };
-
-  const armFollowUpClickGuard = (target) => {
-    consumedPointerTarget = target;
-    document.addEventListener('click', consumeFollowUpClick, true);
-    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
-    consumeClickTimer = window.setTimeout(() => {
-      consumedPointerTarget = null;
-      consumeClickTimer = 0;
-      document.removeEventListener('click', consumeFollowUpClick, true);
-    }, 700);
+  const resetVeilPointer = () => {
+    veilPointerId = null;
+    veilPointerX = 0;
+    veilPointerY = 0;
+    veilPointerMoved = false;
   };
 
   const close = () => {
     if (closed) return;
     closed = true;
+    if (veilDismissTimer) window.clearTimeout(veilDismissTimer);
+    veilDismissTimer = 0;
+    resetVeilPointer();
     document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.removeEventListener('pointermove', handleOutsidePointerMove, true);
+    document.removeEventListener('pointerup', handleOutsidePointerUp, true);
+    document.removeEventListener('pointercancel', handleOutsidePointerCancel, true);
     document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
     if (node.isConnected) nativeRemove();
@@ -269,26 +263,69 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
+  const dismissThroughVeil = () => {
+    if (closed || veilDismissing) return;
+    const sheet = node.querySelector(':scope > .v2-layer');
+    if (!sheet) {
+      close();
+      return;
+    }
+    veilDismissing = true;
+    sheet.classList.remove('is-dragging');
+    sheet.classList.add('is-dismissing');
+    if (kind === 'top') sheet.style.setProperty('--v2-layer-drag-y', '-110%');
+    else if (kind === 'bottom') sheet.style.setProperty('--v2-layer-drag-y', '110%');
+    else sheet.style.setProperty('--v2-layer-drag-x', '110%');
+    veilDismissTimer = window.setTimeout(close, 150);
+  };
+
   const handleOutsidePointerDown = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
-    // Do not prevent the browser's pointer/touch sequence here. WebKit may
-    // otherwise suppress the next trusted tap after the veil dismissal. We
-    // stop propagation now and consume the resulting click for the same target.
+    veilPointerId = event.pointerId;
+    veilPointerX = event.clientX;
+    veilPointerY = event.clientY;
+    veilPointerMoved = false;
+    // The veil owns the complete pointer sequence. The modal remains mounted and
+    // the underlying stage remains inert until pointerup/click have been consumed.
     event.stopImmediatePropagation();
-    armFollowUpClickGuard(event.target);
-    close();
+  };
+
+  const handleOutsidePointerMove = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    const dx = event.clientX - veilPointerX;
+    const dy = event.clientY - veilPointerY;
+    if ((dx * dx) + (dy * dy) > 100) veilPointerMoved = true;
+    event.stopImmediatePropagation();
+  };
+
+  const handleOutsidePointerUp = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    const shouldDismiss = !veilPointerMoved;
+    resetVeilPointer();
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (shouldDismiss) dismissThroughVeil();
+  };
+
+  const handleOutsidePointerCancel = (event) => {
+    if (closed || technical || veilPointerId == null || event.pointerId !== veilPointerId) return;
+    resetVeilPointer();
+    event.stopImmediatePropagation();
   };
 
   const handleOutsideClick = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    close();
+    dismissThroughVeil();
   };
 
   node.v2Close = close;
   node.remove = close;
   document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+  document.addEventListener('pointermove', handleOutsidePointerMove, true);
+  document.addEventListener('pointerup', handleOutsidePointerUp, true);
+  document.addEventListener('pointercancel', handleOutsidePointerCancel, true);
   document.addEventListener('click', handleOutsideClick, true);
   disposeGesture = initV2LayerDismissGesture(node, {
     kind,

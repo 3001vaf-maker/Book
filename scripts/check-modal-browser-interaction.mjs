@@ -69,6 +69,25 @@ for (const [name, engine, contextOptions] of [
     };
 
     await open();
+
+    // Shared Z contract: the surface and its Header never vertically scroll;
+    // only Z Body owns native vertical scrolling.
+    const z = page.locator('[data-v2-z]').first();
+    const zHeader = z.locator(':scope > [data-v2-z-header]');
+    const zBody = z.locator(':scope > [data-v2-z-body]');
+    const headerBefore = await zHeader.boundingBox();
+    assert.ok(headerBefore, `${name}: missing Shared Z Header`);
+    const bodyCanScroll = await zBody.evaluate((node) => node.scrollHeight > node.clientHeight);
+    assert.equal(bodyCanScroll, true, `${name}: Z Body is not the scrollable viewport`);
+    await zBody.evaluate((node) => { node.scrollTop = 240; });
+    await page.waitForTimeout(80);
+    const headerAfter = await zHeader.boundingBox();
+    assert.ok(headerAfter, `${name}: Shared Z Header disappeared after body scroll`);
+    assert.equal(Math.round(headerAfter.y), Math.round(headerBefore.y), `${name}: Shared Z Header moved during Z Body scroll`);
+    assert.equal(await z.evaluate((node) => node.scrollTop), 0, `${name}: outer Z surface scrolled vertically`);
+    assert.ok(await zBody.evaluate((node) => node.scrollTop > 0), `${name}: Z Body did not retain vertical scroll`);
+    await zBody.evaluate((node) => { node.scrollTop = 0; });
+
     await tapOrClick(page.locator('[data-test-settings]'));
     await page.waitForTimeout(300);
     const menuSelector = '[data-shared-profile-action="workplaces"]';
@@ -157,6 +176,16 @@ for (const [name, engine, contextOptions] of [
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through X veil`);
 
+    // The same veil rule must protect interactive Z content. The tap that dismisses
+    // the modal is consumed by the veil; a second, separate tap may activate Z.
+    await tapOrClick(page.locator('[data-test-settings]'));
+    await page.locator('[data-modal]').waitFor();
+    await activateSelector('[data-test-under-veil]');
+    await page.locator('[data-modal]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('[data-test-under-veil-count]').textContent(), '0', `${name}: Z action fired through modal veil`);
+    await activateSelector('[data-test-under-veil]');
+    assert.equal(await page.locator('[data-test-under-veil-count]').textContent(), '1', `${name}: Z action did not fire on the next clean tap after veil dismissal`);
+
     // Q keeps its contextual Header C and D active; other Header zones remain veil-dismiss targets.
     await tapOrClick(page.locator('[data-test-open-q]'));
     await page.locator('[data-test-q-content]').waitFor();
@@ -207,7 +236,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (X action→editor→picker contract, Journal time discard/save, selectors, veil, Q C/D, 10 sheet variants)`);
+    console.log(`${name}: PASS (stable Z Header/Body, X action→editor→picker, Journal time discard/save, selectors, veil ownership, Q C/D, 10 sheet variants)`);
   } finally {
     await browser.close();
   }

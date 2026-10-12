@@ -1,14 +1,14 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
 
 const Z_HEADER_STYLE = [
-  'position:sticky',
-  'top:0',
+  'position:relative',
   'z-index:20',
   'box-sizing:border-box',
   'min-height:40px',
   'margin:0 -18px',
-  'padding:0 18px 20px 0',
+  'padding:0 18px 8px 0',
   'display:flex',
+  'flex:0 0 auto',
   'flex-direction:column',
   'background:var(--v2-white,#fff)',
 ].join(';');
@@ -24,7 +24,11 @@ const Z_HEADER_CONTENT_STYLE = [
 
 const Z_BODY_STYLE = [
   'min-width:0',
+  'min-height:0',
   'box-sizing:border-box',
+  'flex:1 1 auto',
+  'overflow-y:auto',
+  'overscroll-behavior:contain',
   '--v2-z-body-section-gap:20px',
 ].join(';');
 
