@@ -205,8 +205,8 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
 
   let disposeGesture = () => {};
-  let consumeClickTimer = 0;
-  let consumedPointerTarget = null;
+  let veilDismissTimer = 0;
+  let veilDismissing = false;
   const stopPointerPropagation = (event) => event.stopPropagation();
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => {
     node.addEventListener(type, stopPointerPropagation);
@@ -227,33 +227,11 @@ export function mountV2Layer(html, { root = null } = {}) {
     return Boolean(qHeaderAction && app?.contains?.(qHeaderAction));
   };
 
-  const consumeFollowUpClick = (event) => {
-    if (!consumedPointerTarget) return;
-    const sameTarget = event.target === consumedPointerTarget
-      || consumedPointerTarget.contains?.(event.target);
-    if (!sameTarget) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    consumedPointerTarget = null;
-    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
-    consumeClickTimer = 0;
-    document.removeEventListener('click', consumeFollowUpClick, true);
-  };
-
-  const armFollowUpClickGuard = (target) => {
-    consumedPointerTarget = target;
-    document.addEventListener('click', consumeFollowUpClick, true);
-    if (consumeClickTimer) window.clearTimeout(consumeClickTimer);
-    consumeClickTimer = window.setTimeout(() => {
-      consumedPointerTarget = null;
-      consumeClickTimer = 0;
-      document.removeEventListener('click', consumeFollowUpClick, true);
-    }, 700);
-  };
-
   const close = () => {
     if (closed) return;
     closed = true;
+    if (veilDismissTimer) window.clearTimeout(veilDismissTimer);
+    veilDismissTimer = 0;
     document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
     document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
@@ -269,21 +247,35 @@ export function mountV2Layer(html, { root = null } = {}) {
     if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
+  const dismissThroughVeil = () => {
+    if (closed || veilDismissing) return;
+    const sheet = node.querySelector(':scope > .v2-layer');
+    if (!sheet) {
+      close();
+      return;
+    }
+    veilDismissing = true;
+    sheet.classList.remove('is-dragging');
+    sheet.classList.add('is-dismissing');
+    if (kind === 'top') sheet.style.setProperty('--v2-layer-drag-y', '-110%');
+    else if (kind === 'bottom') sheet.style.setProperty('--v2-layer-drag-y', '110%');
+    else sheet.style.setProperty('--v2-layer-drag-x', '110%');
+    veilDismissTimer = window.setTimeout(close, 150);
+  };
+
   const handleOutsidePointerDown = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
-    // Do not prevent the browser's pointer/touch sequence here. WebKit may
-    // otherwise suppress the next trusted tap after the veil dismissal. We
-    // stop propagation now and consume the resulting click for the same target.
+    // The veil owns the whole pointer sequence. Do not remove it on pointerdown:
+    // the underlying Z/Header must remain inaccessible until the dismissing tap
+    // has been fully consumed and the modal dismissal animation has completed.
     event.stopImmediatePropagation();
-    armFollowUpClickGuard(event.target);
-    close();
   };
 
   const handleOutsideClick = (event) => {
     if (closed || technical || !isTopApplicationLayer() || eventIsOwnedByModal(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    close();
+    dismissThroughVeil();
   };
 
   node.v2Close = close;
