@@ -72,17 +72,27 @@ expect(
 );
 expect(
   communicationService.includes('async ensureTelegramInboundIdentity(')
-    && communicationService.includes("'', '', 'TELEGRAM', ${externalUserId}")
-    && communicationService.includes('verifiedAt')
-    && communicationService.includes('NULL, CURRENT_TIMESTAMP'),
-  'An unlinked private Telegram sender must get a provisional external identity without inventing a phone or UEI.',
+    && communicationService.includes('type_value: { type: AccountContactType.TELEGRAM, value: externalUserId }')
+    && communicationService.includes('where: { telegramId: externalUserId }')
+    && communicationService.includes('bookingIdentityForAccount(tenantId, account.id)')
+    && communicationService.includes('const verifiedAt = personPhone || uei ? new Date() : null;'),
+  'Inbound Telegram identity recovery must reuse only an existing Account Telegram mapping and keep unknown senders provisional.',
 );
 expect(
-  telegramBot.includes('ensureTelegramInboundIdentity(connection.tenantId')
+  communicationService.includes('"personPhone" = CASE WHEN EXCLUDED."personPhone" <> \'\'')
+    && communicationService.includes('"uei" = CASE WHEN EXCLUDED."uei" <> \'\'')
+    && communicationService.includes('"verifiedAt" = COALESCE(EXCLUDED."verifiedAt"')
+    && communicationService.includes('"externalThreadId" = ${externalUserId}'),
+  'Recovered Telegram identity must heal the provisional identity and prior Telegram messages without erasing known identity data.',
+);
+expect(
+  telegramBot.includes('const identityLinked = Boolean(identity')
+    && telegramBot.includes("message.chat.type === 'private' && (!identity || !identityLinked)")
+    && telegramBot.includes('ensureTelegramInboundIdentity(connection.tenantId')
     && telegramBot.includes('const linkedIdentity = Boolean(identity')
     && telegramBot.includes('messageBody && !isStart')
     && telegramBot.includes('inbound-recorded linked=${linkedIdentity}'),
-  'Ordinary text from an unlinked Telegram sender must be persisted as a DIRECT inbound message instead of being discarded behind the app-entry prompt.',
+  'Ordinary private Telegram text must retry a provisional identity link before persisting the DIRECT inbound message.',
 );
 expect(
   communicationService.includes('const telegramExternalThread = channel === \'TELEGRAM\'')

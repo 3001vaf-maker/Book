@@ -15,6 +15,7 @@ const selectors = read('ui/selectors/selectors.css');
 const info = read('ui/info/info.css');
 const time = read('ui/time/index.js');
 const accountShell = read('online-booking/account-shell.js');
+const chatRuntime = read('core/chat/runtime.js');
 
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
@@ -32,6 +33,17 @@ expect(menuHeader.includes("state.title.textContent = 'Меню'"), 'Shared H ow
 expect(menuHeader.includes('state.cSlot.hidden = true') && menuHeader.includes("header.classList.remove('has-c')"), 'Shared H owner must remove C from menu state.');
 expect(menuHeader.includes('state.aControl.disabled = true'), 'Shared H owner must keep A inactive in menu state.');
 expect(menuHeader.includes('state.dControl.disabled = false'), 'Shared H owner must keep D interactive in menu state.');
+expect(
+  menuHeader.includes("state.dControl.className = 'v2-header__control v2-header__control--chat'")
+    && menuHeader.includes("state.dControl.setAttribute('aria-label', 'Чат')")
+    && menuHeader.includes('state.dControl.innerHTML = \'<span class="v2-header__icon v2-header__icon--chat"'),
+  'Shared H owner must force D to the chat bubble and never leak a surface-specific D such as attachment into Menu.',
+);
+expect(
+  chatRuntime.includes("document.querySelector('[data-v2-app].is-deck-open')")
+    && chatRuntime.includes("new CustomEvent('book:v2-navigation-request', { detail: { open: false } })"),
+  'Chat attachment action must stay inside chat and yield to Menu D while H is open.',
+);
 
 expect(header.includes("if (!slot || slot.hidden) return '';"), 'Shared Header must not render empty action placeholders.');
 expect(header.includes('const cVisible = Boolean(c && !c.hidden);'), 'Shared Header must derive C geometry from a real visible action.');

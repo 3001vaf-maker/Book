@@ -124,7 +124,15 @@ export function mountChatThread(root, {
 
   initMessageComposer(root);
   const form = root.querySelector('[data-message-composer]');
-  root.querySelector('[data-chat-attachment]')?.addEventListener('click', () => form?.querySelector('[data-message-attachment]')?.click());
+  root.querySelector('[data-chat-attachment]')?.addEventListener('click', (event) => {
+    if (document.querySelector('[data-v2-app].is-deck-open')) {
+      event.preventDefault();
+      event.stopPropagation();
+      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: false } }));
+      return;
+    }
+    form?.querySelector('[data-message-attachment]')?.click();
+  });
   const getAttachments = bindMessageAttachments(form);
 
   if (typeof onMessageOpen === 'function') {
