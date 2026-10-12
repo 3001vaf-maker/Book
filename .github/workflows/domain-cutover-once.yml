@@ -1,0 +1,39 @@
+name: Domain Cutover Once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  update-domain-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Align production domain smoke checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/check.yml')
+          text = path.read_text()
+          text = text.replace('book.va-tools.ru', 'app.va-tools.ru')
+          text = text.replace('client.va-tools.ru', 'user.va-tools.ru')
+          path.write_text(text)
+          PY
+          if git diff --quiet -- .github/workflows/check.yml; then
+            echo "Domain smoke checks are already aligned"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/check.yml
+          git commit -m "Align production domain smoke checks"
+          git push origin HEAD:staging
