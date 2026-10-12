@@ -14,9 +14,10 @@ export function pageHeader(title, subtitle = '', meta = '') {
 /**
  * Canonical workspace Header context.
  * It supplies A/B/D metadata to the shared workspace shell without drawing a
- * second visible header inside Z.
+ * second visible header inside Z. D is owned by the shared Header and is never
+ * hidden by feature code.
  */
-export function workspaceHeaderContext({ title = '', a = null, c = null, d = null, hideD = false } = {}) {
+export function workspaceHeaderContext({ title = '', a = null, c = null, d = null } = {}) {
   const actionData = a?.data ? ` ${String(a.data).trim()}` : '';
   const cData = c?.data ? ` ${String(c.data).trim()}` : '';
   const dData = d?.data ? ` ${String(d.data).trim()}` : '';
@@ -25,7 +26,7 @@ export function workspaceHeaderContext({ title = '', a = null, c = null, d = nul
   const action = a ? `<button type="button" class="workspace-header-context__action" data-workspace-context-action${actionData} data-workspace-a-kind="${escapeHtml(a.kind || 'settings')}" data-workspace-a-label="${escapeHtml(a.label || '')}" data-workspace-a-image="${escapeHtml(a.image || '')}" data-workspace-a-image-position="${escapeHtml(a.imagePosition || '')}" data-workspace-a-initials="${escapeHtml(a.initials || '')}" data-workspace-a-settings-tag="${a.settingsTag ? 'true' : 'false'}" aria-label="${escapeHtml(a.aria || 'Настройки контекста')}"${actionDisabled}></button>` : '';
   const cAction = c ? `<button type="button" class="workspace-header-context__c-action" data-v2-primary-action data-v2-primary-label="${escapeHtml(c.label || '')}" data-workspace-c-kind="${escapeHtml(c.kind || 'text')}"${cData} aria-label="${escapeHtml(c.aria || c.label || 'Действие')}"${cDisabled}></button>` : '';
   const dAction = d ? `<button type="button" class="workspace-header-context__d-action" data-workspace-d-action${dData} data-workspace-d-kind="${escapeHtml(d.kind || 'chat')}" aria-label="${escapeHtml(d.aria || 'Действие справа')}"></button>` : '';
-  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-hide-d="${hideD ? 'true' : 'false'}">${action}${cAction}${dAction}</div>`;
+  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}">${action}${cAction}${dAction}</div>`;
 }
 
 /**
@@ -57,7 +58,7 @@ export function headerToggle({ items = [], activeId = '', data = 'data-header-to
  * Canonical grouping for more than one header control block.
  */
 export function headerControlGroup(items = []) {
-  return `<div class="header-control-group">${(Array.isArray(items) ? items : []).filter(Boolean).join('')}</div>`;
+  return `<div class="header-control-group" role="group">${(Array.isArray(items) ? items : []).filter(Boolean).join('')}</div>`;
 }
 
 /**
