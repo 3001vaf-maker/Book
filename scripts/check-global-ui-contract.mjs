@@ -4,6 +4,7 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const alphabet = read('UI_ALPHABET.md');
 const shell = read('ui/v2/shell.js');
 const header = read('ui/v2/header.js');
+const workspaceHeader = read('ui/header/index.js');
 const menuHeader = read('ui/v2/header-state.js');
 const v2Index = read('ui/v2/index.js');
 const zLayout = read('ui/v2/z-layout.js');
@@ -11,6 +12,7 @@ const zStack = read('ui/v2/z-stack.js');
 const zAffordance = read('ui/v2/z-affordance.js');
 const modalPortal = read('ui/v2/modal-portal.js');
 const modals = read('ui/modals/index.js');
+const appearanceQ = read('ui/cards/appearance-q.js');
 const selectors = read('ui/selectors/selectors.css');
 const info = read('ui/info/info.css');
 const time = read('ui/time/index.js');
@@ -54,6 +56,8 @@ expect(
 expect(header.includes("if (!slot || slot.hidden) return '';"), 'Shared Header must not render empty action placeholders.');
 expect(header.includes('const cVisible = Boolean(c && !c.hidden);'), 'Shared Header must derive C geometry from a real visible action.');
 expect(!header.includes('v2-header__slot is-empty'), 'Shared Header must not reserve visual space with empty slots.');
+expect(!workspaceHeader.includes('hideD'), 'Surface Header context must never expose a way to hide global Chat D.');
+expect(!appearanceQ.includes('hideD'), 'Q surfaces must never request suppression of global Chat D.');
 
 expect(zLayout.includes("return `${v2QHeader(header)}${v2QBody(content)}`;"), 'Every Q must keep the same Shared Header + Body frame as Z.');
 expect(zLayout.includes('bindV2ZHeaderOwner(root)') && zLayout.includes('root.replaceChildren = (...children) => {') && zLayout.includes('clearV2ZHeaderRows(root);'), 'Screen-scoped Z Header rows must be cleared when their owner surface is replaced.');
