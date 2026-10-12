@@ -932,19 +932,19 @@ jobs:
           expect_contains "admin.va-tools.ru" "/admin/document-registry/catalog.js" "privacy-policy"
           expect_contains "admin.va-tools.ru" "/admin/document-registry/view.js" "Реестр документов"
 
-          expect_status "book.va-tools.ru" "/" "200"
-          expect_status "book.va-tools.ru" "/core.js" "200"
-          expect_contains "book.va-tools.ru" "/" "<title>Рабочее пространство</title>"
-          expect_contains "book.va-tools.ru" "/core.js" "app-content"
+          expect_status "app.va-tools.ru" "/" "200"
+          expect_status "app.va-tools.ru" "/core.js" "200"
+          expect_contains "app.va-tools.ru" "/" "<title>Рабочее пространство</title>"
+          expect_contains "app.va-tools.ru" "/core.js" "app-content"
 
-          expect_status "client.va-tools.ru" "/" "200"
-          expect_status "client.va-tools.ru" "/online-booking/booking.js" "200"
-          expect_status "client.va-tools.ru" "/online-booking/model.js" "200"
-          expect_status "client.va-tools.ru" "/core/time/zone.js" "200"
-          expect_contains "client.va-tools.ru" "/" "<title>Рабочее пространство</title>"
-          expect_contains "client.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
-          expect_contains "client.va-tools.ru" "/online-booking/model.js" "zonedDateTimeParts"
-          expect_contains "client.va-tools.ru" "/core/time/zone.js" "Intl.DateTimeFormat"
+          expect_status "user.va-tools.ru" "/" "200"
+          expect_status "user.va-tools.ru" "/online-booking/booking.js" "200"
+          expect_status "user.va-tools.ru" "/online-booking/model.js" "200"
+          expect_status "user.va-tools.ru" "/core/time/zone.js" "200"
+          expect_contains "user.va-tools.ru" "/" "<title>Рабочее пространство</title>"
+          expect_contains "user.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
+          expect_contains "user.va-tools.ru" "/online-booking/model.js" "zonedDateTimeParts"
+          expect_contains "user.va-tools.ru" "/core/time/zone.js" "Intl.DateTimeFormat"
 
       - name: Start and verify staging frontend
         shell: bash
