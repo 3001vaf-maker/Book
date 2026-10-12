@@ -6,8 +6,8 @@ const stack = fs.readFileSync('ui/v2/z-stack.js', 'utf8');
 
 assert.match(
   affordance,
-  /'margin:20px 0 0 18px'/,
-  'Shared Z/Q dismiss affordance must live below the rounded top-left corner, in the visible second header band.',
+  /'margin:8px 0 4px 18px'/,
+  'Shared Z/Q dismiss affordance must stay compact at the top of the stable Header without creating an empty header band.',
 );
 assert.match(
   affordance,
