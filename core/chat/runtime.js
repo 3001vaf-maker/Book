@@ -1,5 +1,6 @@
 import {
   emptyState,
+  field,
   initSegmentControls,
   openNotice,
   segmentControl,
@@ -80,13 +81,18 @@ export function mountChatList(root, {
     data: `data-chat-thread="${index}"`,
     aria: `Открыть диалог ${threadTitle(thread)}`,
   }));
+  const search = values.length > 1
+    ? `<div data-chat-thread-search>${field({ label: 'Поиск', name: 'chatThreadSearch', placeholder: 'Найти диалог', autocomplete: 'off' })}</div>`
+    : '';
   surface({
     mode: 'list',
     title,
     a,
     c,
     d,
-    body: items.length ? v2ListEntries(items) : emptyState(emptyTitle, emptyText),
+    body: items.length
+      ? `${search}<div data-chat-thread-list>${v2ListEntries(items)}</div><p data-chat-thread-search-empty hidden>Ничего не найдено.</p>`
+      : emptyState(emptyTitle, emptyText),
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
@@ -95,6 +101,20 @@ export function mountChatList(root, {
     const thread = values[Number(node.dataset.chatThread)];
     if (thread) onOpenThread?.(thread);
   }));
+  const searchInput = root.querySelector('[name="chatThreadSearch"]');
+  searchInput?.addEventListener('input', () => {
+    const query = String(searchInput.value || '').trim().toLocaleLowerCase('ru-RU');
+    let visible = 0;
+    root.querySelectorAll('[data-chat-thread]').forEach((node) => {
+      const thread = values[Number(node.dataset.chatThread)];
+      const haystack = `${threadTitle(thread)} ${threadSubtitle(thread)}`.toLocaleLowerCase('ru-RU');
+      const matches = !query || haystack.includes(query);
+      node.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    const empty = root.querySelector('[data-chat-thread-search-empty]');
+    if (empty) empty.hidden = visible > 0;
+  });
 }
 
 export function mountChatThread(root, {
