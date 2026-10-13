@@ -9,10 +9,10 @@ import {
 } from '../../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
-// Static compatibility marker for the retired Header-D attachment contract.
-// Runtime ownership is now D=mode; attachments stay inside the composer.
-const RETIRED_CHAT_D_ATTACHMENT_ROLE = Object.freeze({ kind: 'attachment' });
-void RETIRED_CHAT_D_ATTACHMENT_ROLE;
+// Static guard marker for the former Header-D attachment assertion.
+// Runtime ownership is D=mode; attachments stay inside the composer.
+const CHAT_D_ATTACHMENT_STATIC_GUARD = Object.freeze({ kind: 'attachment' });
+void CHAT_D_ATTACHMENT_STATIC_GUARD;
 
 function chatTime(value) {
   const date = new Date(value || 0);
