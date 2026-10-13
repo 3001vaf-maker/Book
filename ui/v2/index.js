@@ -7,9 +7,11 @@ export { v2ZHeader, v2ZBody, v2QHeader, v2QBody, v2ZBodySection, v2ZBodySections
 export { v2Layer, mountV2Layer } from './modal-portal.js';
 export { initV2Swipe, initV2StickerSwipe } from './swipe.js';
 export { setV2MenuHeaderState, bindV2MenuHeaderState } from './header-state.js';
+export { syncV2HorizontalAffordances, bindV2HorizontalAffordances } from './horizontal-affordance.js';
 
 import { bindV2StableZFrame } from './z-stack.js';
 import { setV2MenuHeaderState, bindV2MenuHeaderState } from './header-state.js';
+import { bindV2HorizontalAffordances } from './horizontal-affordance.js';
 import { setV2DeckOpen as setV2DeckOpenOwner, initV2WorkspaceInteraction as initV2WorkspaceInteractionOwner } from './workspace-navigation.js';
 
 function rootApp(root) {
@@ -28,6 +30,7 @@ export function initV2WorkspaceInteraction(root, options = {}) {
   const app = rootApp(root);
   bindV2StableZFrame(app?.querySelector?.('[data-v2-front] > [data-v2-z]'));
   const disposeMenuHeader = bindV2MenuHeaderState(app);
+  const disposeHorizontalAffordances = bindV2HorizontalAffordances(app);
   const onDeckOpenChange = options.onDeckOpenChange;
   const dispose = initV2WorkspaceInteractionOwner(root, {
     ...options,
@@ -39,6 +42,7 @@ export function initV2WorkspaceInteraction(root, options = {}) {
   setV2MenuHeaderState(app, Boolean(options.deckOpen));
   return () => {
     disposeMenuHeader?.();
+    disposeHorizontalAffordances?.();
     dispose?.();
   };
 }

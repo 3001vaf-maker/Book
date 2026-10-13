@@ -1,0 +1,23 @@
+/* Empty Shared Z/Q Header keeps only the dismiss affordance and must not form a visible band. */
+[data-v2-z-header]:has(> [data-v2-z-header-content]:empty),
+[data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
+  min-height:28px!important;
+  padding-bottom:0!important;
+  background:transparent!important;
+}
+
+[data-v2-z-header]:has(> [data-v2-z-header-content]:empty) > [data-v2-z-dismiss],
+[data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-z-dismiss]{
+  margin-top:2px!important;
+  margin-bottom:2px!important;
+}
+
+[data-v2-z-header]:has(> [data-v2-z-header-content]:empty) > [data-v2-z-header-content],
+[data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-q-header-content]{
+  display:none!important;
+}
+
+/* A Q body starts directly after its compact empty Header; feature margins must not recreate a fake Header strip. */
+[data-v2-q-body] > .workspace-header-context + .entity-details{
+  margin-top:0;
+}

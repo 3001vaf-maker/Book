@@ -10,8 +10,12 @@ const v2Index = read('ui/v2/index.js');
 const zLayout = read('ui/v2/z-layout.js');
 const zStack = read('ui/v2/z-stack.js');
 const zAffordance = read('ui/v2/z-affordance.js');
+const surfaceHeaderCss = read('ui/v2/surface-header.css');
+const horizontalAffordance = read('ui/v2/horizontal-affordance.js');
+const horizontalAffordanceCss = read('ui/v2/horizontal-affordance.css');
 const modalPortal = read('ui/v2/modal-portal.js');
 const modals = read('ui/modals/index.js');
+const modalCss = read('ui/modals/modal.css');
 const appearanceQ = read('ui/cards/appearance-q.js');
 const selectors = read('ui/selectors/selectors.css');
 const info = read('ui/info/info.css');
@@ -31,6 +35,7 @@ expect(alphabet.includes('S — только информационное/тех
 expect(alphabet.includes('Текущее выбранное значение в закрытом select всегда визуально центрировано'), 'UI alphabet must keep selector values centered.');
 
 expect(shell.includes('data-v2-app style="--v2-base:#000000"'), 'Shared H owner must keep the application background black.');
+expect(shell.includes('data-v2-horizontal-rail'), 'Shared horizontal rail must expose one canonical marker.');
 expect(menuHeader.includes("state.title.textContent = 'Меню'"), 'Shared H owner must set B to Menu while the deck is open.');
 expect(
   menuHeader.includes('state.cSlot.hidden = true')
@@ -54,22 +59,29 @@ expect(
 );
 
 expect(header.includes("if (!slot || slot.hidden) return '';"), 'Shared Header must not render empty action placeholders.');
+expect(header.includes("slot.settingsTag && !slot.disabled"), 'Shared Header settings badge must never render on an inactive A control.');
 expect(header.includes('const cVisible = Boolean(c && !c.hidden);'), 'Shared Header must derive C geometry from a real visible action.');
 expect(!header.includes('v2-header__slot is-empty'), 'Shared Header must not reserve visual space with empty slots.');
+expect(workspaceHeader.includes('function isSettingsTarget') && workspaceHeader.includes("semantic.includes('настрой')"), 'Workspace A settings badge must only represent a real settings target.');
 expect(!workspaceHeader.includes('hideD'), 'Surface Header context must never expose a way to hide global Chat D.');
 expect(!appearanceQ.includes('hideD'), 'Q surfaces must never request suppression of global Chat D.');
 
 expect(zLayout.includes("return `${v2QHeader(header)}${v2QBody(content)}`;"), 'Every Q must keep the same Shared Header + Body frame as Z.');
 expect(zLayout.includes('bindV2ZHeaderOwner(root)') && zLayout.includes('root.replaceChildren = (...children) => {') && zLayout.includes('clearV2ZHeaderRows(root);'), 'Screen-scoped Z Header rows must be cleared when their owner surface is replaced.');
+expect(surfaceHeaderCss.includes('[data-v2-q-header-content]:empty') && surfaceHeaderCss.includes('min-height:28px!important'), 'Empty Shared Z/Q Header must collapse to the compact affordance-only state.');
 expect(zAffordance.includes('drop-shadow('), 'Shared Z/Q dismiss affordance must remain visibly separated from the surface.');
 expect(zAffordance.includes('[data-v2-q-header] > [data-v2-z-dismiss]'), 'Shared dismiss affordance must work in Q as well as Z.');
 expect(zStack.includes('export function bindV2StableZFrame'), 'Shared Z owner must protect Header + Body geometry while body content changes.');
 expect(v2Index.includes('bindV2StableZFrame') && !v2Index.includes('ensureRootZFrame'), 'Root Z must bind the stable Shared frame instead of repairing it after destruction.');
+expect(v2Index.includes('bindV2HorizontalAffordances'), 'Shared V2 runtime must bind horizontal rail affordances.');
+expect(horizontalAffordance.includes('rail.children.length > 1') && horizontalAffordance.includes("classList.toggle('has-v2-horizontal-rail'"), 'Horizontal rail cue must be based on real multiple-card layout.');
+expect(horizontalAffordanceCss.includes('.v2-section.has-v2-horizontal-rail') && horizontalAffordanceCss.includes('content:"›"'), 'Horizontal rail cue must stay visible but quiet in the section title.');
 expect(accountShell.includes('if (!canReuseScene) {') && accountShell.includes('root.innerHTML = v2Shell({'), 'End-user surfaces must keep the persistent Shared FEZ scene.');
 
 expect(modalPortal.includes('.v2-header__slot--c .v2-header__control, [data-v2-header] .v2-header__slot--d .v2-header__control'), 'Q veil must leave both Header C and D interactive.');
 expect(modalPortal.includes("if (qLayer && event.target.closest('[data-v2-z-dismiss]')) node.v2Close?.();"), 'Q Shared dismiss affordance must close only the active Q layer.');
 expect(modals.includes('S_INTERACTIVE_CONTENT') && modals.includes('S modal is informational only'), 'Shared S owner must reject buttons/forms/editors/pickers.');
+expect(modalCss.includes('.modal-sheet.modal--top > .document-tiles:has(+ .entity-details){display:none}'), 'Document S modal must show facts only and never duplicate the source document tile.');
 expect(time.includes("variant:'x'") && time.includes("variant: 'x'"), 'Shared time pickers must be X work modals.');
 
 expect(selectors.includes('.ui-select__control{') && selectors.includes('justify-content:center'), 'Closed Shared Select value must be centered.');
