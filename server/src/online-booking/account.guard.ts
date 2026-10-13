@@ -31,6 +31,50 @@ export class AccountGuard implements CanActivate {
       if (!account || String(profileData.deletedAt || '').trim()) throw new Error('inactive account token');
       const tenantId = String(request.params?.tenantId || '').trim();
       request.accountAuth = { accountId: payload.sub, tenantId };
+
+      if (tenantId) {
+        await this.prisma.$executeRaw`
+          UPDATE "CommunicationMessage" m
+          SET "status" = 'delivered',
+              "deliveredAt" = COALESCE(m."deliveredAt", CURRENT_TIMESTAMP)
+          WHERE m."tenantId" = ${tenantId}
+            AND m."direction" = 'outbound'
+            AND m."purpose" = 'DIRECT'
+            AND m."readAt" IS NULL
+            AND m."failedAt" IS NULL
+            AND m."status" <> 'failed'
+            AND m."deliveredAt" IS NULL
+            AND EXISTS (
+              SELECT 1
+              FROM "AccountContact" c
+              WHERE c."accountId" = ${payload.sub}
+                AND c."type" = 'PHONE'
+                AND c."value" = m."personPhone"
+            )
+        `;
+
+        const requestPath = String((request as any).path || request.url || '').split('?')[0];
+        if (request.method === 'GET' && /\/account\/chat\/?$/.test(requestPath)) {
+          await this.prisma.$executeRaw`
+            UPDATE "CommunicationMessage" m
+            SET "status" = 'read',
+                "deliveredAt" = COALESCE(m."deliveredAt", CURRENT_TIMESTAMP),
+                "readAt" = COALESCE(m."readAt", CURRENT_TIMESTAMP)
+            WHERE m."tenantId" = ${tenantId}
+              AND m."direction" = 'outbound'
+              AND m."purpose" = 'DIRECT'
+              AND m."failedAt" IS NULL
+              AND m."status" <> 'failed'
+              AND EXISTS (
+                SELECT 1
+                FROM "AccountContact" c
+                WHERE c."accountId" = ${payload.sub}
+                  AND c."type" = 'PHONE'
+                  AND c."value" = m."personPhone"
+              )
+          `;
+        }
+      }
       return true;
     } catch {
       throw new UnauthorizedException('Войдите в аккаунт заново');
