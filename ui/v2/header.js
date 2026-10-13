@@ -9,11 +9,17 @@ function defaultChatBadge() {
 function headerControl(slot = {}, role = '') {
   if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
-  const aria = text(slot.aria || slot.label || role);
+  const requestedKind = slot.kind || 'text';
+  const kind = role === 'd' ? 'mode' : requestedKind;
+  const aria = text(role === 'd' ? 'Переключить режим' : (slot.aria || slot.label || role));
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
-  const kind = slot.kind || 'text';
-  const badgeValue = slot.badge == null && kind === 'chat' ? defaultChatBadge() : Number(slot.badge || 0);
+  const modeData = role === 'd'
+    ? `${String(slot.data || '').trim()} data-app-mode-switch data-app-mode-source-kind="${text(requestedKind)}"`.trim()
+    : slot.data;
+  const badgeValue = slot.badge == null && (role === 'd' || requestedKind === 'chat')
+    ? defaultChatBadge()
+    : Number(slot.badge || 0);
   const badge = badgeValue > 0 ? `<span class="v2-header__badge">${Math.min(99, badgeValue)}</span>` : '';
   const variant = slot.variant === 'danger' ? 'danger' : (slot.variant === 'white' || slot.variant === 'secondary' ? 'white' : '');
   const variantClass = variant ? ` v2-header__control--${variant}` : '';
@@ -27,6 +33,8 @@ function headerControl(slot = {}, role = '') {
     body = image
       ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
+  } else if (kind === 'mode') {
+    body = '<span class="v2-header__icon v2-header__icon--mode" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h12M13 4l3 3-3 3M20 17H8M11 14l-3 3 3 3"></path></svg></span>';
   } else if (kind === 'chat') {
     body = '<span class="v2-header__icon v2-header__icon--chat" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4c-4.7 0-8 2.8-8 6.7 0 2.5 1.4 4.6 3.8 5.8L7.2 20l3.6-2.1c.4.1.8.1 1.2.1 4.7 0 8-2.8 8-7.3S16.7 4 12 4Z"></path></svg></span>';
   } else if (kind === 'contacts') {
@@ -38,7 +46,7 @@ function headerControl(slot = {}, role = '') {
   } else if (kind === 'back') {
     body = '<span class="v2-header__back" aria-hidden="true">‹</span>';
   }
-  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
+  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(modeData)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
