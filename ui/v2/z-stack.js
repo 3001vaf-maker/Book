@@ -41,6 +41,14 @@ export function bindV2StableZFrame(node) {
   return node;
 }
 
+function nextLayerDepth(host, dismissible) {
+  const layers = [...host.querySelectorAll(':scope > [data-v2-z-layer]')];
+  if (!dismissible) return 1;
+  const modeRootIndex = layers.findLastIndex((layer) => layer.dataset.v2ModeRoot === 'true');
+  if (modeRootIndex >= 0) return layers.length - modeRootIndex + 1;
+  return layers.length + 1;
+}
+
 export function mountV2ZLayer(root, html, { onClose = null, stack = false, dismissible = true } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
@@ -53,11 +61,12 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false, dismi
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
   bindV2StableZFrame(node);
   node.dataset.v2Dismissible = dismissible ? 'true' : 'false';
+  if (!dismissible) node.dataset.v2ModeRoot = 'true';
   if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => {
     if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
     else layer.remove();
   });
-  const depth = host.querySelectorAll('[data-v2-z-layer]').length + 1;
+  const depth = nextLayerDepth(host, dismissible);
   node.dataset.v2ZDepth = String(depth);
   node.style.setProperty('--v2-z-layer-shift', `${depth * 12}px`);
   host.appendChild(node);
