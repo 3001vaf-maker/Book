@@ -38,7 +38,7 @@ export async function getProfessionalChatThreads() {
 }
 
 export async function ensureProfessionalChatThread(identity = {}) {
-  if (identity?.conversationId) return identity;
+  if (identity?.conversationId || identity?.id) return { ...identity, id: identity.conversationId || identity.id };
   return ensureProfessionalDirectConversation(identity);
 }
 
@@ -58,8 +58,12 @@ export async function getEndUserChatThreads() {
   return getGlobalAccountRelationships();
 }
 
+export async function getEndUserChatConversations(tenantId) {
+  return getEndUserMessengerConversations(tenantId);
+}
+
 export async function getEndUserChatConversation(tenantId) {
-  const conversations = await getEndUserMessengerConversations(tenantId);
+  const conversations = await getEndUserChatConversations(tenantId);
   const direct = directConversation(conversations);
   if (!direct) throw new Error('Диалог не найден');
   return direct;
