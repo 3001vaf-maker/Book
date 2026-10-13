@@ -2,6 +2,64 @@ import { API_BASE } from '../environment.js';
 
 const ACCOUNT_TOKEN_KEY = 'book.account.token';
 const ACCOUNT_EMAIL_KEY = 'book.account.email';
+const ACCOUNT_UNREAD_KEY = '__VA_TOOLS_ACCOUNT_UNREAD__';
+
+function unreadSnapshot() {
+  if (typeof globalThis === 'undefined') return { total: 0, byTenant: {} };
+  const value = globalThis[ACCOUNT_UNREAD_KEY];
+  if (value && typeof value === 'object' && value.byTenant && typeof value.byTenant === 'object') return value;
+  const initial = { total: 0, byTenant: {} };
+  globalThis[ACCOUNT_UNREAD_KEY] = initial;
+  return initial;
+}
+
+function syncInstalledBadge(total) {
+  if (typeof navigator === 'undefined') return;
+  const count = Math.max(0, Math.trunc(Number(total) || 0));
+  if (count > 0 && typeof navigator.setAppBadge === 'function') {
+    void navigator.setAppBadge(count).catch(() => {});
+  } else if (count === 0 && typeof navigator.clearAppBadge === 'function') {
+    void navigator.clearAppBadge().catch(() => {});
+  }
+}
+
+function publishUnread(byTenant = {}) {
+  const normalized = {};
+  for (const [tenantId, value] of Object.entries(byTenant || {})) {
+    const id = String(tenantId || '').trim();
+    const count = Math.max(0, Math.trunc(Number(value) || 0));
+    if (id) normalized[id] = count;
+  }
+  const total = Object.values(normalized).reduce((sum, value) => sum + Number(value || 0), 0);
+  const snapshot = { total, byTenant: normalized };
+  if (typeof globalThis !== 'undefined') globalThis[ACCOUNT_UNREAD_KEY] = snapshot;
+  syncInstalledBadge(total);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('va-tools:account-unread', { detail: snapshot }));
+  }
+  return snapshot;
+}
+
+function setTenantUnread(tenantId, count) {
+  const id = String(tenantId || '').trim();
+  if (!id) return unreadSnapshot();
+  const current = unreadSnapshot();
+  return publishUnread({ ...current.byTenant, [id]: Math.max(0, Math.trunc(Number(count) || 0)) });
+}
+
+export function getAccountUnreadState() {
+  const current = unreadSnapshot();
+  return { total: Number(current.total || 0), byTenant: { ...current.byTenant } };
+}
+
+export function getGlobalAccountUnreadCount() {
+  return Math.max(0, Math.trunc(Number(unreadSnapshot().total) || 0));
+}
+
+export function getTenantAccountUnreadCount(tenantId) {
+  const id = String(tenantId || '').trim();
+  return Math.max(0, Math.trunc(Number(unreadSnapshot().byTenant?.[id]) || 0));
+}
 
 export function getAccountToken() {
   return localStorage.getItem(ACCOUNT_TOKEN_KEY) || '';
@@ -13,6 +71,7 @@ export function getRememberedAccountEmail() {
 
 export function clearAccount() {
   localStorage.removeItem(ACCOUNT_TOKEN_KEY);
+  publishUnread({});
 }
 
 async function request(path, { tenantId = '', auth = false, ...options } = {}) {
@@ -67,7 +126,10 @@ async function jsonResponse(response, fallbackMessage) {
 }
 
 function storeSession(_tenantId, payload) {
-  if (payload?.accessToken) localStorage.setItem(ACCOUNT_TOKEN_KEY, payload.accessToken);
+  if (payload?.accessToken) {
+    localStorage.setItem(ACCOUNT_TOKEN_KEY, payload.accessToken);
+    publishUnread({});
+  }
   if (payload?.account?.email) localStorage.setItem(ACCOUNT_EMAIL_KEY, payload.account.email);
   return payload;
 }
@@ -177,21 +239,65 @@ export async function changeGlobalAccountPassword(currentPassword, newPassword) 
   );
 }
 
-export async function getGlobalAccountRelationships() {
-  return jsonResponse(
-    await request('/online-booking/account/relationships', { auth: true }),
-    'Не удалось загрузить связи аккаунта',
+export async function getGlobalAccountUnreadSummary() {
+  const payload = await jsonResponse(
+    await request('/online-booking/account/unread-summary', { auth: true }),
+    'Не удалось загрузить непрочитанные уведомления',
   );
+  const byTenant = {};
+  for (const row of Array.isArray(payload?.byTenant) ? payload.byTenant : []) {
+    const tenantId = String(row?.tenantId || '').trim();
+    if (!tenantId) continue;
+    byTenant[tenantId] = Math.max(0, Math.trunc(Number(row?.unreadCount) || 0));
+  }
+  const snapshot = publishUnread(byTenant);
+  return { ...payload, total: snapshot.total, byTenant: Object.entries(snapshot.byTenant).map(([tenantId, unreadCount]) => ({ tenantId, unreadCount })) };
+}
+
+export async function getGlobalAccountRelationships() {
+  const [relationships, summary] = await Promise.all([
+    jsonResponse(
+      await request('/online-booking/account/relationships', { auth: true }),
+      'Не удалось загрузить связи аккаунта',
+    ),
+    getGlobalAccountUnreadSummary().catch(() => ({ ...getAccountUnreadState(), byTenant: [] })),
+  ]);
+  const counts = new Map((Array.isArray(summary?.byTenant) ? summary.byTenant : [])
+    .map((row) => [String(row?.tenantId || ''), Math.max(0, Math.trunc(Number(row?.unreadCount) || 0))]));
+  return (Array.isArray(relationships) ? relationships : []).map((relationship) => {
+    const tenantId = String(relationship?.tenantId || '');
+    const unreadCount = counts.get(tenantId) || 0;
+    const context = relationship?.context && typeof relationship.context === 'object' && !Array.isArray(relationship.context)
+      ? relationship.context
+      : {};
+    const profile = context?.profile && typeof context.profile === 'object' && !Array.isArray(context.profile)
+      ? context.profile
+      : {};
+    return {
+      ...relationship,
+      unreadCount,
+      context: {
+        ...context,
+        profile: { ...profile, tenantId, unreadCount },
+      },
+    };
+  });
 }
 
 export async function deleteGlobalAccountRelationship(tenantId) {
-  return jsonResponse(
-    await request(`/online-booking/account/relationships/${encodeURIComponent(String(tenantId || ''))}`, {
+  const id = String(tenantId || '');
+  const result = await jsonResponse(
+    await request(`/online-booking/account/relationships/${encodeURIComponent(id)}`, {
       auth: true,
       method: 'DELETE',
     }),
     'Не удалось удалить контакт',
   );
+  const current = getAccountUnreadState();
+  const next = { ...current.byTenant };
+  delete next[id];
+  publishUnread(next);
+  return result;
 }
 
 export async function decideGlobalAccountInvestment(tenantId, investmentId, decision) {
@@ -394,14 +500,16 @@ export async function bindAccountTelegramEntry(tenantId, token) {
 }
 
 export async function getAccountNotifications(tenantId) {
-  return jsonResponse(
+  const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications`, { tenantId, auth: true }),
     'Не удалось загрузить уведомления',
   );
+  setTenantUnread(tenantId, payload?.unreadCount || 0);
+  return payload;
 }
 
 export async function markAccountNotificationRead(tenantId, notificationId) {
-  return jsonResponse(
+  const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications/${encodeURIComponent(notificationId)}/read`, {
       tenantId,
       auth: true,
@@ -409,6 +517,8 @@ export async function markAccountNotificationRead(tenantId, notificationId) {
     }),
     'Не удалось открыть уведомление',
   );
+  setTenantUnread(tenantId, Math.max(0, getTenantAccountUnreadCount(tenantId) - 1));
+  return payload;
 }
 
 export async function getAccountChat(tenantId) {

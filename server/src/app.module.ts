@@ -19,6 +19,7 @@ import { TenantInvitationModule } from './tenant-invitation/tenant-invitation.mo
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
 import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
 import { PasswordResetModule } from './password-reset/password-reset.module';
+import { AccountUnreadModule } from './account-unread/account-unread.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PasswordResetModule } from './password-reset/password-reset.module';
     SaasAdminModule,
     PlatformNoticeModule,
     PasswordResetModule,
+    AccountUnreadModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],

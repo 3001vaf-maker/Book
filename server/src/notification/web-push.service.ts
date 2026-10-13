@@ -25,6 +25,7 @@ type PushDeliveryRow = {
   type: string;
   entityType: string;
   entityId: string;
+  accountId: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -143,6 +144,21 @@ export class WebPushService {
     return url.toString();
   }
 
+  private async globalUnreadCount(accountId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>`
+      SELECT COUNT(*) AS "count"
+      FROM "NotificationDelivery" d
+      INNER JOIN "AccountContact" c
+        ON c."accountId" = ${accountId}
+       AND c."type" = 'PHONE'
+       AND c."value" = d."recipientKey"
+      WHERE d."channel" = 'IN_APP'
+        AND d."readAt" IS NULL
+    `;
+    const count = Number(rows[0]?.count || 0);
+    return Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  }
+
   private async markSent(tenantId: string, deliveryId: string) {
     const now = new Date();
     await this.prisma.$executeRaw`
@@ -173,7 +189,7 @@ export class WebPushService {
       SELECT
         d."id" AS "deliveryId", d."notificationId", d."tenantId", d."recipientKey",
         n."title", n."body", n."type", n."entityType", n."entityId",
-        s."endpoint", s."p256dh", s."auth"
+        s."accountId", s."endpoint", s."p256dh", s."auth"
       FROM "NotificationDelivery" d
       INNER JOIN "Notification" n
         ON n."id" = d."notificationId" AND n."tenantId" = d."tenantId"
@@ -188,7 +204,11 @@ export class WebPushService {
 
     let sent = 0;
     let failed = 0;
+    const unreadByAccount = new Map<string, number>();
     for (const row of rows) {
+      if (!unreadByAccount.has(row.accountId)) {
+        unreadByAccount.set(row.accountId, await this.globalUnreadCount(row.accountId));
+      }
       const payload = JSON.stringify({
         notificationId: row.notificationId,
         title: row.title,
@@ -197,6 +217,7 @@ export class WebPushService {
         entityType: row.entityType,
         entityId: row.entityId,
         tag: row.notificationId,
+        badgeCount: unreadByAccount.get(row.accountId) || 0,
         url: this.targetUrl(tenantId),
       });
       try {
