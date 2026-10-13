@@ -1,8 +1,9 @@
-/* Shared cue: show a quiet right chevron only when a horizontal card rail has more content. */
+/* Shared cue: only a section with more than one card in a horizontal rail gets a quiet right chevron. */
+.v2-section.has-v2-horizontal-rail .v2-section__title,
 .v2-section:has(
-  .entity-card-rail > :nth-child(2),
-  .mini-card-rail > :nth-child(2),
-  .v2-rail > :nth-child(2)
+  [data-v2-horizontal-rail] > :nth-child(2),
+  [data-entity-card-rail] > :nth-child(2),
+  [data-mini-card-rail] > :nth-child(2)
 ) .v2-section__title{
   width:100%;
   display:flex;
@@ -10,21 +11,21 @@
   gap:8px;
 }
 
+.v2-section.has-v2-horizontal-rail .v2-section__title::after,
 .v2-section:has(
-  .entity-card-rail > :nth-child(2),
-  .mini-card-rail > :nth-child(2),
-  .v2-rail > :nth-child(2)
+  [data-v2-horizontal-rail] > :nth-child(2),
+  [data-entity-card-rail] > :nth-child(2),
+  [data-mini-card-rail] > :nth-child(2)
 ) .v2-section__title::after{
-  content:"";
-  box-sizing:border-box;
-  width:9px;
-  height:9px;
+  content:"›";
   margin-left:auto;
-  margin-right:6px;
-  flex:0 0 9px;
-  border-top:1.5px solid currentColor;
-  border-right:1.5px solid currentColor;
-  opacity:.32;
-  transform:rotate(45deg);
+  margin-right:4px;
+  flex:0 0 auto;
+  color:currentColor;
+  font-size:20px;
+  line-height:1;
+  font-weight:400;
+  opacity:.46;
+  transform:translateY(-1px);
   pointer-events:none;
 }
