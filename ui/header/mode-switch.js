@@ -70,11 +70,8 @@ export function openAppModeSwitch(trigger = null) {
     }
 
     const current = currentDomainAppMode();
-    if (mode === current) {
-      layer.v2Close?.();
-      return;
-    }
-    if (switchDomainAppMode(mode)) layer.v2Close?.();
+    const returningFromMessenger = messengerSurfaceActive() && mode === current;
+    if (switchDomainAppMode(mode, { force: returningFromMessenger })) layer.v2Close?.();
   }));
 
   return layer;
