@@ -12,6 +12,7 @@ import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
 import { CommunicationService } from './communication.service';
 import { MessengerCoreService } from './messenger-core.service';
+import { ProfessionalMessengerController } from './professional-messenger.controller';
 import { TelegramBotService } from './telegram-bot.service';
 import { EmailChannelService } from './email-channel.service';
 import { ProfessionalEmailService } from './professional-email.service';
@@ -19,7 +20,7 @@ import { SaasAccessModule } from '../saas-access/saas-access.module';
 
 @Module({
   imports: [AuthModule, BusinessStateModule, TenantDocumentArchiveModule, NotificationModule, PlatformNoticeModule, TransactionalEmailModule, SaasAccessModule],
-  controllers: [CommunicationController],
+  controllers: [CommunicationController, ProfessionalMessengerController],
   providers: [CommunicationService, MessengerCoreService, CommunicationHistoryService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, EmailChannelService, ProfessionalEmailService, PrismaService],
   exports: [CommunicationService, MessengerCoreService, CommunicationHistoryService, CommunicationDispatchService, CommunicationBroadcastService, TelegramBotService, EmailChannelService, ProfessionalEmailService],
 })
