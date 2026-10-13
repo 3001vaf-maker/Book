@@ -15,6 +15,11 @@ function chatTime(value) {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
+function threadUnread(thread = {}) {
+  const count = Math.max(0, Math.trunc(Number(thread?.unreadCount) || 0));
+  return count > 0 ? `${count > 99 ? '99+' : count} новых` : '';
+}
+
 function zSurface(root) {
   if (!root) return null;
   if (root.matches?.('[data-v2-z],[data-v2-z-layer]')) return root;
@@ -69,6 +74,7 @@ export function mountChatList(root, {
     title: threadTitle(thread),
     subtitle: threadSubtitle(thread),
     rightTop: threadTime(thread),
+    rightBottom: threadUnread(thread),
     data: `data-chat-thread="${index}"`,
     aria: `Открыть диалог ${threadTitle(thread)}`,
   }));

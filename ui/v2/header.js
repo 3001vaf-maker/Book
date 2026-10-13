@@ -1,13 +1,20 @@
 import { text, dataAttributes } from './html.js';
 
+function defaultChatBadge() {
+  if (typeof globalThis === 'undefined') return 0;
+  const value = Number(globalThis.__VA_TOOLS_ACCOUNT_UNREAD__?.total || 0);
+  return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+}
+
 function headerControl(slot = {}, role = '') {
   if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
   const aria = text(slot.aria || slot.label || role);
-  const badge = Number(slot.badge || 0) > 0 ? `<span class="v2-header__badge">${Math.min(99, Number(slot.badge || 0))}</span>` : '';
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
   const kind = slot.kind || 'text';
+  const badgeValue = slot.badge == null && kind === 'chat' ? defaultChatBadge() : Number(slot.badge || 0);
+  const badge = badgeValue > 0 ? `<span class="v2-header__badge">${Math.min(99, badgeValue)}</span>` : '';
   const variant = slot.variant === 'danger' ? 'danger' : (slot.variant === 'white' || slot.variant === 'secondary' ? 'white' : '');
   const variantClass = variant ? ` v2-header__control--${variant}` : '';
   const settingsTag = role === 'a' && slot.settingsTag
