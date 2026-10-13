@@ -1,18 +1,22 @@
-/* Empty Shared Z/Q Header keeps only the dismiss affordance and must not form a visible band. */
-[data-v2-z-header]:has(> [data-v2-z-header-content]:empty),
+/* Root Z always keeps its thin, visible Shared Header, even when it currently has no screen rows. */
+[data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
+  min-height:40px!important;
+  padding-bottom:8px!important;
+  background:var(--v2-white,#fff)!important;
+}
+
+/* Empty Q does not need a visible header strip: keep only the shared dismiss affordance. */
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
   min-height:28px!important;
   padding-bottom:0!important;
   background:transparent!important;
 }
 
-[data-v2-z-header]:has(> [data-v2-z-header-content]:empty) > [data-v2-z-dismiss],
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-z-dismiss]{
   margin-top:2px!important;
   margin-bottom:2px!important;
 }
 
-[data-v2-z-header]:has(> [data-v2-z-header-content]:empty) > [data-v2-z-header-content],
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-q-header-content]{
   display:none!important;
 }
