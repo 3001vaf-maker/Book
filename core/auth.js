@@ -2,20 +2,32 @@ import { API_BASE } from './environment.js';
 
 const TOKEN_KEY = 'book.auth.token';
 
+function migrateSessionToken() {
+  const persistent = localStorage.getItem(TOKEN_KEY) || '';
+  if (persistent) return persistent;
+  const legacy = sessionStorage.getItem(TOKEN_KEY) || '';
+  if (!legacy) return '';
+  localStorage.setItem(TOKEN_KEY, legacy);
+  sessionStorage.removeItem(TOKEN_KEY);
+  return legacy;
+}
+
 export function getAuthToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || '';
+  return localStorage.getItem(TOKEN_KEY) || migrateSessionToken();
 }
 
 export function setAuthToken(token) {
   const value = String(token || '').trim();
+  sessionStorage.removeItem(TOKEN_KEY);
   if (!value) {
-    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     return;
   }
-  sessionStorage.setItem(TOKEN_KEY, value);
+  localStorage.setItem(TOKEN_KEY, value);
 }
 
 export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
