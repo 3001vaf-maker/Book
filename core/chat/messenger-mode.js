@@ -65,6 +65,11 @@ function endUserThreadTitle(thread = {}) {
   return profileTitle(thread?.relationship || {});
 }
 
+function personTitle(person = {}) {
+  return [person?.name, person?.surname].filter(Boolean).join(' ').trim()
+    || String((Array.isArray(person?.phones) ? person.phones : []).find(Boolean) || person?.uei || 'Человек');
+}
+
 function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
@@ -89,7 +94,11 @@ function replaceHeader(app, config, layer, { onModeSwitch = null } = {}) {
   current.replaceWith(next);
 
   next.querySelector('.v2-header__slot--a button')?.addEventListener('click', () => layer.querySelector('[data-chat-settings]')?.click());
-  next.querySelector('.v2-header__slot--c button')?.addEventListener('click', () => layer.querySelector('[data-chat-contacts]')?.click());
+  next.querySelector('.v2-header__slot--c button')?.addEventListener('click', () => {
+    const create = layer.querySelector('[data-chat-create]');
+    if (create) create.click();
+    else layer.querySelector('[data-chat-contacts]')?.click();
+  });
   next.querySelector('.v2-header__slot--d button')?.addEventListener('click', () => {
     if (config.d?.kind === 'mode') {
       onModeSwitch?.();
@@ -395,6 +404,69 @@ async function openProfessionalThread(mode, thread) {
   }
 }
 
+function openProfessionalGroupCreate(mode) {
+  const people = getAllPeople()
+    .filter((person) => String(person?.uei || '').trim() || (Array.isArray(person?.phones) && person.phones.some(Boolean)));
+  if (!people.length) {
+    openNotice({ title: 'Группа', message: 'Нет доступных контактов.' });
+    return;
+  }
+  const rows = people.map((person, index) => v2ListEntry({
+    title: personTitle(person),
+    subtitle: String((Array.isArray(person?.phones) ? person.phones : []).find(Boolean) || person?.uei || ''),
+    data: `data-messenger-group-person="${index}"`,
+    aria: `Добавить ${personTitle(person)}`,
+  }));
+  const content = `<form data-messenger-group-form>
+    ${field({ label: 'Название', name: 'title', maxlength: 120, required: true })}
+    ${v2ListEntries(rows)}
+    ${button('Создать группу')}
+  </form>`;
+  const layer = mountModal(document.body, modal(content, {
+    title: 'Новая группа',
+    variant: 'x',
+    surface: 'app',
+    xRole: 'editor',
+  }));
+  const selected = new Set();
+  layer?.querySelectorAll('[data-messenger-group-person]').forEach((node) => node.addEventListener('click', () => {
+    const index = Number(node.dataset.messengerGroupPerson);
+    if (selected.has(index)) selected.delete(index);
+    else selected.add(index);
+    const active = selected.has(index);
+    node.classList.toggle('is-selected', active);
+    node.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }));
+  const form = layer?.querySelector('[data-messenger-group-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const title = String(new FormData(form).get('title') || '').trim();
+    const participants = [...selected].map((index) => {
+      const person = people[index] || {};
+      return {
+        phone: String((Array.isArray(person?.phones) ? person.phones : []).find(Boolean) || ''),
+        uei: String(person?.uei || ''),
+        display: personTitle(person),
+      };
+    }).filter((person) => person.phone || person.uei);
+    if (!title || !participants.length) {
+      openNotice({ title: 'Группа не создана', message: 'Укажите название и выберите хотя бы одного участника.' });
+      return;
+    }
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const conversation = await professionalChatActions.createGroup({ title, participants });
+      layer?.v2Close?.();
+      await renderProfessionalRoot(mode);
+      await openProfessionalThread(mode, conversation);
+    } catch (error) {
+      if (submit) submit.disabled = false;
+      openNotice({ title: 'Группа не создана', message: error instanceof Error ? error.message : 'Не удалось создать группу', variant: 'technical' });
+    }
+  });
+}
+
 async function renderProfessionalRoot(mode, initialPersonKey = '') {
   try {
     const threads = await getProfessionalChatThreads();
@@ -403,6 +475,7 @@ async function renderProfessionalRoot(mode, initialPersonKey = '') {
       title: 'Чат',
       threads,
       surface,
+      onCreate: () => openProfessionalGroupCreate(mode),
       onModeSwitch: () => closeMode(mode),
       onOpenThread: (thread) => void openProfessionalThread(mode, thread),
       threadTitle: professionalThreadTitle,
