@@ -1,15 +1,12 @@
 import { USER_ORIGIN } from '../environment.js';
 import {
-  getAccountChat,
-  getGlobalAccountRelationships,
-  sendAccountChatMessage,
-} from '../account/index.js';
-import {
-  getCommunicationChannels,
-  getCommunicationThread,
-  getCommunicationThreads,
-  sendCommunicationMessage,
-} from '../communications/chat.js';
+  getEndUserChatThread,
+  getEndUserChatThreads,
+  getProfessionalChatThread,
+  getProfessionalChatThreads,
+  sendEndUserChatMessage,
+  sendProfessionalChatMessage,
+} from './internal-chat.js';
 import { findPeopleByPhone, getAllPeople } from '../people/data.js';
 import {
   mountV2ZLayer,
@@ -55,29 +52,6 @@ function messageTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
-}
-
-function channelValue(value) {
-  const channel = String(value || '').trim().toUpperCase();
-  if (channel === 'IN_APP' || channel === 'PUSH' || channel === 'CHAT') return 'PUSH';
-  if (channel === 'TELEGRAM' || channel === 'EMAIL') return channel;
-  return channel;
-}
-
-function professionalChannelOptions(channels = []) {
-  const available = new Set((Array.isArray(channels) ? channels : []).map(channelValue).filter(Boolean));
-  available.add('PUSH');
-  return [
-    { value: 'ALL', label: 'Общий' },
-    { value: 'PUSH', label: 'Чат' },
-    ...(available.has('TELEGRAM') ? [{ value: 'TELEGRAM', label: 'Telegram' }] : []),
-    ...(available.has('EMAIL') ? [{ value: 'EMAIL', label: 'Email' }] : []),
-  ];
-}
-
-function filteredMessages(messages = [], filter = 'ALL') {
-  if (filter === 'ALL') return Array.isArray(messages) ? messages : [];
-  return (Array.isArray(messages) ? messages : []).filter((message) => channelValue(message?.channel) === filter);
 }
 
 function parseHeader(markup) {
@@ -157,7 +131,7 @@ async function openEndUserThread(mode, relationship) {
   const surface = surfaceOwner(mode.app, layer, null);
 
   const render = async () => {
-    const messages = await getAccountChat(tenantId);
+    const messages = await getEndUserChatThread(tenantId);
     if (!layer.isConnected) return;
     mountChatThread(layer, {
       title,
@@ -165,7 +139,7 @@ async function openEndUserThread(mode, relationship) {
       viewer: 'account',
       surface,
       onSend: async ({ body, attachments }) => {
-        await sendAccountChatMessage(tenantId, body, attachments);
+        await sendEndUserChatMessage(tenantId, body, attachments);
         await render();
       },
       sendErrorMessage: 'Не удалось отправить сообщение',
@@ -182,7 +156,7 @@ async function openEndUserThread(mode, relationship) {
 
 async function renderEndUserRoot(mode) {
   try {
-    const relationships = await getGlobalAccountRelationships();
+    const relationships = await getEndUserChatThreads();
     const surface = surfaceOwner(mode.app, mode.root, () => closeMode(mode));
     mountChatList(mode.root, {
       title: 'Чат',
@@ -208,36 +182,22 @@ async function openProfessionalThread(mode, thread) {
   if (!layer) return;
   const phone = String(thread?.personPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
-  const externalThreadId = String(thread?.externalThreadId || '').trim();
   const title = professionalThreadTitle(thread);
-  let filter = 'ALL';
+  const surface = surfaceOwner(mode.app, layer, null);
 
   const render = async () => {
-    const [messages, channelState] = await Promise.all([
-      getCommunicationThread({ phone, uei, externalThreadId }),
-      getCommunicationChannels({ phone, uei, externalThreadId }).catch(() => ({ channels: [] })),
-    ]);
+    const messages = await getProfessionalChatThread({ phone, uei });
     if (!layer.isConnected) return;
-    const options = professionalChannelOptions(channelState?.channels);
-    if (!options.some((option) => option.value === filter)) filter = 'ALL';
-    const surface = surfaceOwner(mode.app, layer, null);
     mountChatThread(layer, {
       title,
-      messages: filteredMessages(messages, filter),
+      messages,
       viewer: 'profile',
       surface,
-      channelOptions: options,
-      channel: filter,
-      onSend: async ({ body, attachments, channel }) => {
-        const selected = channel === 'ALL' ? 'PUSH' : channel;
-        await sendCommunicationMessage({ channel: selected, phone, uei, externalThreadId, body, attachments });
+      onSend: async ({ body, attachments }) => {
+        await sendProfessionalChatMessage({ phone, uei, body, attachments });
         await render();
       },
-    });
-    const selector = layer.querySelector('[name="messageChannel"]');
-    selector?.addEventListener('change', () => {
-      filter = String(selector.value || 'ALL').toUpperCase();
-      void render();
+      sendErrorMessage: 'Не удалось отправить сообщение',
     });
   };
 
@@ -251,7 +211,7 @@ async function openProfessionalThread(mode, thread) {
 
 async function renderProfessionalRoot(mode, initialPersonKey = '') {
   try {
-    const threads = await getCommunicationThreads();
+    const threads = await getProfessionalChatThreads();
     const surface = surfaceOwner(mode.app, mode.root, () => closeMode(mode));
     mountChatList(mode.root, {
       title: 'Чат',
