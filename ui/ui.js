@@ -36,7 +36,7 @@ import { documentTile, documentTiles, documentPage, openDocumentViewer } from '.
 import { v2Header, v2CardDeck, v2Shell, v2Section, v2HorizontalRail, v2RailCard, v2Sticker, v2ZLayer, mountV2ZLayer, v2ZHeader, v2ZBody, v2QHeader, v2QBody, v2ZBodySection, v2ZBodySections, v2ZFrame, v2QFrame, setV2ZHeaderRows, clearV2ZHeaderRows, initV2Swipe, initV2StickerSwipe, initV2WorkspaceInteraction, setV2DeckOpen } from './v2/index.js';
 import { openSharedProfileSettingsMenu, openSharedPhotoAction, openSharedPasswordAction, setSharedProfilePrimary } from './profile/index.js';
 import { mountRecordZ, mountRecordQ, recordZHost, recordQHeaderHost, renderRecordZ, recordTimeRows, recordWorkplaceCards, recordProcedureList, recordPersonList, recordConfirmationMiniCard, setRecordPrimaryAction, bindRecordSettings, closeRecordZStack } from './record/runtime.js';
-import { installAppModeSwitch } from './app-mode/index.js';
+import { installAppModeSwitch } from './header/mode-switch.js';
 
 installAppModeSwitch();
 
