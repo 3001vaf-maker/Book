@@ -106,6 +106,7 @@ export function mountChatThread(root, {
   onContacts = null,
   onSend,
   onMessageOpen = null,
+  onPollVote = null,
   sendErrorMessage = 'Не удалось отправить сообщение',
   channelOptions = [],
   channel = '',
@@ -144,12 +145,76 @@ export function mountChatThread(root, {
   });
   const getAttachments = bindMessageAttachments(form);
 
+  let replyTo = null;
+  const setReply = (message = null) => {
+    replyTo = message?.id ? message : null;
+    form?.querySelector('[data-message-reply]')?.remove();
+    if (!replyTo || !form) return;
+    const preview = document.createElement('div');
+    preview.className = 'message-composer__reply';
+    preview.dataset.messageReply = 'true';
+    const label = document.createElement('span');
+    label.textContent = `Ответ: ${String(replyTo.body || 'Сообщение').slice(0, 80)}`;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'message-composer__reply-close';
+    close.setAttribute('aria-label', 'Отменить ответ');
+    close.textContent = '×';
+    close.addEventListener('click', () => setReply(null));
+    preview.append(label, close);
+    form.prepend(preview);
+  };
+
   if (typeof onMessageOpen === 'function') {
     root.querySelectorAll('[data-message-id]').forEach((node) => {
       const message = normalized.find((item) => String(item?.id || '') === String(node.dataset.messageId || ''));
-      if (!message) return;
-      onMessageOpen({ node, message });
+      if (!message || message.deleted || message.deletedAt) return;
+      let longPressTimer = 0;
+      let longPressed = false;
+      const open = (event) => {
+        if (event?.target?.closest?.('a,video,button,input,textarea')) return;
+        onMessageOpen({ node, message, event, setReply });
+      };
+      node.addEventListener('click', (event) => {
+        if (longPressed) {
+          longPressed = false;
+          return;
+        }
+        open(event);
+      });
+      node.addEventListener('pointerdown', (event) => {
+        if (event.target.closest?.('a,video,button,input,textarea')) return;
+        longPressed = false;
+        longPressTimer = window.setTimeout(() => {
+          longPressed = true;
+          open(event);
+        }, 480);
+      });
+      const cancelLongPress = () => {
+        if (longPressTimer) window.clearTimeout(longPressTimer);
+        longPressTimer = 0;
+      };
+      node.addEventListener('pointerup', cancelLongPress);
+      node.addEventListener('pointercancel', cancelLongPress);
+      node.addEventListener('pointerleave', cancelLongPress);
     });
+  }
+
+  if (typeof onPollVote === 'function') {
+    root.querySelectorAll('[data-message-poll-option]').forEach((button) => button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const bubble = button.closest('[data-message-id]');
+      const message = normalized.find((item) => String(item?.id || '') === String(bubble?.dataset?.messageId || ''));
+      const optionId = String(button.dataset.messagePollOption || '');
+      if (!message || !optionId) return;
+      button.disabled = true;
+      try {
+        await onPollVote({ message, optionId });
+      } catch (error) {
+        button.disabled = false;
+        openNotice({ title: 'Голос не сохранён', message: error instanceof Error ? error.message : 'Не удалось сохранить голос', variant: 'technical' });
+      }
+    }));
   }
 
   form?.addEventListener('submit', async (event) => {
@@ -164,6 +229,7 @@ export function mountChatThread(root, {
       await onSend({
         body: bodyValue,
         attachments,
+        replyToId: String(replyTo?.id || ''),
         channel: selectedChannel() || String(channel || 'CHAT').trim().toUpperCase(),
       });
     } catch (error) {
