@@ -13,12 +13,12 @@ function syncV2ZStackInteraction(app, host) {
     surface.inert = blocked;
     surface.classList.toggle('is-v2-obscured', blocked);
     const dismiss = surface.querySelector(':scope > [data-v2-z-header] > [data-v2-z-dismiss], :scope > [data-v2-q-header] > [data-v2-z-dismiss]');
-    if (dismiss) dismiss.hidden = blocked;
+    if (dismiss) dismiss.hidden = blocked || surface.dataset.v2Dismissible === 'false';
   });
 }
 
-export function v2ZLayer(content = '', { className = '' } = {}) {
-  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer style="padding-top:0">${v2ZFrame(content)}</main>`;
+export function v2ZLayer(content = '', { className = '', dismissible = true } = {}) {
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer data-v2-dismissible="${dismissible ? 'true' : 'false'}" style="padding-top:0">${v2ZFrame(content)}</main>`;
 }
 
 export function bindV2StableZFrame(node) {
@@ -41,7 +41,7 @@ export function bindV2StableZFrame(node) {
   return node;
 }
 
-export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}) {
+export function mountV2ZLayer(root, html, { onClose = null, stack = false, dismissible = true } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');
   const front = app?.querySelector?.('[data-v2-front]');
@@ -52,6 +52,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
   const node = template.content.firstElementChild;
   if (!node?.matches?.('[data-v2-z-layer]')) return null;
   bindV2StableZFrame(node);
+  node.dataset.v2Dismissible = dismissible ? 'true' : 'false';
   if (!stack) host.querySelectorAll('[data-v2-z-layer]').forEach((layer) => {
     if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
     else layer.remove();
@@ -108,11 +109,16 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false } = {}
     dispose();
     onClose?.();
   };
-  node.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-v2-z-close]')) close();
-  });
-  disposeDismissAffordance = bindV2ZDismissAffordance(node, { onDismiss: close });
-  disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 });
+  if (dismissible) {
+    node.addEventListener('click', (event) => {
+      if (event.target.closest?.('[data-v2-z-close]')) close();
+    });
+    disposeDismissAffordance = bindV2ZDismissAffordance(node, { onDismiss: close });
+    disposeSwipe = initV2Swipe(node, { onRight: close, revealDeck: false, threshold: 28, edgeWidth: 36 });
+  } else {
+    const dismiss = node.querySelector(':scope > [data-v2-z-header] > [data-v2-z-dismiss], :scope > [data-v2-q-header] > [data-v2-z-dismiss]');
+    if (dismiss) dismiss.hidden = true;
+  }
   node.v2Dispose = dispose;
   node.v2Close = close;
   notify();
