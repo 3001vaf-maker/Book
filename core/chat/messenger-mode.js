@@ -1,12 +1,17 @@
 import { USER_ORIGIN } from '../environment.js';
 import {
+  endUserChatActions,
+  ensureProfessionalChatThread,
+  getEndUserChatConversations,
   getEndUserChatThread,
   getEndUserChatThreads,
   getProfessionalChatThread,
   getProfessionalChatThreads,
+  professionalChatActions,
   sendEndUserChatMessage,
   sendProfessionalChatMessage,
 } from './internal-chat.js';
+import { openMessengerMessageActions } from './message-actions.js';
 import { findPeopleByPhone, getAllPeople } from '../people/data.js';
 import {
   mountV2ZLayer,
@@ -32,6 +37,7 @@ function profileTitle(relationship = {}) {
 }
 
 function professionalThreadTitle(thread = {}) {
+  if (String(thread?.type || '').toUpperCase() === 'GROUP') return String(thread?.title || '').trim() || 'Группа';
   const phone = String(thread?.personPhone || '').trim();
   const uei = String(thread?.uei || '').trim();
   if (phone) {
@@ -45,7 +51,12 @@ function professionalThreadTitle(thread = {}) {
     const name = [person?.name, person?.surname].filter(Boolean).join(' ').trim();
     if (name) return name;
   }
-  return String(thread?.display || '').trim() || 'Человек';
+  return String(thread?.display || thread?.title || '').trim() || 'Человек';
+}
+
+function endUserThreadTitle(thread = {}) {
+  if (String(thread?.type || '').toUpperCase() === 'GROUP') return String(thread?.title || '').trim() || 'Группа';
+  return profileTitle(thread?.relationship || {});
 }
 
 function messageTime(value) {
@@ -122,24 +133,41 @@ function threadLayer(mode) {
   );
 }
 
-async function openEndUserThread(mode, relationship) {
-  const tenantId = String(relationship?.tenantId || '').trim();
-  if (!tenantId) return;
+async function openEndUserThread(mode, thread) {
+  const tenantId = String(thread?.tenantId || thread?.relationship?.tenantId || '').trim();
+  const conversationId = String(thread?.id || '').trim();
+  if (!tenantId || !conversationId) return;
   const layer = threadLayer(mode);
   if (!layer) return;
-  const title = profileTitle(relationship);
+  const title = endUserThreadTitle(thread);
   const surface = surfaceOwner(mode.app, layer, null);
+  const actions = endUserChatActions(tenantId);
 
   const render = async () => {
-    const messages = await getEndUserChatThread(tenantId);
+    const messages = await getEndUserChatThread(tenantId, conversationId);
     if (!layer.isConnected) return;
     mountChatThread(layer, {
       title,
       messages,
       viewer: 'account',
       surface,
-      onSend: async ({ body, attachments }) => {
-        await sendEndUserChatMessage(tenantId, body, attachments);
+      onSend: async ({ body, attachments, replyToId }) => {
+        await sendEndUserChatMessage(tenantId, body, attachments, { conversationId, replyToId });
+        await render();
+      },
+      onMessageOpen: ({ message, setReply }) => openMessengerMessageActions({
+        message,
+        viewer: 'account',
+        actions,
+        render,
+        setReply,
+        getConversations: () => getEndUserChatConversations(tenantId),
+        threadTitle: (conversation) => String(conversation?.type || '').toUpperCase() === 'GROUP'
+          ? String(conversation?.title || 'Группа')
+          : profileTitle(thread?.relationship || {}),
+      }),
+      onPollVote: async ({ message, optionId }) => {
+        await actions.vote(message.id, optionId);
         await render();
       },
       sendErrorMessage: 'Не удалось отправить сообщение',
@@ -157,16 +185,31 @@ async function openEndUserThread(mode, relationship) {
 async function renderEndUserRoot(mode) {
   try {
     const relationships = await getEndUserChatThreads();
+    const batches = await Promise.all((Array.isArray(relationships) ? relationships : []).map(async (relationship) => {
+      const tenantId = String(relationship?.tenantId || '').trim();
+      if (!tenantId) return [];
+      try {
+        const conversations = await getEndUserChatConversations(tenantId);
+        return (Array.isArray(conversations) ? conversations : []).map((conversation) => ({
+          ...conversation,
+          tenantId,
+          relationship,
+        }));
+      } catch {
+        return [];
+      }
+    }));
+    const threads = batches.flat().sort((a, b) => new Date(b?.lastMessageAt || b?.updatedAt || 0).getTime() - new Date(a?.lastMessageAt || a?.updatedAt || 0).getTime());
     const surface = surfaceOwner(mode.app, mode.root, () => closeMode(mode));
     mountChatList(mode.root, {
       title: 'Чат',
-      threads: relationships,
+      threads,
       surface,
       onModeSwitch: () => closeMode(mode),
-      onOpenThread: (relationship) => void openEndUserThread(mode, relationship),
-      threadTitle: profileTitle,
-      threadSubtitle: () => '',
-      threadTime: () => '',
+      onOpenThread: (thread) => void openEndUserThread(mode, thread),
+      threadTitle: endUserThreadTitle,
+      threadSubtitle: (thread) => String(thread?.body || ''),
+      threadTime: (thread) => messageTime(thread?.lastMessageAt || thread?.updatedAt),
       emptyTitle: 'Диалогов пока нет',
       emptyText: 'Диалоги появятся после добавления контактов.',
     });
@@ -178,23 +221,47 @@ async function renderEndUserRoot(mode) {
 }
 
 async function openProfessionalThread(mode, thread) {
+  let conversation;
+  try {
+    conversation = await ensureProfessionalChatThread({
+      ...thread,
+      conversationId: thread?.id || thread?.conversationId || '',
+    });
+  } catch (error) {
+    openNotice({ title: 'Чат недоступен', message: error instanceof Error ? error.message : 'Не удалось открыть чат', variant: 'technical' });
+    return;
+  }
   const layer = threadLayer(mode);
   if (!layer) return;
-  const phone = String(thread?.personPhone || '').trim();
-  const uei = String(thread?.uei || '').trim();
-  const title = professionalThreadTitle(thread);
+  const phone = String(conversation?.personPhone || thread?.personPhone || '').trim();
+  const uei = String(conversation?.uei || thread?.uei || '').trim();
+  const conversationId = String(conversation?.id || '').trim();
+  const title = professionalThreadTitle({ ...thread, ...conversation });
   const surface = surfaceOwner(mode.app, layer, null);
 
   const render = async () => {
-    const messages = await getProfessionalChatThread({ phone, uei });
+    const messages = await getProfessionalChatThread({ conversationId, phone, uei });
     if (!layer.isConnected) return;
     mountChatThread(layer, {
       title,
       messages,
       viewer: 'profile',
       surface,
-      onSend: async ({ body, attachments }) => {
-        await sendProfessionalChatMessage({ phone, uei, body, attachments });
+      onSend: async ({ body, attachments, replyToId }) => {
+        await sendProfessionalChatMessage({ conversationId, phone, uei, body, attachments, replyToId });
+        await render();
+      },
+      onMessageOpen: ({ message, setReply }) => openMessengerMessageActions({
+        message,
+        viewer: 'profile',
+        actions: professionalChatActions,
+        render,
+        setReply,
+        getConversations: getProfessionalChatThreads,
+        threadTitle: professionalThreadTitle,
+      }),
+      onPollVote: async ({ message, optionId }) => {
+        await professionalChatActions.vote(message.id, optionId);
         await render();
       },
       sendErrorMessage: 'Не удалось отправить сообщение',
@@ -220,8 +287,8 @@ async function renderProfessionalRoot(mode, initialPersonKey = '') {
       onModeSwitch: () => closeMode(mode),
       onOpenThread: (thread) => void openProfessionalThread(mode, thread),
       threadTitle: professionalThreadTitle,
-      threadSubtitle: (thread) => thread.body || (Array.isArray(thread.attachments) && thread.attachments.length ? 'Медиа' : ''),
-      threadTime: (thread) => messageTime(thread.createdAt),
+      threadSubtitle: (thread) => thread.body || '',
+      threadTime: (thread) => messageTime(thread.lastMessageAt || thread.updatedAt || thread.createdAt),
       emptyTitle: 'Чат пока пуст',
       emptyText: 'Диалоги появятся здесь.',
     });
@@ -230,7 +297,7 @@ async function renderProfessionalRoot(mode, initialPersonKey = '') {
     if (initialPersonKey) {
       const person = getAllPeople().find((item) => String(item?.key || '') === String(initialPersonKey));
       const phone = String((Array.isArray(person?.phones) ? person.phones : []).find(Boolean) || '');
-      if (phone) await openProfessionalThread(mode, { personPhone: phone, uei: String(person?.uei || '') });
+      if (phone || person?.uei) await openProfessionalThread(mode, { personPhone: phone, uei: String(person?.uei || '') });
     }
   } catch (error) {
     closeMode(mode);
