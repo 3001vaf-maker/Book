@@ -44,12 +44,7 @@ function applyMenuHeader(header, state) {
   }
   header.classList.remove('has-c');
   if (state.aControl) state.aControl.disabled = true;
-  if (state.dControl) {
-    state.dControl.disabled = false;
-    state.dControl.className = 'v2-header__control v2-header__control--chat';
-    state.dControl.setAttribute('aria-label', 'Чат');
-    state.dControl.innerHTML = '<span class="v2-header__icon v2-header__icon--chat" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4c-4.7 0-8 2.8-8 6.7 0 2.5 1.4 4.6 3.8 5.8L7.2 20l3.6-2.1c.4.1.8.1 1.2.1 4.7 0 8-2.8 8-7.3S16.7 4 12 4Z"></path></svg></span>';
-  }
+  if (state.dControl) state.dControl.disabled = false;
 
   const hasD = Boolean(state.dSlot);
   header.style.gridTemplateColumns = hasD
