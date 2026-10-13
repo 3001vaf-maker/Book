@@ -64,10 +64,10 @@ export function currentDomainAppMode(hostname = globalThis.location?.hostname ||
   return '';
 }
 
-export function switchDomainAppMode(id, { assign = null } = {}) {
+export function switchDomainAppMode(id, { assign = null, force = false } = {}) {
   const mode = appModeDefinition(id);
   if (!mode || mode.kind !== 'domain' || !mode.origin) return false;
-  if (currentDomainAppMode() === mode.id) return true;
+  if (!force && currentDomainAppMode() === mode.id) return true;
   const navigate = typeof assign === 'function'
     ? assign
     : (url) => globalThis.location?.assign?.(url);
