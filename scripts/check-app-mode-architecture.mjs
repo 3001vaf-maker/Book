@@ -79,13 +79,13 @@ requireText(messengerMode, 'openThreadSearch', 'Messenger must expose message se
 requireText(messengerMode, 'openProfessionalGroupCreate', 'professional Messenger must create groups inside the shared shell');
 requireText(messengerMode, 'openPollCreate', 'professional Messenger must create polls inside the shared shell');
 
-requireText(messageActions, "title: 'Ответить'", 'message menu must support reply');
-requireText(messageActions, "title: 'Копировать'", 'message menu must support copy');
-requireText(messageActions, "title: 'Переслать'", 'message menu must support forwarding');
-requireText(messageActions, "title: 'Изменить'", 'message menu must support editing own messages');
-requireText(messageActions, "title: 'Закрепить'", 'message menu must support pinning');
-requireText(messageActions, "title: 'Удалить'", 'message menu must support deleting own messages');
-requireText(messageActions, "title: 'Информация'", 'message menu must expose message information');
+requireText(messageActions, "actionEntry('reply', 'Ответить')", 'message menu must support reply');
+requireText(messageActions, "actionEntry('copy', 'Копировать')", 'message menu must support copy');
+requireText(messageActions, "actionEntry('forward', 'Переслать')", 'message menu must support forwarding');
+requireText(messageActions, "actionEntry('edit', 'Изменить')", 'message menu must support editing own messages');
+requireText(messageActions, "actionEntry('pin', message.pinnedAt ? 'Открепить' : 'Закрепить')", 'message menu must support pinning');
+requireText(messageActions, "actionEntry('delete', 'Удалить')", 'message menu must support deleting own messages');
+requireText(messageActions, "actionEntry('info', 'Информация')", 'message menu must expose message information');
 requireText(messageActions, 'actions.react', 'message menu must support reactions');
 
 requireText(internalChat, "INTERNAL_CHAT_CHANNEL = 'CHAT'", 'the Messenger internal channel must be CHAT');
@@ -108,7 +108,7 @@ requireText(messengerCore, 'createGroup', 'Messenger core must support groups');
 requireText(messengerCore, 'createPoll', 'Messenger core must support polls');
 requireText(messengerCore, 'search(', 'Messenger core must support search');
 
-requireText(dispatch, "if (requested === 'PUSH' || requested === 'IN_APP') return 'CHAT'", 'legacy internal channel names must normalize to CHAT only at the external dispatch boundary');
+requireText(dispatch, "if (requested === 'PUSH' || requested === 'IN_APP') return 'CHAT'", 'external dispatch boundary must normalize internal transport names to CHAT');
 requireText(dispatch, "const channels: string[] = ['CHAT']", 'CHAT must be the canonical internal channel exposed by dispatch');
 requireText(dispatch, "if (channel === 'CHAT')", 'dispatch must route CHAT to the internal Messenger core');
 requireText(dispatch, 'this.messenger.recordDirectMessage', 'direct CHAT must enter the Messenger core');
