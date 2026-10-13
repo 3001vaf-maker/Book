@@ -1,0 +1,30 @@
+/* Shared cue: show a quiet right chevron only when a horizontal card rail has more content. */
+.v2-section:has(
+  .entity-card-rail > :nth-child(2),
+  .mini-card-rail > :nth-child(2),
+  .v2-rail > :nth-child(2)
+) .v2-section__title{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.v2-section:has(
+  .entity-card-rail > :nth-child(2),
+  .mini-card-rail > :nth-child(2),
+  .v2-rail > :nth-child(2)
+) .v2-section__title::after{
+  content:"";
+  box-sizing:border-box;
+  width:9px;
+  height:9px;
+  margin-left:auto;
+  margin-right:6px;
+  flex:0 0 9px;
+  border-top:1.5px solid currentColor;
+  border-right:1.5px solid currentColor;
+  opacity:.32;
+  transform:rotate(45deg);
+  pointer-events:none;
+}
