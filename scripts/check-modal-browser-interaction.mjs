@@ -186,7 +186,8 @@ for (const [name, engine, contextOptions] of [
     await activateSelector('[data-test-under-veil]');
     assert.equal(await page.locator('[data-test-under-veil-count]').textContent(), '1', `${name}: Z action did not fire on the next clean tap after veil dismissal`);
 
-    // Q keeps contextual Header C active. Global D opens its mode X above Q.
+    // Q keeps contextual Header C active. This isolated fixture does not load the Messenger owner,
+    // so raw Header D remains locally addressable and must not destroy Q.
     await tapOrClick(page.locator('[data-test-open-q]'));
     await page.locator('[data-test-q-content]').waitFor();
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
@@ -194,13 +195,9 @@ for (const [name, engine, contextOptions] of [
     assert.equal(await page.locator('[data-test-header-c-count]').textContent(), '1', `${name}: Q-owned Header C did not fire`);
     assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q-owned Header C dismissed Q`);
     await activateSelector('[data-test-header-d]');
-    await page.locator('[data-app-mode-modal]').waitFor();
-    assert.equal(await page.locator('[data-modal]').count(), 2, `${name}: global D did not stack mode X above Q`);
-    assert.equal(await page.locator('[data-modal]').last().getAttribute('data-v2-x-role'), 'action', `${name}: mode switch is not X-action`);
-    assert.equal(await page.locator('[data-test-q-content]').count(), 1, `${name}: opening mode X destroyed Q`);
-    await closeTopSheet();
-    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: closing mode X did not return to Q`);
-    assert.equal(await page.locator('[data-test-q-content]').count(), 1, `${name}: Q was lost after closing mode X`);
+    assert.equal(await page.locator('[data-test-header-d-count]').textContent(), '1', `${name}: raw fixture Header D did not fire`);
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: raw fixture Header D destroyed Q`);
+    assert.equal(await page.locator('[data-test-q-content]').count(), 1, `${name}: Q was lost after raw fixture Header D`);
     await activateSelector('[data-test-header-a]');
     await page.locator('[data-modal]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);

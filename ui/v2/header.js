@@ -9,17 +9,11 @@ function defaultChatBadge() {
 function headerControl(slot = {}, role = '') {
   if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
-  const requestedKind = slot.kind || 'text';
-  const kind = role === 'd' ? 'mode' : requestedKind;
-  const aria = text(role === 'd' ? 'Переключить режим' : (slot.aria || slot.label || role));
+  const kind = slot.kind || 'text';
+  const aria = text(slot.aria || slot.label || role);
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
-  const modeData = role === 'd'
-    ? `${String(slot.data || '').trim()} data-app-mode-switch data-app-mode-source-kind="${text(requestedKind)}"`.trim()
-    : slot.data;
-  const badgeValue = slot.badge == null && (role === 'd' || requestedKind === 'chat')
-    ? defaultChatBadge()
-    : Number(slot.badge || 0);
+  const badgeValue = slot.badge == null && kind === 'chat' ? defaultChatBadge() : Number(slot.badge || 0);
   const badge = badgeValue > 0 ? `<span class="v2-header__badge">${Math.min(99, badgeValue)}</span>` : '';
   const variant = slot.variant === 'danger' ? 'danger' : (slot.variant === 'white' || slot.variant === 'secondary' ? 'white' : '');
   const variantClass = variant ? ` v2-header__control--${variant}` : '';
@@ -49,7 +43,7 @@ function headerControl(slot = {}, role = '') {
   } else if (kind === 'back') {
     body = '<span class="v2-header__back" aria-hidden="true">‹</span>';
   }
-  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(modeData)}${roleStyle} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
+  return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)}${roleStyle} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${settingsTag}${badge}</button></div>`;
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {

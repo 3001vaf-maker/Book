@@ -43,7 +43,9 @@ export class JwtAuthGuard implements CanActivate {
       `;
 
       const requestPath = String((request as any).path || request.url || '').split('?')[0];
-      if (request.method === 'GET' && /\/communications\/chat\/thread\/?$/.test(requestPath)) {
+      const chatThread = request.method === 'GET' && /\/communications\/chat\/thread\/?$/.test(requestPath);
+      const messengerThread = request.method === 'GET' && /\/communications\/messenger\/conversations\/[^/]+\/messages\/?$/.test(requestPath);
+      if (chatThread) {
         const phone = canonicalPhone((request.query as any)?.phone);
         const uei = text((request.query as any)?.uei);
         const externalThreadId = text((request.query as any)?.externalThreadId);
@@ -63,6 +65,22 @@ export class JwtAuthGuard implements CanActivate {
                 OR (${phone} = '' AND ${uei} <> '' AND "uei" = ${uei})
                 OR (${phone} = '' AND ${uei} = '' AND ${externalThreadId} <> '' AND "externalThreadId" = ${externalThreadId})
               )
+          `;
+        }
+      } else if (messengerThread) {
+        const conversationId = text(request.params?.conversationId);
+        if (conversationId) {
+          await this.prisma.$executeRaw`
+            UPDATE "CommunicationMessage"
+            SET "status" = 'read',
+                "deliveredAt" = COALESCE("deliveredAt", CURRENT_TIMESTAMP),
+                "readAt" = COALESCE("readAt", CURRENT_TIMESTAMP)
+            WHERE "tenantId" = ${payload.tenantId}
+              AND "conversationId" = ${conversationId}
+              AND "direction" = 'inbound'
+              AND "purpose" = 'DIRECT'
+              AND "failedAt" IS NULL
+              AND "status" <> 'failed'
           `;
         }
       }

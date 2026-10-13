@@ -44,22 +44,98 @@ function messageStatusMarkup(message = {}, outgoing = false, system = false) {
   return '';
 }
 
+function reactionsMarkup(message = {}) {
+  const values = Array.isArray(message.reactions) ? message.reactions : [];
+  const counts = new Map();
+  values.forEach((reaction) => {
+    const emoji = String(reaction?.emoji || '').trim();
+    if (!emoji) return;
+    counts.set(emoji, (counts.get(emoji) || 0) + 1);
+  });
+  if (!counts.size) return '';
+  return `<div class="message-bubble__reactions">${[...counts.entries()].map(([emoji, count]) => `<span class="message-bubble__reaction">${text(emoji)}${count > 1 ? ` ${count}` : ''}</span>`).join('')}</div>`;
+}
+
+function pollMarkup(message = {}) {
+  const poll = message?.poll && typeof message.poll === 'object' ? message.poll : null;
+  const options = Array.isArray(poll?.options) ? poll.options : [];
+  if (!poll || !options.length) return '';
+  return `<div class="message-poll" data-message-poll>${options.map((option) => {
+    const votes = Array.isArray(option?.votes) ? option.votes.length : 0;
+    return `<button type="button" class="message-poll__option" data-message-poll-option="${text(option?.id || '')}"><span>${text(option?.label || '')}</span><strong>${votes}</strong></button>`;
+  }).join('')}</div>`;
+}
+
 export function messageBubble(message = {}, { viewer = 'account' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
   const outgoing = viewer === 'profile' ? direction === 'outbound' : direction === 'inbound';
   const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
   const time = message.time || message.createdAt || '';
-  const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
-  const body = text(message.body || '').replaceAll('\n', '<br>');
+  const deleted = Boolean(message.deleted || message.deletedAt);
+  const attachments = deleted ? '' : (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
+  const body = deleted ? 'Сообщение удалено' : text(message.body || '').replaceAll('\n', '<br>');
   const status = messageStatusMarkup(message, outgoing, system);
-  const meta = time || status ? `<span class="message-bubble__meta">${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}${status}</span>` : '';
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${meta}</div>`;
+  const edited = !deleted && message.editedAt ? '<span class="message-bubble__edited">изменено</span>' : '';
+  const meta = time || status || edited ? `<span class="message-bubble__meta">${edited}${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}${status}</span>` : '';
+  const reply = !deleted && message.replyToId
+    ? `<div class="message-bubble__reply"><strong>Ответ</strong><span>${text(message.replyPreview || 'Сообщение')}</span></div>`
+    : '';
+  const forwarded = !deleted && message.forwardedFromId ? '<div class="message-bubble__forwarded">Переслано</div>' : '';
+  const poll = deleted ? '' : pollMarkup(message);
+  const reactions = deleted ? '' : reactionsMarkup(message);
+  return `<div class="${classes}${deleted ? ' message-bubble--deleted' : ''}" data-message-id="${text(message.id || '')}">${forwarded}${reply}${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${poll}${reactions}${meta}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
   const values = Array.isArray(messages) ? messages : [];
-  return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
+  const byId = new Map(values.map((message) => [String(message?.id || ''), message]));
+  return `<div class="message-thread" data-message-thread>${values.map((message) => {
+    const replied = message?.replyToId ? byId.get(String(message.replyToId)) : null;
+    return messageBubble({ ...message, replyPreview: replied?.body || '' }, options);
+  }).join('')}</div>`;
+}
+
+export function bindMessageActivation(node, onActivate, { delay = 480 } = {}) {
+  if (!node || typeof onActivate !== 'function') return () => {};
+  let timer = 0;
+  let longPressed = false;
+  const ignored = (event) => Boolean(event?.target?.closest?.('a,video,button,input,textarea'));
+  const open = (event) => {
+    if (!ignored(event)) onActivate(event);
+  };
+  const click = (event) => {
+    if (longPressed) {
+      longPressed = false;
+      return;
+    }
+    open(event);
+  };
+  const pointerDown = (event) => {
+    if (ignored(event)) return;
+    longPressed = false;
+    timer = window.setTimeout(() => {
+      longPressed = true;
+      open(event);
+    }, delay);
+  };
+  const cancel = () => {
+    if (timer) window.clearTimeout(timer);
+    timer = 0;
+  };
+  node.addEventListener('click', click);
+  node.addEventListener('pointerdown', pointerDown);
+  node.addEventListener('pointerup', cancel);
+  node.addEventListener('pointercancel', cancel);
+  node.addEventListener('pointerleave', cancel);
+  return () => {
+    cancel();
+    node.removeEventListener('click', click);
+    node.removeEventListener('pointerdown', pointerDown);
+    node.removeEventListener('pointerup', cancel);
+    node.removeEventListener('pointercancel', cancel);
+    node.removeEventListener('pointerleave', cancel);
+  };
 }
 
 async function fileAttachment(file) {
@@ -130,11 +206,10 @@ export function messageComposer({
   attachments = false,
   attachmentTrigger = 'composer',
 } = {}) {
-  void attachmentTrigger;
-  const externalAttachmentTrigger = false;
+  const externalAttachmentTrigger = attachments && attachmentTrigger === 'external';
   const classes = [
     'message-composer',
     attachments && !externalAttachmentTrigger ? 'message-composer--with-attachments' : 'message-composer--plain',
   ].filter(Boolean).join(' ');
-  return `<form class="${classes}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+  return `<form class="${classes}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach${externalAttachmentTrigger ? ' sr-only' : ''}" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }

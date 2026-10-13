@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunicationBroadcastService } from './communication-broadcast.service';
 import { CommunicationDispatchService } from './communication-dispatch.service';
 import { CommunicationHistoryService } from './communication-history.service';
+import { MessengerCoreService } from './messenger-core.service';
 import { ProfessionalEmailService } from './professional-email.service';
 import { TelegramBotService } from './telegram-bot.service';
 
@@ -33,8 +34,111 @@ export class CommunicationController {
     private readonly professionalEmail: ProfessionalEmailService,
     private readonly history: CommunicationHistoryService,
     private readonly dispatch: CommunicationDispatchService,
+    private readonly messenger: MessengerCoreService,
     private readonly broadcasts: CommunicationBroadcastService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('messenger/conversations')
+  messengerConversations(@Req() request: OwnerRequest) {
+    return this.messenger.conversations(request.auth!.tenantId, 'professional');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/groups')
+  createMessengerGroup(@Req() request: OwnerRequest, @Body() body: { title?: unknown; participants?: unknown }) {
+    return this.messenger.createGroup(request.auth!.tenantId, body?.title, body?.participants);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('messenger/conversations/:conversationId/messages')
+  messengerMessages(@Req() request: OwnerRequest, @Param('conversationId') conversationId: string, @Query('limit') limit = '500') {
+    return this.messenger.messages(request.auth!.tenantId, conversationId, 'professional', {}, Number(limit));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/conversations/:conversationId/messages')
+  sendMessengerMessage(
+    @Req() request: OwnerRequest,
+    @Param('conversationId') conversationId: string,
+    @Body() body: { body?: unknown; attachments?: unknown; replyToId?: unknown },
+  ) {
+    return this.messenger.sendToConversation(request.auth!.tenantId, conversationId, 'professional', {}, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('messenger/search')
+  searchMessenger(
+    @Req() request: OwnerRequest,
+    @Query('q') query = '',
+    @Query('conversationId') conversationId = '',
+  ) {
+    return this.messenger.search(request.auth!.tenantId, 'professional', {}, query, conversationId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('messenger/messages/:messageId')
+  editMessengerMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string, @Body() body: { body?: unknown }) {
+    return this.messenger.editMessage(request.auth!.tenantId, messageId, 'professional', {}, body?.body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('messenger/messages/:messageId')
+  deleteMessengerMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string) {
+    return this.messenger.deleteMessage(request.auth!.tenantId, messageId, 'professional', {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/messages/:messageId/reactions')
+  reactMessengerMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string, @Body() body: { emoji?: unknown }) {
+    return this.messenger.toggleReaction(request.auth!.tenantId, messageId, 'professional', {}, body?.emoji);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/messages/:messageId/pin')
+  pinMessengerMessage(@Req() request: OwnerRequest, @Param('messageId') messageId: string) {
+    return this.messenger.togglePin(request.auth!.tenantId, messageId, 'professional', {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/messages/:messageId/forward')
+  forwardMessengerMessage(
+    @Req() request: OwnerRequest,
+    @Param('messageId') messageId: string,
+    @Body() body: { conversationId?: unknown },
+  ) {
+    return this.messenger.forwardMessage(request.auth!.tenantId, messageId, 'professional', {}, String(body?.conversationId || ''));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/conversations/:conversationId/polls')
+  createMessengerPoll(
+    @Req() request: OwnerRequest,
+    @Param('conversationId') conversationId: string,
+    @Body() body: { question?: unknown; options?: unknown },
+  ) {
+    return this.messenger.createPoll(request.auth!.tenantId, conversationId, 'professional', {}, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('messenger/messages/:messageId/vote')
+  voteMessengerPoll(
+    @Req() request: OwnerRequest,
+    @Param('messageId') messageId: string,
+    @Body() body: { optionId?: unknown },
+  ) {
+    return this.messenger.votePoll(request.auth!.tenantId, messageId, 'professional', {}, body?.optionId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('messenger/conversations/:conversationId/state')
+  messengerConversationState(
+    @Req() request: OwnerRequest,
+    @Param('conversationId') conversationId: string,
+    @Body() body: { archived?: unknown; muted?: unknown },
+  ) {
+    return this.messenger.setConversationState(request.auth!.tenantId, conversationId, 'professional', {}, body || {});
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('integrations/email')
