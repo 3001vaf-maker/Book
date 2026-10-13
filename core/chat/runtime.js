@@ -26,7 +26,7 @@ function zSurface(root) {
   return root.closest?.('[data-v2-z],[data-v2-z-layer]') || null;
 }
 
-export function mountChatChannelHeader(root, { channelOptions = [], channel = 'PUSH' } = {}) {
+export function mountChatChannelHeader(root, { channelOptions = [], channel = 'CHAT' } = {}) {
   const options = (Array.isArray(channelOptions) ? channelOptions : [])
     .filter((option) => option?.value)
     .map((option) => ({ value: String(option.value), label: String(option.label || option.value) }));
@@ -127,7 +127,7 @@ export function mountChatThread(root, {
     body,
   });
 
-  const selectedChannel = mountChatChannelHeader(root, { channelOptions, channel });
+  const selectedChannel = mountChatChannelHeader(root, { channelOptions, channel: channel || 'CHAT' });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
 
@@ -164,7 +164,7 @@ export function mountChatThread(root, {
       await onSend({
         body: bodyValue,
         attachments,
-        channel: selectedChannel() || String(channel || 'PUSH').trim().toUpperCase(),
+        channel: selectedChannel() || String(channel || 'CHAT').trim().toUpperCase(),
       });
     } catch (error) {
       if (submit) submit.disabled = false;
