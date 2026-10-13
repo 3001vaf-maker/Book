@@ -73,7 +73,7 @@ export class CommunicationDispatchService {
         channel: 'IN_APP',
         body,
         attachments,
-        status: 'delivered',
+        status: 'sent',
       });
     }
     if (channel === 'TELEGRAM') {
