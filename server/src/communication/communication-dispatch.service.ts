@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommunicationService } from './communication.service';
 import { CommunicationHistoryService } from './communication-history.service';
+import { MessengerCoreService } from './messenger-core.service';
 import { TelegramBotService } from './telegram-bot.service';
 import { EmailChannelService } from './email-channel.service';
 import type { MessagePurpose } from './message-purpose';
@@ -25,6 +26,7 @@ export class CommunicationDispatchService {
   constructor(
     private readonly communications: CommunicationService,
     private readonly history: CommunicationHistoryService,
+    private readonly messenger: MessengerCoreService,
     private readonly telegram: TelegramBotService,
     private readonly email: EmailChannelService,
     private readonly access: SaasAccessService,
@@ -71,6 +73,9 @@ export class CommunicationDispatchService {
       throw new BadRequestException('Вложения можно отправить только через Чат');
     }
     if (channel === 'CHAT') {
+      if (input.purpose === 'DIRECT') {
+        return this.messenger.recordDirectMessage(tenantId, 'professional', { phone: input?.phone, uei: input?.uei }, { body, attachments });
+      }
       return this.communications.recordMessage(tenantId, {
         phone: input?.phone,
         uei: input?.uei,
