@@ -7,6 +7,7 @@ const header = readFileSync(new URL('../ui/v2/header.js', import.meta.url), 'utf
 const profileCards = readFileSync(new URL('../core/profile/card-presentation.js', import.meta.url), 'utf8');
 const chatRuntime = readFileSync(new URL('../core/chat/runtime.js', import.meta.url), 'utf8');
 const chatUi = readFileSync(new URL('../ui/chat/index.js', import.meta.url), 'utf8');
+const chatCss = readFileSync(new URL('../ui/chat/chat.css', import.meta.url), 'utf8');
 const unreadController = readFileSync(new URL('../server/src/account-unread/account-unread.controller.ts', import.meta.url), 'utf8');
 const unreadService = readFileSync(new URL('../server/src/account-unread/account-unread.service.ts', import.meta.url), 'utf8');
 const accountGuard = readFileSync(new URL('../server/src/online-booking/account.guard.ts', import.meta.url), 'utf8');
@@ -39,7 +40,7 @@ test('global unread state is driven by real direct messages, not system notifica
   assert.match(serviceWorker, /setAppBadge/);
 });
 
-test('direct message status progresses sent to delivered to read and is visible in chat', () => {
+test('direct message status progresses sent to delivered to read and is visibly distinct', () => {
   assert.match(dispatch, /status: 'sent'/);
   assert.match(onlineBooking, /direction: 'inbound'[\s\S]*status: 'sent'/);
   assert.match(accountGuard, /"status" = 'delivered'/);
@@ -50,7 +51,12 @@ test('direct message status progresses sent to delivered to read and is visible 
   assert.match(chatUi, /message-bubble__status--sent/);
   assert.match(chatUi, /message-bubble__status--delivered/);
   assert.match(chatUi, /message-bubble__status--read/);
+  assert.match(chatUi, /message-bubble__status-tick--read-primary/);
+  assert.match(chatUi, /message-bubble__status-tick--read-secondary/);
   assert.match(chatUi, /aria-label="Отправлено"/);
   assert.match(chatUi, /aria-label="Доставлено"/);
   assert.match(chatUi, /aria-label="Прочитано"/);
+  assert.match(chatCss, /message-bubble__status--delivered\{[^}]*color:var\(--text-secondary\)/);
+  assert.match(chatCss, /message-bubble__status-tick--read-primary\{color:#2f8f57\}/);
+  assert.match(chatCss, /message-bubble__status-tick--read-secondary\{color:#d0a100\}/);
 });
