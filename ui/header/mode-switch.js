@@ -51,7 +51,7 @@ export function openAppModeSwitch(trigger = null) {
 
   const layer = mountModal(document.body, modal(
     `<div data-app-mode-modal>${modeRows()}</div>`,
-    { title: 'Режим', variant: 'x', surface: 'app', className: 'modal--app-mode' },
+    { title: 'Режим', variant: 'x', xRole: 'action', surface: 'app', className: 'modal--app-mode' },
   ));
   if (!layer) return null;
 
