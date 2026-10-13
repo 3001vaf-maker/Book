@@ -12,7 +12,7 @@ type PreferenceRow = {
   id: string; tenantId: string; personPhone: string; uei: string; preferredChannels: unknown; createdAt: Date; updatedAt: Date;
 };
 
-const KNOWN_CHANNELS = new Set(['IN_APP', 'PUSH', 'TELEGRAM', 'EMAIL', 'SMS', 'WHATSAPP']);
+const KNOWN_CHANNELS = new Set(['CHAT', 'TELEGRAM', 'EMAIL', 'SMS', 'WHATSAPP', 'MAX']);
 
 function text(value: unknown) { return String(value ?? '').trim(); }
 function canonicalPhone(value: unknown) {
@@ -21,9 +21,14 @@ function canonicalPhone(value: unknown) {
   if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
   return digits;
 }
+function canonicalChannel(value: unknown) {
+  const channel = text(value).toUpperCase();
+  if (channel === 'PUSH' || channel === 'IN_APP') return 'CHAT';
+  return channel;
+}
 function normalizeChannels(value: unknown) {
   const source = Array.isArray(value) ? value : [];
-  return [...new Set(source.map((item) => text(item).toUpperCase()).filter((item) => KNOWN_CHANNELS.has(item)))];
+  return [...new Set(source.map(canonicalChannel).filter((item) => KNOWN_CHANNELS.has(item)))];
 }
 
 @Injectable()
