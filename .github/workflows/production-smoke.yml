@@ -1,0 +1,60 @@
+name: Production Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/production-smoke.yml'
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  domains:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production domains
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_page() {
+            local name="$1"
+            local url="$2"
+            local output
+            output="$(curl --fail-with-body --silent --show-error --location \
+              --connect-timeout 5 --max-time 15 \
+              --output /tmp/body \
+              --write-out '%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}|%{url_effective}' \
+              "$url")"
+            IFS='|' read -r code dns connect tls ttfb total effective <<<"$output"
+            printf '%-8s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
+              "$name" "$code" "$dns" "$connect" "$tls" "$ttfb" "$total" "$effective"
+            case "$code" in
+              2*|3*) ;;
+              *) echo "$name returned unexpected HTTP $code"; exit 1 ;;
+            esac
+          }
+
+          check_page app https://app.va-tools.ru/
+          check_page user https://user.va-tools.ru/
+          check_page admin https://admin.va-tools.ru/
+
+          health_meta="$(curl --fail-with-body --silent --show-error --location \
+            --connect-timeout 5 --max-time 15 \
+            --output /tmp/health.json \
+            --write-out '%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}|%{url_effective}' \
+            https://api.va-tools.ru/health)"
+          IFS='|' read -r code dns connect tls ttfb total effective <<<"$health_meta"
+          printf '%-8s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
+            api "$code" "$dns" "$connect" "$tls" "$ttfb" "$total" "$effective"
+          test "$code" = "200"
+          node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('/tmp/health.json','utf8')); if(x.status!=='ok'||x.database!=='ok') { console.error(x); process.exit(1) } console.log('api health:', JSON.stringify(x))"
