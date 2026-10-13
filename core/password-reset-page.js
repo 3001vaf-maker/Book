@@ -1,3 +1,5 @@
+import { clearAccount } from './account/index.js';
+import { clearAuthToken } from './auth.js';
 import { API_BASE } from './environment.js';
 import { initPasswordFields, openNotice, passwordField, v2Sticker } from '../ui/ui.js';
 
@@ -21,11 +23,8 @@ function renderInvalid(message = 'Ссылка восстановления не
 }
 
 function renderSuccess() {
-  if (kind === 'account') localStorage.removeItem('book.account.token');
-  else {
-    localStorage.removeItem('book.auth.token');
-    sessionStorage.removeItem('book.auth.token');
-  }
+  if (kind === 'account') clearAccount('');
+  else clearAuthToken();
   root.innerHTML = v2Sticker({
     title: 'Пароль изменён',
     body: '<p>Новый пароль сохранён. Войдите с ним в систему.</p>',
