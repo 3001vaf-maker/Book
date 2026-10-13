@@ -9,11 +9,12 @@ function defaultChatBadge() {
 function headerControl(slot = {}, role = '') {
   if (!slot || slot.hidden) return '';
   const label = text(slot.label || '');
-  const aria = text(slot.aria || slot.label || role);
+  const requestedKind = slot.kind || 'text';
+  const kind = role === 'd' ? 'mode' : requestedKind;
+  const aria = text(role === 'd' ? 'Переключить режим' : (slot.aria || slot.label || role));
   const image = String(slot.image || '').trim();
   const initials = text(slot.initials || (slot.label || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
-  const kind = slot.kind || 'text';
-  const badgeValue = slot.badge == null && kind === 'chat' ? defaultChatBadge() : Number(slot.badge || 0);
+  const badgeValue = slot.badge == null && role === 'd' ? defaultChatBadge() : Number(slot.badge || 0);
   const badge = badgeValue > 0 ? `<span class="v2-header__badge">${Math.min(99, badgeValue)}</span>` : '';
   const variant = slot.variant === 'danger' ? 'danger' : (slot.variant === 'white' || slot.variant === 'secondary' ? 'white' : '');
   const variantClass = variant ? ` v2-header__control--${variant}` : '';
@@ -27,6 +28,8 @@ function headerControl(slot = {}, role = '') {
     body = image
       ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
       : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials}</span>`;
+  } else if (kind === 'mode') {
+    body = '<span class="v2-header__icon v2-header__icon--mode" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg></span>';
   } else if (kind === 'chat') {
     body = '<span class="v2-header__icon v2-header__icon--chat" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4c-4.7 0-8 2.8-8 6.7 0 2.5 1.4 4.6 3.8 5.8L7.2 20l3.6-2.1c.4.1.8.1 1.2.1 4.7 0 8-2.8 8-7.3S16.7 4 12 4Z"></path></svg></span>';
   } else if (kind === 'contacts') {
