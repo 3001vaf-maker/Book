@@ -61,6 +61,7 @@ export function mountChatList(root, {
   surface,
   onSettings = null,
   onContacts = null,
+  onModeSwitch = null,
   onOpenThread = null,
   threadTitle = (thread) => String(thread?.title || ''),
   threadSubtitle = (thread) => String(thread?.subtitle || ''),
@@ -70,6 +71,7 @@ export function mountChatList(root, {
   const values = Array.isArray(threads) ? threads : [];
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
+  const d = onModeSwitch ? { kind: 'mode', data: 'data-chat-mode-switch', aria: 'Вернуться в приложение' } : null;
   const items = values.map((thread, index) => v2ListEntry({
     title: threadTitle(thread),
     subtitle: threadSubtitle(thread),
@@ -83,11 +85,12 @@ export function mountChatList(root, {
     title,
     a,
     c,
-    d: null,
+    d,
     body: items.length ? v2ListEntries(items) : emptyState(emptyTitle, emptyText),
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
+  root.querySelector('[data-chat-mode-switch]')?.addEventListener('click', () => onModeSwitch?.());
   root.querySelectorAll('[data-chat-thread]').forEach((node) => node.addEventListener('click', () => {
     const thread = values[Number(node.dataset.chatThread)];
     if (thread) onOpenThread?.(thread);
