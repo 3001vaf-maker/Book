@@ -59,23 +59,29 @@ expect(
 );
 
 expect(header.includes("if (!slot || slot.hidden) return '';"), 'Shared Header must not render empty action placeholders.');
-expect(header.includes("slot.settingsTag && !slot.disabled"), 'Shared Header settings badge must never render on an inactive A control.');
+expect(header.includes("role === 'a' && slot.settingsTag") && !header.includes('slot.settingsTag && !slot.disabled'), 'Shared Header settings badge must follow the explicit settingsTag contract without guessing from disabled state.');
 expect(header.includes('const cVisible = Boolean(c && !c.hidden);'), 'Shared Header must derive C geometry from a real visible action.');
 expect(!header.includes('v2-header__slot is-empty'), 'Shared Header must not reserve visual space with empty slots.');
-expect(workspaceHeader.includes('function isSettingsTarget') && workspaceHeader.includes("semantic.includes('настрой')"), 'Workspace A settings badge must only represent a real settings target.');
+expect(workspaceHeader.includes('data-workspace-a-settings-tag="${a.settingsTag ? \'true\' : \'false\'}"') && !workspaceHeader.includes('function isSettingsTarget'), 'Workspace A settings badge must follow the explicit screen context and must not infer settings from labels.');
 expect(!workspaceHeader.includes('hideD'), 'Surface Header context must never expose a way to hide global Chat D.');
 expect(!appearanceQ.includes('hideD'), 'Q surfaces must never request suppression of global Chat D.');
 
 expect(zLayout.includes("return `${v2QHeader(header)}${v2QBody(content)}`;"), 'Every Q must keep the same Shared Header + Body frame as Z.');
 expect(zLayout.includes('bindV2ZHeaderOwner(root)') && zLayout.includes('root.replaceChildren = (...children) => {') && zLayout.includes('clearV2ZHeaderRows(root);'), 'Screen-scoped Z Header rows must be cleared when their owner surface is replaced.');
-expect(surfaceHeaderCss.includes('[data-v2-q-header-content]:empty') && surfaceHeaderCss.includes('min-height:28px!important'), 'Empty Shared Z/Q Header must collapse to the compact affordance-only state.');
+expect(
+  surfaceHeaderCss.includes('[data-v2-z-header]:has(> [data-v2-z-header-content]:empty)')
+    && surfaceHeaderCss.includes('min-height:40px!important')
+    && surfaceHeaderCss.includes('[data-v2-q-header]:has(> [data-v2-q-header-content]:empty)')
+    && surfaceHeaderCss.includes('min-height:28px!important'),
+  'Empty root Z Header must remain thin and visible while an empty Q Header collapses to the affordance-only state.',
+);
 expect(zAffordance.includes('drop-shadow('), 'Shared Z/Q dismiss affordance must remain visibly separated from the surface.');
 expect(zAffordance.includes('[data-v2-q-header] > [data-v2-z-dismiss]'), 'Shared dismiss affordance must work in Q as well as Z.');
 expect(zStack.includes('export function bindV2StableZFrame'), 'Shared Z owner must protect Header + Body geometry while body content changes.');
 expect(v2Index.includes('bindV2StableZFrame') && !v2Index.includes('ensureRootZFrame'), 'Root Z must bind the stable Shared frame instead of repairing it after destruction.');
 expect(v2Index.includes('bindV2HorizontalAffordances'), 'Shared V2 runtime must bind horizontal rail affordances.');
 expect(horizontalAffordance.includes('rail.children.length > 1') && horizontalAffordance.includes("classList.toggle('has-v2-horizontal-rail'"), 'Horizontal rail cue must be based on real multiple-card layout.');
-expect(horizontalAffordanceCss.includes('.v2-section.has-v2-horizontal-rail') && horizontalAffordanceCss.includes('content:"›"'), 'Horizontal rail cue must stay visible but quiet in the section title.');
+expect(horizontalAffordanceCss.includes('.v2-section.has-v2-horizontal-rail') && horizontalAffordanceCss.includes('content:"→"') && horizontalAffordanceCss.includes('opacity:.72'), 'Horizontal rail cue must be clearly visible and visually distinct from the Z dismiss chevron.');
 expect(accountShell.includes('if (!canReuseScene) {') && accountShell.includes('root.innerHTML = v2Shell({'), 'End-user surfaces must keep the persistent Shared FEZ scene.');
 
 expect(modalPortal.includes('.v2-header__slot--c .v2-header__control, [data-v2-header] .v2-header__slot--d .v2-header__control'), 'Q veil must leave both Header C and D interactive.');
