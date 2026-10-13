@@ -1,4 +1,4 @@
-/* Shared cue: only a section with more than one card in a horizontal rail gets a quiet right chevron. */
+/* Shared cue: only a section with more than one card in a horizontal rail gets a distinct right-continuation marker. */
 .v2-section.has-v2-horizontal-rail .v2-section__title,
 .v2-section:has(
   [data-v2-horizontal-rail] > :nth-child(2),
@@ -17,15 +17,15 @@
   [data-entity-card-rail] > :nth-child(2),
   [data-mini-card-rail] > :nth-child(2)
 ) .v2-section__title::after{
-  content:"›";
+  content:"→";
   margin-left:auto;
   margin-right:4px;
   flex:0 0 auto;
   color:currentColor;
-  font-size:20px;
+  font-size:21px;
   line-height:1;
-  font-weight:400;
-  opacity:.46;
+  font-weight:600;
+  opacity:.72;
   transform:translateY(-1px);
   pointer-events:none;
 }
