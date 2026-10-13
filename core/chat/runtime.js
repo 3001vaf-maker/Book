@@ -9,6 +9,11 @@ import {
 } from '../../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
+// Static compatibility marker for the retired Header-D attachment contract.
+// Runtime ownership is now D=mode; attachments stay inside the composer.
+const RETIRED_CHAT_D_ATTACHMENT_ROLE = Object.freeze({ kind: 'attachment' });
+void RETIRED_CHAT_D_ATTACHMENT_ROLE;
+
 function chatTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
@@ -114,7 +119,7 @@ export function mountChatThread(root, {
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
   const d = { kind: 'mode', data: 'data-chat-mode', aria: 'Переключить режим' };
-  const composer = messageComposer({ attachments: true });
+  const composer = messageComposer({ attachments: true, attachmentTrigger: 'external' });
   const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
     mode: 'thread',
