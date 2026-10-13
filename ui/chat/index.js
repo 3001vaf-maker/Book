@@ -130,10 +130,10 @@ export function messageComposer({
   attachments = false,
   attachmentTrigger = 'composer',
 } = {}) {
-  const externalAttachmentTrigger = attachments && attachmentTrigger === 'external';
+  void attachmentTrigger;
   const classes = [
     'message-composer',
-    attachments && !externalAttachmentTrigger ? 'message-composer--with-attachments' : 'message-composer--plain',
+    attachments ? 'message-composer--with-attachments' : 'message-composer--plain',
   ].filter(Boolean).join(' ');
-  return `<form class="${classes}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach${externalAttachmentTrigger ? ' sr-only' : ''}" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
+  return `<form class="${classes}" ${data}>${attachments ? `<input class="sr-only" type="file" accept="image/*,video/*,application/pdf,.pdf" multiple data-message-attachment-input><button type="button" class="message-composer__attach" data-message-attachment aria-label="Прикрепить файл">📎</button>` : ''}<textarea class="message-composer__input" name="message" rows="1" placeholder="${text(placeholder)}" aria-label="${text(placeholder)}"></textarea>${button('➤', { className: 'message-composer__send', type: 'submit', data: sendData, aria: 'Отправить' })}${attachments ? '<div class="message-composer__attachments" data-message-attachment-preview></div>' : ''}</form>`;
 }
