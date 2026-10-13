@@ -19,7 +19,8 @@ const workplaceBookingVisibilityMigration = readFileSync(new URL('../server/pris
 const sharedProfileUi = readFileSync(new URL('../ui/profile/index.js', import.meta.url), 'utf8');
 const listEntryUi = readFileSync(new URL('../ui/lists/list-entry.js', import.meta.url), 'utf8');
 
-assert.doesNotMatch(auth, /prepareProductionWorkspace|localStorage\.removeItem/);
+assert.doesNotMatch(auth, /prepareProductionWorkspace/);
+assert.doesNotMatch(auth, /book\.(?:profile|workplaces|people|uei|records|recordEvents|procedures|dds|wallets|products)/, 'auth owner must never clear or own business datasets');
 assert.doesNotMatch(core, /workspace-sync|syncWorkspaceBeforeRender|startWorkspaceSync/);
 assert.match(core, /loadProfileState/);
 
