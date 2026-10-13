@@ -18,6 +18,7 @@ import { SaasAccessModule } from './saas-access/saas-access.module';
 import { TenantInvitationModule } from './tenant-invitation/tenant-invitation.module';
 import { SaasAdminModule } from './saas-admin/saas-admin.module';
 import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
+import { PasswordResetModule } from './password-reset/password-reset.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PlatformNoticeModule } from './platform-notice/platform-notice.module';
     TenantInvitationModule,
     SaasAdminModule,
     PlatformNoticeModule,
+    PasswordResetModule,
   ],
   controllers: [HealthController],
   providers: [PrismaService],
