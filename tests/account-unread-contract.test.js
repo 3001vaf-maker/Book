@@ -27,6 +27,9 @@ test('global unread state is driven by real direct messages, not system notifica
   assert.match(accountCore, /account\/unread-summary/);
   assert.match(accountCore, /__VA_TOOLS_ACCOUNT_UNREAD__/);
   assert.match(accountCore, /navigator\.setAppBadge/);
+  assert.doesNotMatch(accountCore, /function getAccountNotifications[\s\S]{0,600}setTenantUnread/);
+  assert.doesNotMatch(accountCore, /function markAccountNotificationRead[\s\S]{0,700}setTenantUnread/);
+  assert.match(accountCore, /function getAccountChat[\s\S]{0,600}getGlobalAccountUnreadSummary/);
   assert.match(header, /defaultChatBadge/);
   assert.match(header, /kind === 'chat'/);
   assert.match(profileCards, /value:'unread'/);
