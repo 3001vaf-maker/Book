@@ -155,7 +155,7 @@ assert.match(selectors, /variant: 'x'/);
 assert.doesNotMatch(selectors, /document\.body\.appendChild\(surface\)/);
 assert.doesNotMatch(selectorCss, /\.ui-selector\{[^}]*position:fixed/s);
 
-assert.match(v2, /mountV2ZLayer\(root, html, \{ onClose = null, stack = false \}/);
+assert.match(v2, /mountV2ZLayer\(root, html, \{ onClose = null, stack = false, dismissible = true \}/);
 assert.match(v2, /const front = app\?\.querySelector\?\.\('\[data-v2-front\]'\)/);
 assert.match(v2, /const host = front \|\| stage/);
 assert.match(v2, /if \(!stack\) host\.querySelectorAll/);
