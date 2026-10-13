@@ -33,7 +33,7 @@ export function v2Section(title = '', content = '', { className = '' } = {}) {
 }
 
 export function v2HorizontalRail(content = '', { className = '' } = {}) {
-  return `<div class="v2-rail ${text(className)}">${content}</div>`;
+  return `<div class="v2-rail ${text(className)}" data-v2-horizontal-rail>${content}</div>`;
 }
 
 export function v2RailCard({ title = '', subtitle = '', meta = '', data = '', aria = '', className = '' } = {}) {
