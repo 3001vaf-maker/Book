@@ -14,9 +14,15 @@ import {
 import { openMessengerMessageActions } from './message-actions.js';
 import { findPeopleByPhone, getAllPeople } from '../people/data.js';
 import {
+  button,
+  field,
+  modal,
+  mountModal,
   mountV2ZLayer,
   openNotice,
   v2Header,
+  v2ListEntries,
+  v2ListEntry,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -133,6 +139,72 @@ function threadLayer(mode) {
   );
 }
 
+function scrollToMessage(root, messageId) {
+  const target = [...root.querySelectorAll('[data-message-id]')]
+    .find((node) => String(node.dataset.messageId || '') === String(messageId || ''));
+  target?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+}
+
+function openThreadSearch({ root, actions, conversationId }) {
+  const content = `<form data-messenger-search-form>${field({
+    label: 'Поиск',
+    name: 'query',
+    placeholder: 'Текст сообщения',
+    autocomplete: 'off',
+  })}${button('Найти')}</form><div data-messenger-search-results></div>`;
+  const layer = mountModal(document.body, modal(content, {
+    title: 'Поиск в чате',
+    variant: 'x',
+    surface: 'app',
+    xRole: 'action',
+  }));
+  const form = layer?.querySelector('[data-messenger-search-form]');
+  const resultsHost = layer?.querySelector('[data-messenger-search-results]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = String(new FormData(form).get('query') || '').trim();
+    if (!query || !resultsHost) return;
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const results = await actions.search({ query, conversationId });
+      const values = Array.isArray(results) ? results : [];
+      resultsHost.innerHTML = values.length
+        ? v2ListEntries(values.map((message, index) => v2ListEntry({
+          title: String(message?.body || 'Сообщение').slice(0, 120),
+          subtitle: message?.createdAt ? new Date(message.createdAt).toLocaleString('ru-RU') : '',
+          data: `data-messenger-search-result="${index}"`,
+          aria: 'Перейти к сообщению',
+        })))
+        : '<p>Ничего не найдено.</p>';
+      resultsHost.querySelectorAll('[data-messenger-search-result]').forEach((node) => node.addEventListener('click', () => {
+        const message = values[Number(node.dataset.messengerSearchResult)];
+        layer?.v2Close?.();
+        scrollToMessage(root, message?.id);
+      }));
+    } catch (error) {
+      openNotice({ title: 'Поиск недоступен', message: error instanceof Error ? error.message : 'Не удалось выполнить поиск', variant: 'technical' });
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+}
+
+function openThreadMenu({ root, actions, conversationId }) {
+  const layer = mountModal(document.body, modal(v2ListEntries([
+    v2ListEntry({ title: 'Поиск', data: 'data-messenger-thread-search', aria: 'Поиск в чате' }),
+  ]), {
+    title: 'Чат',
+    variant: 'x',
+    surface: 'app',
+    xRole: 'action',
+  }));
+  layer?.querySelector('[data-messenger-thread-search]')?.addEventListener('click', () => {
+    layer?.v2Close?.();
+    openThreadSearch({ root, actions, conversationId });
+  });
+}
+
 async function openEndUserThread(mode, thread) {
   const tenantId = String(thread?.tenantId || thread?.relationship?.tenantId || '').trim();
   const conversationId = String(thread?.id || '').trim();
@@ -151,6 +223,7 @@ async function openEndUserThread(mode, thread) {
       messages,
       viewer: 'account',
       surface,
+      onSettings: () => openThreadMenu({ root: layer, actions, conversationId }),
       onSend: async ({ body, attachments, replyToId }) => {
         await sendEndUserChatMessage(tenantId, body, attachments, { conversationId, replyToId });
         await render();
@@ -247,6 +320,7 @@ async function openProfessionalThread(mode, thread) {
       messages,
       viewer: 'profile',
       surface,
+      onSettings: () => openThreadMenu({ root: layer, actions: professionalChatActions, conversationId }),
       onSend: async ({ body, attachments, replyToId }) => {
         await sendProfessionalChatMessage({ conversationId, phone, uei, body, attachments, replyToId });
         await render();
