@@ -1,3 +1,14 @@
+async function syncAppBadge(count) {
+  const value = Math.max(0, Math.trunc(Number(count) || 0));
+  try {
+    if (value > 0 && typeof self.registration.setAppBadge === 'function') {
+      await self.registration.setAppBadge(value);
+    } else if (value <= 0 && typeof self.registration.clearAppBadge === 'function') {
+      await self.registration.clearAppBadge();
+    }
+  } catch {}
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -6,7 +17,7 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data?.text?.() || '' };
   }
 
-  const title = String(payload.title || 'Book');
+  const title = String(payload.title || 'VA Tools');
   const options = {
     body: String(payload.body || ''),
     tag: String(payload.tag || payload.notificationId || ''),
@@ -17,7 +28,15 @@ self.addEventListener('push', (event) => {
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    syncAppBadge(payload.badgeCount),
+  ]));
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'va-tools:badge') return;
+  event.waitUntil(syncAppBadge(event.data?.count));
 });
 
 self.addEventListener('notificationclick', (event) => {
