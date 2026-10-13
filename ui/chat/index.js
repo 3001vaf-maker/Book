@@ -44,22 +44,56 @@ function messageStatusMarkup(message = {}, outgoing = false, system = false) {
   return '';
 }
 
+function reactionsMarkup(message = {}) {
+  const values = Array.isArray(message.reactions) ? message.reactions : [];
+  const counts = new Map();
+  values.forEach((reaction) => {
+    const emoji = String(reaction?.emoji || '').trim();
+    if (!emoji) return;
+    counts.set(emoji, (counts.get(emoji) || 0) + 1);
+  });
+  if (!counts.size) return '';
+  return `<div class="message-bubble__reactions">${[...counts.entries()].map(([emoji, count]) => `<span class="message-bubble__reaction">${text(emoji)}${count > 1 ? ` ${count}` : ''}</span>`).join('')}</div>`;
+}
+
+function pollMarkup(message = {}) {
+  const poll = message?.poll && typeof message.poll === 'object' ? message.poll : null;
+  const options = Array.isArray(poll?.options) ? poll.options : [];
+  if (!poll || !options.length) return '';
+  return `<div class="message-poll" data-message-poll>${options.map((option) => {
+    const votes = Array.isArray(option?.votes) ? option.votes.length : 0;
+    return `<button type="button" class="message-poll__option" data-message-poll-option="${text(option?.id || '')}"><span>${text(option?.label || '')}</span><strong>${votes}</strong></button>`;
+  }).join('')}</div>`;
+}
+
 export function messageBubble(message = {}, { viewer = 'account' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
   const outgoing = viewer === 'profile' ? direction === 'outbound' : direction === 'inbound';
   const classes = ['message-bubble', system ? 'message-bubble--system' : outgoing ? 'message-bubble--outgoing' : 'message-bubble--incoming'].join(' ');
   const time = message.time || message.createdAt || '';
-  const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
-  const body = text(message.body || '').replaceAll('\n', '<br>');
+  const deleted = Boolean(message.deleted || message.deletedAt);
+  const attachments = deleted ? '' : (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
+  const body = deleted ? 'Сообщение удалено' : text(message.body || '').replaceAll('\n', '<br>');
   const status = messageStatusMarkup(message, outgoing, system);
-  const meta = time || status ? `<span class="message-bubble__meta">${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}${status}</span>` : '';
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${meta}</div>`;
+  const edited = !deleted && message.editedAt ? '<span class="message-bubble__edited">изменено</span>' : '';
+  const meta = time || status || edited ? `<span class="message-bubble__meta">${edited}${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}${status}</span>` : '';
+  const reply = !deleted && message.replyToId
+    ? `<div class="message-bubble__reply"><strong>Ответ</strong><span>${text(message.replyPreview || 'Сообщение')}</span></div>`
+    : '';
+  const forwarded = !deleted && message.forwardedFromId ? '<div class="message-bubble__forwarded">Переслано</div>' : '';
+  const poll = deleted ? '' : pollMarkup(message);
+  const reactions = deleted ? '' : reactionsMarkup(message);
+  return `<div class="${classes}${deleted ? ' message-bubble--deleted' : ''}" data-message-id="${text(message.id || '')}">${forwarded}${reply}${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${poll}${reactions}${meta}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
   const values = Array.isArray(messages) ? messages : [];
-  return `<div class="message-thread" data-message-thread>${values.map((message) => messageBubble(message, options)).join('')}</div>`;
+  const byId = new Map(values.map((message) => [String(message?.id || ''), message]));
+  return `<div class="message-thread" data-message-thread>${values.map((message) => {
+    const replied = message?.replyToId ? byId.get(String(message.replyToId)) : null;
+    return messageBubble({ ...message, replyPreview: replied?.body || '' }, options);
+  }).join('')}</div>`;
 }
 
 async function fileAttachment(file) {
