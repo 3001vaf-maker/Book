@@ -57,7 +57,8 @@ expect(messengerMode.includes("ROOT_CLASS = 'messenger-mode-z'") && messengerMod
 expect(messengerMode.includes("THREAD_CLASS = 'messenger-thread-z'") && messengerMode.includes('stack: true'), 'Messenger dialogs must be Z2+ layers over Z1.');
 expect(messengerMode.includes(".v2-header__control--chat") && messengerMode.includes('stopImmediatePropagation()'), 'APP D chat control must enter Shared Messenger before legacy D handlers run.');
 expect(internalChat.includes("INTERNAL_CHAT_CHANNEL = 'CHAT'"), 'Internal Messenger channel must be CHAT.');
-expect(internalChat.includes("PROFESSIONAL_INTERNAL_TRANSPORT = 'PUSH'"), 'Legacy PUSH transport must stay isolated behind the internal Chat adapter.');
+expect(internalChat.includes("from './messenger-api.js'"), 'Internal Chat adapter must use the Messenger API.');
+expect(!internalChat.includes("'PUSH'"), 'Push must stay outside the internal Messenger correspondence channel.');
 expect(!internalChat.includes('TELEGRAM') && !internalChat.includes('EMAIL'), 'Internal Chat adapter must not consume external integrations.');
 
 expect(zStack.includes('dismissible = true') && zStack.includes("node.dataset.v2ModeRoot = 'true'"), 'Shared Z owner must support an independent non-dismissible Messenger root.');
