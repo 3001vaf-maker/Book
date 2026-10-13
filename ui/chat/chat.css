@@ -5,9 +5,14 @@
 .message-bubble--system{align-self:center;max-width:92%;background:transparent;color:var(--text-secondary);text-align:center;font-size:12px}
 .message-bubble__meta{justify-self:end;display:inline-flex;align-items:center;gap:4px;min-height:12px}
 .message-bubble__time{font-size:10px;color:var(--text-secondary)}
-.message-bubble__status{display:inline-block;min-width:10px;font-size:11px;line-height:1;font-weight:700;letter-spacing:-2px;color:var(--text-secondary);white-space:nowrap}
+.message-bubble__status{display:inline-flex;align-items:center;min-width:10px;font-size:11px;line-height:1;font-weight:700;color:var(--text-secondary);white-space:nowrap}
 .message-bubble__status--sent{letter-spacing:0}
-.message-bubble__status--read{color:#2684ff}
+.message-bubble__status--delivered{gap:0;color:var(--text-secondary)}
+.message-bubble__status--read{gap:0}
+.message-bubble__status-tick{display:inline-block;margin-left:-1px}
+.message-bubble__status-tick:first-child{margin-left:0}
+.message-bubble__status-tick--read-primary{color:#2f8f57}
+.message-bubble__status-tick--read-secondary{color:#d0a100}
 .message-bubble__status--failed{letter-spacing:0}
 .message-bubble__attachments{display:grid;gap:6px}
 .message-attachment{display:block;max-width:100%;overflow:hidden;border-radius:12px;background:var(--surface-soft)}
