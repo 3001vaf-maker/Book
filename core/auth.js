@@ -5,11 +5,11 @@ const TOKEN_KEY = 'book.auth.token';
 function migrateSessionToken() {
   const persistent = localStorage.getItem(TOKEN_KEY) || '';
   if (persistent) return persistent;
-  const legacy = sessionStorage.getItem(TOKEN_KEY) || '';
-  if (!legacy) return '';
-  localStorage.setItem(TOKEN_KEY, legacy);
+  const sessionValue = sessionStorage.getItem(TOKEN_KEY) || '';
+  if (!sessionValue) return '';
+  localStorage.setItem(TOKEN_KEY, sessionValue);
   sessionStorage.removeItem(TOKEN_KEY);
-  return legacy;
+  return sessionValue;
 }
 
 export function getAuthToken() {
