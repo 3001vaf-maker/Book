@@ -8,6 +8,7 @@ const dispatch = fs.readFileSync('server/src/communication/communication-dispatc
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const messengerMode = fs.readFileSync('core/chat/messenger-mode.js', 'utf8');
+const internalChat = fs.readFileSync('core/chat/internal-chat.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
@@ -27,12 +28,9 @@ expect(profileChat.includes("from '../core/chat/runtime.js'") && profileChat.inc
 expect(profileChat.includes('body, attachments'), 'Professional direct thread must send attachments through the neutral Chat runtime.');
 expect(!profileChat.includes('function bindMessageAttachments') && !profileChat.includes('function fileAttachment'), 'Professional Chat must not duplicate Shared Chat attachment logic.');
 expect(!profileChat.includes('<style>') && !profileChat.includes("document.createElement('style')"), 'Professional Chat must not own local styles.');
-expect(profileChat.includes("data-chat-new-message") && profileChat.includes("recipientOptions(root, state)"), 'Chat settings must expose the existing one/many/group/all message composer after Notifications E removal.');
-expect(profileChat.includes("name: 'broadcastChannel'") && profileChat.includes("{ value: 'TELEGRAM', label: 'Telegram' }") && profileChat.includes("{ value: 'EMAIL', label: 'Email' }"), 'Bulk Chat composition must preserve Telegram/Email channel choice from the removed duplicate broadcast UI.');
 expect(!settingsSource.includes("['communications', 'Уведомления'") && !fs.existsSync('settings/communications/communications.js'), 'Duplicate Notifications E and its retired settings UI must stay removed.');
 
 expect(accountChat.includes('v2Header({') && accountChat.includes('v2Shell'), 'End-user Chat must use the shared V2 H + Z shell.');
-expect(accountChat.includes("selected ? 'v2-app--chat' : 'v2-app--chat-list'"), 'End-user legacy Chat shell must stay V2 while Shared Messenger mode supersedes its D entry.');
 expect(accountChat.includes("from '../core/chat/runtime.js'") && accountChat.includes('mountChatThread(') && accountChat.includes('mountChatList('), 'End-user Chat must use the neutral Core Chat runtime.');
 expect(!accountChat.includes('bindMessageAttachments(form)') && !accountChat.includes('messageThread(') && !accountChat.includes('messageComposer('), 'End-user account shell must not own Chat thread/composer behavior.');
 expect(!accountChat.includes('accountBottomNavigation') && !accountChat.includes('bindBottomNavigation'), 'End-user V2 Chat must not restore bottom navigation.');
@@ -52,13 +50,15 @@ expect(chatCss.includes('.message-composer__input:focus-visible') && chatCss.inc
 expect(!fs.existsSync('ui/shell/index.js'), 'Legacy ui/shell owner must be physically removed.');
 expect(!fs.existsSync('ui/shell/shell.css'), 'Legacy ui/shell CSS must be physically removed.');
 
-expect(messengerMode.includes('getCommunicationThreads') && messengerMode.includes('getGlobalAccountRelationships'), 'One Shared Messenger owner must serve both professional and end-user runtimes.');
+expect(messengerMode.includes("from './internal-chat.js'"), 'Shared Messenger owner must depend on the internal Chat adapter only.');
+expect(messengerMode.includes('getProfessionalChatThreads') && messengerMode.includes('getEndUserChatThreads'), 'One Shared Messenger owner must serve both professional and end-user runtimes.');
+expect(!messengerMode.includes('TELEGRAM') && !messengerMode.includes('EMAIL') && !messengerMode.includes('getCommunicationChannels'), 'Messenger core must not know external integrations before internal Chat is complete.');
 expect(messengerMode.includes("ROOT_CLASS = 'messenger-mode-z'") && messengerMode.includes('dismissible: false'), 'Messenger Z1 must be a non-dismissible mode root.');
 expect(messengerMode.includes("THREAD_CLASS = 'messenger-thread-z'") && messengerMode.includes('stack: true'), 'Messenger dialogs must be Z2+ layers over Z1.');
 expect(messengerMode.includes(".v2-header__control--chat") && messengerMode.includes('stopImmediatePropagation()'), 'APP D chat control must enter Shared Messenger before legacy D handlers run.');
-expect(messengerMode.includes("{ value: 'ALL', label: 'Общий' }") && messengerMode.includes("{ value: 'PUSH', label: 'Чат' }"), 'Professional Messenger must show Общий and Чат instead of Push.');
-expect(messengerMode.includes('filteredMessages(messages, filter)'), 'Professional mode selector must filter the unified conversation.');
-expect(messengerMode.includes('getAccountChat(tenantId)') && !messengerMode.includes('getAccountNotifications'), 'End-user Messenger must contain internal Chat messages only.');
+expect(internalChat.includes("INTERNAL_CHAT_CHANNEL = 'CHAT'"), 'Internal Messenger channel must be CHAT.');
+expect(internalChat.includes("PROFESSIONAL_INTERNAL_TRANSPORT = 'PUSH'"), 'Legacy PUSH transport must stay isolated behind the internal Chat adapter.');
+expect(!internalChat.includes('TELEGRAM') && !internalChat.includes('EMAIL'), 'Internal Chat adapter must not consume external integrations.');
 
 expect(zStack.includes('dismissible = true') && zStack.includes("node.dataset.v2ModeRoot = 'true'"), 'Shared Z owner must support an independent non-dismissible Messenger root.');
 expect(zStack.includes("surface.dataset.v2Dismissible === 'false'") && zStack.includes('if (dismissible) {'), 'Messenger Z1 must have neither swipe dismissal nor a live dismiss affordance.');
