@@ -54,7 +54,8 @@ requireText(chatRuntime, "kind: 'attachment'", 'Messenger Z2 dialog D must be at
 requireText(chatRuntime, 'data-chat-attachment', 'Messenger dialog must connect Header D to the file picker');
 requireText(chatRuntime, "channel = 'CHAT'", 'internal Messenger runtime must default to CHAT');
 rejectText(chatRuntime, "channel = 'PUSH'", 'Push must not be a Messenger UI channel');
-requireText(chatRuntime, 'pointerdown', 'Messenger messages must support long-press actions');
+requireText(chatRuntime, 'bindMessageActivation', 'Messenger runtime must delegate message gestures to Shared Chat UI');
+requireText(chatUi, 'pointerdown', 'Shared Chat UI must own Messenger long-press gesture handling');
 requireText(chatRuntime, 'replyToId', 'Messenger composer must support replies');
 requireText(chatRuntime, 'chatThreadSearch', 'Messenger Z1 must support conversation search');
 requireText(chatRuntime, 'onCreate', 'Messenger Z1 must expose capability-based creation without a separate shell');
