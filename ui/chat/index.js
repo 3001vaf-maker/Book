@@ -96,6 +96,48 @@ export function messageThread(messages = [], options = {}) {
   }).join('')}</div>`;
 }
 
+export function bindMessageActivation(node, onActivate, { delay = 480 } = {}) {
+  if (!node || typeof onActivate !== 'function') return () => {};
+  let timer = 0;
+  let longPressed = false;
+  const ignored = (event) => Boolean(event?.target?.closest?.('a,video,button,input,textarea'));
+  const open = (event) => {
+    if (!ignored(event)) onActivate(event);
+  };
+  const click = (event) => {
+    if (longPressed) {
+      longPressed = false;
+      return;
+    }
+    open(event);
+  };
+  const pointerDown = (event) => {
+    if (ignored(event)) return;
+    longPressed = false;
+    timer = window.setTimeout(() => {
+      longPressed = true;
+      open(event);
+    }, delay);
+  };
+  const cancel = () => {
+    if (timer) window.clearTimeout(timer);
+    timer = 0;
+  };
+  node.addEventListener('click', click);
+  node.addEventListener('pointerdown', pointerDown);
+  node.addEventListener('pointerup', cancel);
+  node.addEventListener('pointercancel', cancel);
+  node.addEventListener('pointerleave', cancel);
+  return () => {
+    cancel();
+    node.removeEventListener('click', click);
+    node.removeEventListener('pointerdown', pointerDown);
+    node.removeEventListener('pointerup', cancel);
+    node.removeEventListener('pointercancel', cancel);
+    node.removeEventListener('pointerleave', cancel);
+  };
+}
+
 async function fileAttachment(file) {
   if (!(file instanceof File)) return null;
   if (!/^(image|video)\//i.test(file.type || '') && String(file.type || '').toLowerCase() !== 'application/pdf') {
