@@ -17,10 +17,11 @@ expect(
   'Root Telegram entry must not inherit an unrelated browser Account.',
 );
 expect(
-  runtime.includes('onTelegramEntryCompleted')
-    && runtime.includes("removeTelegramEntryFromUrl({ removeBooking: true })")
-    && runtime.includes('location.reload();'),
-  'Successful root Telegram resolve/bind must clean the entry URL and reload the global account UI with the resolved Account.',
+  runtime.includes('continueTelegramEntryToBooking(rootTelegramRoute.tenantId)')
+    && runtime.includes("url.searchParams.set('booking', tenant)")
+    && runtime.includes("url.searchParams.set('entry', 'account-booking')")
+    && runtime.includes('location.replace('),
+  'Successful Telegram entry must continue directly into booking for the same tenant instead of dropping the booking context.',
 );
 expect(
   runtime.includes('await bindAccountTelegramEntry(tenant, entry);')
