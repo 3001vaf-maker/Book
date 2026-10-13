@@ -11,6 +11,24 @@ export class AccountUnreadService {
   constructor(private readonly prisma: PrismaService) {}
 
   async summary(accountId: string) {
+    await this.prisma.$executeRaw`
+      UPDATE "CommunicationMessage" m
+      SET "status" = 'delivered',
+          "deliveredAt" = COALESCE(m."deliveredAt", CURRENT_TIMESTAMP)
+      FROM "AccountTenantLink" l, "AccountContact" c
+      WHERE l."accountId" = ${accountId}
+        AND c."accountId" = ${accountId}
+        AND c."type" = 'PHONE'
+        AND l."tenantId" = m."tenantId"
+        AND c."value" = m."personPhone"
+        AND m."direction" = 'outbound'
+        AND m."purpose" = 'DIRECT'
+        AND m."readAt" IS NULL
+        AND m."failedAt" IS NULL
+        AND m."status" <> 'failed'
+        AND m."deliveredAt" IS NULL
+    `;
+
     const rows = await this.prisma.$queryRaw<UnreadRow[]>`
       SELECT m."tenantId", COUNT(*)::int AS "unreadCount"
       FROM "CommunicationMessage" m
@@ -23,7 +41,6 @@ export class AccountUnreadService {
        AND c."value" = m."personPhone"
       WHERE m."direction" = 'outbound'
         AND m."purpose" = 'DIRECT'
-        AND m."channel" = 'IN_APP'
         AND m."readAt" IS NULL
         AND m."failedAt" IS NULL
         AND m."status" <> 'failed'
