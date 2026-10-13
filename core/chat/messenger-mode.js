@@ -86,8 +86,12 @@ function parseHeader(markup) {
   return template.content.firstElementChild || null;
 }
 
+function currentHeader(app) {
+  return app?.querySelector?.(':scope > [data-v2-header]') || app?.querySelector?.('[data-v2-header]') || null;
+}
+
 function replaceHeader(app, config, layer, { onModeSwitch = null } = {}) {
-  const current = app?.querySelector?.(':scope > [data-v2-header]') || app?.querySelector?.('[data-v2-header]');
+  const current = currentHeader(app);
   if (!current) return;
   const next = parseHeader(v2Header({ a: config.a, b: config.title, c: config.c, d: config.d }));
   if (!next) return;
@@ -112,7 +116,7 @@ function surfaceOwner(app, layer, onModeSwitch) {
 }
 
 function restoreOriginalHeader(mode) {
-  const current = mode.app?.querySelector?.(':scope > [data-v2-header]') || mode.app?.querySelector?.('[data-v2-header]');
+  const current = currentHeader(mode.app);
   if (current && mode.originalHeader) current.replaceWith(mode.originalHeader);
 }
 
@@ -124,18 +128,24 @@ function closeMode(mode) {
   activeMode = null;
 }
 
+function renderRootHeader(mode) {
+  replaceHeader(mode.app, {
+    title: 'Чат',
+    a: null,
+    c: null,
+    d: { kind: 'mode', aria: 'Вернуться в приложение' },
+  }, mode.root, { onModeSwitch: () => closeMode(mode) });
+}
+
 function threadLayer(mode) {
-  const layer = mountV2ZLayer(
+  return mountV2ZLayer(
     mode.root,
     v2ZLayer('', { className: THREAD_CLASS }),
     {
       stack: true,
-      onClose: () => {
-        mode.renderRootHeader?.();
-      },
+      onClose: () => renderRootHeader(mode),
     },
   );
-  return layer;
 }
 
 async function openEndUserThread(mode, relationship) {
@@ -143,32 +153,27 @@ async function openEndUserThread(mode, relationship) {
   if (!tenantId) return;
   const layer = threadLayer(mode);
   if (!layer) return;
+  const title = profileTitle(relationship);
   const surface = surfaceOwner(mode.app, layer, null);
-  surface({ title: profileTitle(relationship), d: { kind: 'attachment' }, body: '' });
-  try {
+
+  const render = async () => {
     const messages = await getAccountChat(tenantId);
+    if (!layer.isConnected) return;
     mountChatThread(layer, {
-      title: profileTitle(relationship),
+      title,
       messages,
       viewer: 'account',
       surface,
       onSend: async ({ body, attachments }) => {
         await sendAccountChatMessage(tenantId, body, attachments);
-        if (!layer.isConnected) return;
-        const refreshed = await getAccountChat(tenantId);
-        mountChatThread(layer, {
-          title: profileTitle(relationship),
-          messages: refreshed,
-          viewer: 'account',
-          surface,
-          onSend: async ({ body: nextBody, attachments: nextAttachments }) => {
-            await sendAccountChatMessage(tenantId, nextBody, nextAttachments);
-            layer.v2Close?.();
-            void openEndUserThread(mode, relationship);
-          },
-        });
+        await render();
       },
+      sendErrorMessage: 'Не удалось отправить сообщение',
     });
+  };
+
+  try {
+    await render();
   } catch (error) {
     layer.v2Close?.();
     openNotice({ title: 'Чат недоступен', message: error instanceof Error ? error.message : 'Не удалось открыть чат', variant: 'technical' });
@@ -179,7 +184,6 @@ async function renderEndUserRoot(mode) {
   try {
     const relationships = await getGlobalAccountRelationships();
     const surface = surfaceOwner(mode.app, mode.root, () => closeMode(mode));
-    mode.renderRootHeader = () => surface({ title: 'Чат', d: { kind: 'mode' }, body: mode.root.innerHTML });
     mountChatList(mode.root, {
       title: 'Чат',
       threads: relationships,
@@ -192,9 +196,7 @@ async function renderEndUserRoot(mode) {
       emptyTitle: 'Диалогов пока нет',
       emptyText: 'Диалоги появятся после добавления контактов.',
     });
-    mode.renderRootHeader = () => replaceHeader(mode.app, {
-      title: 'Чат', a: null, c: null, d: { kind: 'mode' },
-    }, mode.root, { onModeSwitch: () => closeMode(mode) });
+    mode.renderRootHeader = () => renderRootHeader(mode);
   } catch (error) {
     closeMode(mode);
     openNotice({ title: 'Messenger недоступен', message: error instanceof Error ? error.message : 'Не удалось открыть Messenger', variant: 'technical' });
@@ -263,16 +265,12 @@ async function renderProfessionalRoot(mode, initialPersonKey = '') {
       emptyTitle: 'Чат пока пуст',
       emptyText: 'Диалоги появятся здесь.',
     });
-    mode.renderRootHeader = () => replaceHeader(mode.app, {
-      title: 'Чат', a: null, c: null, d: { kind: 'mode' },
-    }, mode.root, { onModeSwitch: () => closeMode(mode) });
+    mode.renderRootHeader = () => renderRootHeader(mode);
 
     if (initialPersonKey) {
       const person = getAllPeople().find((item) => String(item?.key || '') === String(initialPersonKey));
       const phone = String((Array.isArray(person?.phones) ? person.phones : []).find(Boolean) || '');
-      if (phone) {
-        await openProfessionalThread(mode, { personPhone: phone, uei: String(person?.uei || '') });
-      }
+      if (phone) await openProfessionalThread(mode, { personPhone: phone, uei: String(person?.uei || '') });
     }
   } catch (error) {
     closeMode(mode);
@@ -284,7 +282,7 @@ export function openMessengerMode({ personKey = '' } = {}) {
   if (activeMode?.root?.isConnected) return activeMode;
   const app = document.querySelector('[data-v2-app]');
   if (!app) return null;
-  const originalHeader = app.querySelector(':scope > [data-v2-header]') || app.querySelector('[data-v2-header]');
+  const originalHeader = currentHeader(app);
   const root = mountV2ZLayer(
     app,
     v2ZLayer('', { className: ROOT_CLASS, dismissible: false }),
