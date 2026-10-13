@@ -7,6 +7,11 @@ import type { MessagePurpose } from './message-purpose';
 import { SaasAccessService } from '../saas-access/saas-access.service';
 
 function text(value: unknown) { return String(value ?? '').trim(); }
+function messengerChannel(value: unknown) {
+  const requested = text(value).toUpperCase();
+  if (requested === 'PUSH' || requested === 'IN_APP') return 'CHAT';
+  return requested;
+}
 
 function telegramRecipient(input: { phone?: unknown; uei?: unknown } = {}) {
   const phone = text(input?.phone);
@@ -30,14 +35,14 @@ export class CommunicationDispatchService {
     if (externalThreadId) {
       return await this.telegram.isExternalThreadAvailable(tenantId, externalThreadId) ? ['TELEGRAM'] : [];
     }
-    const channels: string[] = ['PUSH'];
+    const channels: string[] = ['CHAT'];
     if (await this.communications.telegramIdentity(tenantId, telegramRecipient(input || {}))) channels.push('TELEGRAM');
     if (await this.email.isAvailable(tenantId) && await this.communications.emailIdentity(tenantId, input || {})) channels.push('EMAIL');
     return channels;
   }
 
   async resolveChannel(tenantId: string, input: { phone?: unknown; uei?: unknown; externalThreadId?: unknown; channel?: unknown }) {
-    const requested = text(input?.channel).toUpperCase();
+    const requested = messengerChannel(input?.channel);
     const externalThreadId = text(input?.externalThreadId);
     const available = await this.availableChannels(tenantId, input || {});
     if (requested) {
@@ -49,7 +54,9 @@ export class CommunicationDispatchService {
       return 'TELEGRAM';
     }
     const preferences = await this.history.getPreferences(tenantId, input || {});
-    const preferred = preferences.preferredChannels.find((channel) => available.includes(channel));
+    const preferred = preferences.preferredChannels
+      .map((channel) => messengerChannel(channel))
+      .find((channel) => available.includes(channel));
     return preferred || available[0];
   }
 
@@ -60,10 +67,10 @@ export class CommunicationDispatchService {
     if (!body && !attachments.length) throw new BadRequestException('Пустое сообщение');
 
     const channel = await this.resolveChannel(tenantId, input || {});
-    if (attachments.length && channel !== 'PUSH') {
-      throw new BadRequestException('Вложения можно отправить только через Push');
+    if (attachments.length && channel !== 'CHAT') {
+      throw new BadRequestException('Вложения можно отправить только через Чат');
     }
-    if (channel === 'PUSH') {
+    if (channel === 'CHAT') {
       return this.communications.recordMessage(tenantId, {
         phone: input?.phone,
         uei: input?.uei,
