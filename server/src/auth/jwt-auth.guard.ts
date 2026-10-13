@@ -43,9 +43,9 @@ export class JwtAuthGuard implements CanActivate {
       `;
 
       const requestPath = String((request as any).path || request.url || '').split('?')[0];
-      const legacyThread = request.method === 'GET' && /\/communications\/chat\/thread\/?$/.test(requestPath);
+      const chatThread = request.method === 'GET' && /\/communications\/chat\/thread\/?$/.test(requestPath);
       const messengerThread = request.method === 'GET' && /\/communications\/messenger\/conversations\/[^/]+\/messages\/?$/.test(requestPath);
-      if (legacyThread) {
+      if (chatThread) {
         const phone = canonicalPhone((request.query as any)?.phone);
         const uei = text((request.query as any)?.uei);
         const externalThreadId = text((request.query as any)?.externalThreadId);
