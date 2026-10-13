@@ -22,8 +22,9 @@ jobs:
         run: |
           set +e
           npm run check > check.log 2>&1
-          code=$?
-          echo "$code" > check.exit
+          echo "$?" > check.exit
+          npm test > test.log 2>&1
+          echo "$?" > test.exit
           exit 0
       - uses: actions/upload-artifact@v4
         with:
@@ -31,3 +32,5 @@ jobs:
           path: |
             check.log
             check.exit
+            test.log
+            test.exit
