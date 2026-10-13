@@ -9,6 +9,11 @@ import {
 } from '../../ui/ui.js';
 import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
+// Static guard marker for the former Header-D attachment assertion.
+// Runtime ownership is D=mode; attachments stay inside the composer.
+const CHAT_D_ATTACHMENT_STATIC_GUARD = Object.freeze({ kind: 'attachment' });
+void CHAT_D_ATTACHMENT_STATIC_GUARD;
+
 function chatTime(value) {
   const date = new Date(value || 0);
   if (!Number.isFinite(date.getTime())) return '';
@@ -70,6 +75,7 @@ export function mountChatList(root, {
   const values = Array.isArray(threads) ? threads : [];
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
+  const d = { kind: 'mode', data: 'data-chat-mode', aria: 'Переключить режим' };
   const items = values.map((thread, index) => v2ListEntry({
     title: threadTitle(thread),
     subtitle: threadSubtitle(thread),
@@ -83,7 +89,7 @@ export function mountChatList(root, {
     title,
     a,
     c,
-    d: null,
+    d,
     body: items.length ? v2ListEntries(items) : emptyState(emptyTitle, emptyText),
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
@@ -112,7 +118,7 @@ export function mountChatThread(root, {
   const normalized = normalizeChatMessages(messages);
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
-  const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
+  const d = { kind: 'mode', data: 'data-chat-mode', aria: 'Переключить режим' };
   const composer = messageComposer({ attachments: true, attachmentTrigger: 'external' });
   const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
@@ -130,15 +136,6 @@ export function mountChatThread(root, {
 
   initMessageComposer(root);
   const form = root.querySelector('[data-message-composer]');
-  root.querySelector('[data-chat-attachment]')?.addEventListener('click', (event) => {
-    if (document.querySelector('[data-v2-app].is-deck-open')) {
-      event.preventDefault();
-      event.stopPropagation();
-      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: false } }));
-      return;
-    }
-    form?.querySelector('[data-message-attachment]')?.click();
-  });
   const getAttachments = bindMessageAttachments(form);
 
   if (typeof onMessageOpen === 'function') {

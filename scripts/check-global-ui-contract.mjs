@@ -29,7 +29,7 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 expect(alphabet.includes('Контракт одинаков для профессионального интерфейса и интерфейса конечного пользователя'), 'UI alphabet must state one global contract for both application interfaces.');
 expect(alphabet.includes('B показывает только присвоенный текущему контексту заголовок'), 'UI alphabet must keep B contextual and allow an unassigned title to stay empty.');
 expect(alphabet.includes('C существует только когда прямо сейчас существует реальное контекстное действие'), 'UI alphabet must forbid placeholder C.');
-expect(alphabet.includes('D всегда кликабелен'), 'UI alphabet must keep D interactive.');
+expect(alphabet.includes('D всегда кликабелен') && alphabet.includes('переключить режим'), 'UI alphabet must keep D interactive and mode-owned.');
 expect(alphabet.includes('Информационный control `I`') && alphabet.includes('всегда находится в правой зоне `Z Header`'), 'UI alphabet must keep I on the right side of the surface header.');
 expect(alphabet.includes('S — только информационное/техническое сообщение'), 'UI alphabet must keep S informational only.');
 expect(alphabet.includes('Текущее выбранное значение в закрытом select всегда визуально центрировано'), 'UI alphabet must keep selector values centered.');
@@ -47,24 +47,25 @@ expect(menuHeader.includes('state.cSlot.style.display = state.cDisplay'), 'Share
 expect(menuHeader.includes('state.aControl.disabled = true'), 'Shared H owner must keep A inactive in menu state.');
 expect(menuHeader.includes('state.dControl.disabled = false'), 'Shared H owner must keep D interactive in menu state.');
 expect(
-  menuHeader.includes("state.dControl.className = 'v2-header__control v2-header__control--chat'")
-    && menuHeader.includes("state.dControl.setAttribute('aria-label', 'Чат')")
-    && menuHeader.includes('state.dControl.innerHTML = \'<span class="v2-header__icon v2-header__icon--chat"'),
-  'Shared H owner must force D to the chat bubble and never leak a surface-specific D such as attachment into Menu.',
+  !menuHeader.includes("state.dControl.className = 'v2-header__control v2-header__control--chat'")
+    && !menuHeader.includes("state.dControl.setAttribute('aria-label', 'Чат')")
+    && !menuHeader.includes('v2-header__icon--chat'),
+  'Shared H owner must preserve the global D mode control instead of converting it into Chat while Menu is open.',
 );
 expect(
-  chatRuntime.includes("document.querySelector('[data-v2-app].is-deck-open')")
-    && chatRuntime.includes("new CustomEvent('book:v2-navigation-request', { detail: { open: false } })"),
-  'Chat attachment action must stay inside chat and yield to Menu D while H is open.',
+  chatRuntime.includes("const d = { kind: 'mode'")
+    && !chatRuntime.includes('data-chat-attachment'),
+  'Chat must keep D mode-owned and keep attachments inside the composer.',
 );
 
 expect(header.includes("if (!slot || slot.hidden) return '';"), 'Shared Header must not render empty action placeholders.');
 expect(header.includes("role === 'a' && slot.settingsTag") && !header.includes('slot.settingsTag && !slot.disabled'), 'Shared Header settings badge must follow the explicit settingsTag contract without guessing from disabled state.');
+expect(header.includes("role === 'd' ? 'mode'") && header.includes('data-app-mode-switch'), 'Shared Header must reserve D for the global application mode switch.');
 expect(header.includes('const cVisible = Boolean(c && !c.hidden);'), 'Shared Header must derive C geometry from a real visible action.');
 expect(!header.includes('v2-header__slot is-empty'), 'Shared Header must not reserve visual space with empty slots.');
 expect(workspaceHeader.includes('data-workspace-a-settings-tag="${a.settingsTag ? \'true\' : \'false\'}"') && !workspaceHeader.includes('function isSettingsTarget'), 'Workspace A settings badge must follow the explicit screen context and must not infer settings from labels.');
-expect(!workspaceHeader.includes('hideD'), 'Surface Header context must never expose a way to hide global Chat D.');
-expect(!appearanceQ.includes('hideD'), 'Q surfaces must never request suppression of global Chat D.');
+expect(!workspaceHeader.includes('hideD'), 'Surface Header context must never expose a way to hide global D.');
+expect(!appearanceQ.includes('hideD'), 'Q surfaces must never request suppression of global D.');
 
 expect(zLayout.includes("return `${v2QHeader(header)}${v2QBody(content)}`;"), 'Every Q must keep the same Shared Header + Body frame as Z.');
 expect(zLayout.includes('bindV2ZHeaderOwner(root)') && zLayout.includes('root.replaceChildren = (...children) => {') && zLayout.includes('clearV2ZHeaderRows(root);'), 'Screen-scoped Z Header rows must be cleared when their owner surface is replaced.');
