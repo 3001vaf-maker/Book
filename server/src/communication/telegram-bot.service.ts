@@ -386,13 +386,24 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await this.activatePolling(row);
       const token = this.decryptToken(row);
       const storedOffset = Number(row.inboundOffset || 0);
-      const firstPoll = !Number.isFinite(storedOffset) || storedOffset <= 0;
-      const updates = await this.telegramApi(token, 'getUpdates', firstPoll
-        ? { offset: -1, limit: 1, timeout: 0, allowed_updates: ['message'] }
-        : { offset: storedOffset, limit: 100, timeout: 0, allowed_updates: ['message'] }) as Array<Record<string, any>>;
+      const offset = Number.isFinite(storedOffset) && storedOffset > 0 ? storedOffset : 0;
+      const updates = await this.telegramApi(token, 'getUpdates', {
+        offset,
+        limit: 100,
+        timeout: 0,
+        allowed_updates: ['message'],
+      }) as Array<Record<string, any>>;
       if (!Array.isArray(updates) || !updates.length) return;
       for (const update of updates) {
-        await this.processUpdate(row, update, 'polling');
+        const messageTimestampMs = Number(update?.message?.date || 0) * 1000;
+        const predatesConnection = Number.isFinite(messageTimestampMs)
+          && messageTimestampMs > 0
+          && messageTimestampMs < row.connectedAt.getTime();
+        if (predatesConnection) {
+          this.logger.log(`[telegram-polling] tenant=${tenantId} update=${text(update?.update_id) || 'unknown'} skipped-pre-connection`);
+        } else {
+          await this.processUpdate(row, update, 'polling');
+        }
         const updateId = Number(update?.update_id);
         if (!Number.isFinite(updateId)) continue;
         const nextOffset = Math.trunc(updateId) + 1;
