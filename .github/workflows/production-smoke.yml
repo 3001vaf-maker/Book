@@ -3,7 +3,7 @@ name: Production Smoke
 on:
   workflow_dispatch:
   push:
-    branches: [staging]
+    branches: [main, staging]
     paths:
       - '.github/workflows/production-smoke.yml'
   schedule:
@@ -19,9 +19,9 @@ concurrency:
 jobs:
   domains:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Check production domains
+      - name: Check production domains and critical auth recovery
         shell: bash
         run: |
           set -euo pipefail
@@ -36,7 +36,7 @@ jobs:
               --write-out '%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}|%{url_effective}' \
               "$url")"
             IFS='|' read -r code dns connect tls ttfb total effective <<<"$output"
-            printf '%-8s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
+            printf '%-16s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
               "$name" "$code" "$dns" "$connect" "$tls" "$ttfb" "$total" "$effective"
             case "$code" in
               2*|3*) ;;
@@ -54,7 +54,37 @@ jobs:
             --write-out '%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}|%{url_effective}' \
             https://api.va-tools.ru/health)"
           IFS='|' read -r code dns connect tls ttfb total effective <<<"$health_meta"
-          printf '%-8s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
+          printf '%-16s status=%s dns=%ss connect=%ss tls=%ss ttfb=%ss total=%ss final=%s\n' \
             api "$code" "$dns" "$connect" "$tls" "$ttfb" "$total" "$effective"
           test "$code" = "200"
           node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('/tmp/health.json','utf8')); if(x.status!=='ok'||x.database!=='ok') { console.error(x); process.exit(1) } console.log('api health:', JSON.stringify(x))"
+
+          deployed=0
+          for attempt in $(seq 1 30); do
+            app_reset="$(curl --silent --show-error --location --connect-timeout 5 --max-time 15 https://app.va-tools.ru/reset-password.html || true)"
+            user_reset="$(curl --silent --show-error --location --connect-timeout 5 --max-time 15 https://user.va-tools.ru/reset-password.html || true)"
+            admin_reset="$(curl --silent --show-error --location --connect-timeout 5 --max-time 15 https://admin.va-tools.ru/admin/reset-password.html || true)"
+            platform_reset="$(curl --silent --show-error --connect-timeout 5 --max-time 15 \
+              -H 'Content-Type: application/json' \
+              -d '{"email":"production-smoke-does-not-exist@invalid.example","surface":"app"}' \
+              https://api.va-tools.ru/auth/password-reset/request || true)"
+            account_reset="$(curl --silent --show-error --connect-timeout 5 --max-time 15 \
+              -H 'Content-Type: application/json' \
+              -d '{"identifier":"production-smoke-does-not-exist@invalid.example"}' \
+              https://api.va-tools.ru/online-booking/account/password-reset/request || true)"
+
+            if [[ "$app_reset" == *"Восстановление пароля"* \
+              && "$user_reset" == *"Восстановление пароля"* \
+              && "$admin_reset" == *"Восстановление пароля"* \
+              && "$platform_reset" == *'"accepted":true'* \
+              && "$account_reset" == *'"accepted":true'* ]]; then
+              deployed=1
+              echo "critical auth recovery: deployed and responding (attempt $attempt)"
+              break
+            fi
+
+            echo "critical auth recovery not deployed yet (attempt $attempt)"
+            sleep 10
+          done
+
+          test "$deployed" = "1"
