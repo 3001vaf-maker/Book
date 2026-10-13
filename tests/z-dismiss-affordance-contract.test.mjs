@@ -21,8 +21,8 @@ assert.match(
 );
 assert.match(
   stack,
-  /if \(dismiss\) dismiss\.hidden = blocked;/,
-  'Only the active Z layer may expose its dismiss affordance; obscured Z1/Z2/Z3 controls must not remain visible and dead.',
+  /if \(dismiss\) dismiss\.hidden = blocked \|\| surface\.dataset\.v2Dismissible === 'false';/,
+  'Only the active dismissible Z layer may expose its dismiss affordance; obscured layers and non-dismissible mode roots must keep it hidden.',
 );
 assert.match(
   stack,
