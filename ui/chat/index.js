@@ -22,6 +22,28 @@ function attachmentMarkup(attachment = {}) {
   return '';
 }
 
+function messageStatusMarkup(message = {}, outgoing = false, system = false) {
+  if (!outgoing || system) return '';
+  const status = String(message.status || '').trim().toLowerCase();
+  const failed = Boolean(message.failedAt) || status === 'failed';
+  const read = Boolean(message.readAt) || status === 'read';
+  const delivered = Boolean(message.deliveredAt) || status === 'delivered';
+  const sent = Boolean(message.sentAt) || ['sent', 'delivered', 'read'].includes(status);
+  if (failed) {
+    return '<span class="message-bubble__status message-bubble__status--failed" role="img" aria-label="Не отправлено" title="Не отправлено">!</span>';
+  }
+  if (read) {
+    return '<span class="message-bubble__status message-bubble__status--read" role="img" aria-label="Прочитано" title="Прочитано">✓✓</span>';
+  }
+  if (delivered) {
+    return '<span class="message-bubble__status message-bubble__status--delivered" role="img" aria-label="Доставлено" title="Доставлено">✓✓</span>';
+  }
+  if (sent) {
+    return '<span class="message-bubble__status message-bubble__status--sent" role="img" aria-label="Отправлено" title="Отправлено">✓</span>';
+  }
+  return '';
+}
+
 export function messageBubble(message = {}, { viewer = 'account' } = {}) {
   const direction = String(message.direction || '').toLowerCase();
   const system = direction === 'system' || String(message.kind || '').toLowerCase() === 'system';
@@ -30,7 +52,9 @@ export function messageBubble(message = {}, { viewer = 'account' } = {}) {
   const time = message.time || message.createdAt || '';
   const attachments = (Array.isArray(message.attachments) ? message.attachments : []).map(attachmentMarkup).filter(Boolean).join('');
   const body = text(message.body || '').replaceAll('\n', '<br>');
-  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}</div>`;
+  const status = messageStatusMarkup(message, outgoing, system);
+  const meta = time || status ? `<span class="message-bubble__meta">${time ? `<span class="message-bubble__time">${text(time)}</span>` : ''}${status}</span>` : '';
+  return `<div class="${classes}" data-message-id="${text(message.id || '')}">${attachments ? `<div class="message-bubble__attachments">${attachments}</div>` : ''}${body ? `<div class="message-bubble__body">${body}</div>` : ''}${meta}</div>`;
 }
 
 export function messageThread(messages = [], options = {}) {
