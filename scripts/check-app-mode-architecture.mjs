@@ -21,6 +21,7 @@ const header = read('ui/v2/header.js');
 const chatUi = read('ui/chat/index.js');
 const chatRuntime = read('core/chat/runtime.js');
 const messengerMode = read('core/chat/messenger-mode.js');
+const messageActions = read('core/chat/message-actions.js');
 const internalChat = read('core/chat/internal-chat.js');
 const messengerApi = read('core/chat/messenger-api.js');
 const messengerCore = read('server/src/communication/messenger-core.service.ts');
@@ -55,9 +56,14 @@ requireText(chatRuntime, "channel = 'CHAT'", 'internal Messenger runtime must de
 rejectText(chatRuntime, "channel = 'PUSH'", 'Push must not be a Messenger UI channel');
 requireText(chatRuntime, 'pointerdown', 'Messenger messages must support long-press actions');
 requireText(chatRuntime, 'replyToId', 'Messenger composer must support replies');
+requireText(chatRuntime, 'chatThreadSearch', 'Messenger Z1 must support conversation search');
+requireText(chatRuntime, 'onCreate', 'Messenger Z1 must expose capability-based creation without a separate shell');
 requireText(chatUi, "attachmentTrigger === 'external'", 'dialog attachments must be triggerable from Header D');
 requireText(chatUi, 'message-bubble__reactions', 'Messenger messages must render reactions');
 requireText(chatUi, 'message-poll__option', 'Messenger messages must render polls');
+requireText(chatUi, 'message-bubble__status--sent', 'Messenger must render sent status');
+requireText(chatUi, 'message-bubble__status--delivered', 'Messenger must render delivered status');
+requireText(chatUi, 'message-bubble__status--read', 'Messenger must render read status');
 
 requireText(messengerMode, "ROOT_CLASS = 'messenger-mode-z'", 'Messenger must have one shared embedded root');
 requireText(messengerMode, 'dismissible: false', 'Messenger Z1 must not be swipe-dismissible');
@@ -68,6 +74,18 @@ rejectText(messengerMode, 'getCommunicationChannels', 'Messenger core must not k
 rejectText(messengerMode, 'TELEGRAM', 'Messenger core must not contain Telegram integration');
 rejectText(messengerMode, 'EMAIL', 'Messenger core must not contain Email integration');
 requireText(messengerMode, 'conversationId', 'Messenger Z2 must open a canonical conversation');
+requireText(messengerMode, 'openThreadSearch', 'Messenger must expose message search inside the current conversation');
+requireText(messengerMode, 'openProfessionalGroupCreate', 'professional Messenger must create groups inside the shared shell');
+requireText(messengerMode, 'openPollCreate', 'professional Messenger must create polls inside the shared shell');
+
+requireText(messageActions, "title: 'Ответить'", 'message menu must support reply');
+requireText(messageActions, "title: 'Копировать'", 'message menu must support copy');
+requireText(messageActions, "title: 'Переслать'", 'message menu must support forwarding');
+requireText(messageActions, "title: 'Изменить'", 'message menu must support editing own messages');
+requireText(messageActions, "title: 'Закрепить'", 'message menu must support pinning');
+requireText(messageActions, "title: 'Удалить'", 'message menu must support deleting own messages');
+requireText(messageActions, "title: 'Информация'", 'message menu must expose message information');
+requireText(messageActions, 'actions.react', 'message menu must support reactions');
 
 requireText(internalChat, "INTERNAL_CHAT_CHANNEL = 'CHAT'", 'the Messenger internal channel must be CHAT');
 requireText(internalChat, "from './messenger-api.js'", 'internal Chat must use the Messenger API');
