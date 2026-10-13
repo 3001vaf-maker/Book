@@ -33,10 +33,10 @@ function messageStatusMarkup(message = {}, outgoing = false, system = false) {
     return '<span class="message-bubble__status message-bubble__status--failed" role="img" aria-label="Не отправлено" title="Не отправлено">!</span>';
   }
   if (read) {
-    return '<span class="message-bubble__status message-bubble__status--read" role="img" aria-label="Прочитано" title="Прочитано">✓✓</span>';
+    return '<span class="message-bubble__status message-bubble__status--read" role="img" aria-label="Прочитано" title="Прочитано"><span class="message-bubble__status-tick message-bubble__status-tick--read-primary">✓</span><span class="message-bubble__status-tick message-bubble__status-tick--read-secondary">✓</span></span>';
   }
   if (delivered) {
-    return '<span class="message-bubble__status message-bubble__status--delivered" role="img" aria-label="Доставлено" title="Доставлено">✓✓</span>';
+    return '<span class="message-bubble__status message-bubble__status--delivered" role="img" aria-label="Доставлено" title="Доставлено"><span class="message-bubble__status-tick">✓</span><span class="message-bubble__status-tick">✓</span></span>';
   }
   if (sent) {
     return '<span class="message-bubble__status message-bubble__status--sent" role="img" aria-label="Отправлено" title="Отправлено">✓</span>';
