@@ -190,10 +190,51 @@ function openThreadSearch({ root, actions, conversationId }) {
   });
 }
 
-function openThreadMenu({ root, actions, conversationId }) {
-  const layer = mountModal(document.body, modal(v2ListEntries([
+function openPollCreate({ actions, conversationId, render }) {
+  const content = `<form data-messenger-poll-form>
+    ${field({ label: 'Вопрос', name: 'question', maxlength: 300, required: true })}
+    ${field({ label: 'Вариант 1', name: 'option1', maxlength: 120, required: true })}
+    ${field({ label: 'Вариант 2', name: 'option2', maxlength: 120, required: true })}
+    ${field({ label: 'Вариант 3', name: 'option3', maxlength: 120 })}
+    ${field({ label: 'Вариант 4', name: 'option4', maxlength: 120 })}
+    ${button('Создать опрос')}
+  </form>`;
+  const layer = mountModal(document.body, modal(content, {
+    title: 'Опрос',
+    variant: 'x',
+    surface: 'app',
+    xRole: 'editor',
+  }));
+  const form = layer?.querySelector('[data-messenger-poll-form]');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const question = String(data.get('question') || '').trim();
+    const options = ['option1', 'option2', 'option3', 'option4']
+      .map((name) => String(data.get(name) || '').trim())
+      .filter(Boolean);
+    if (!question || options.length < 2) return;
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      await actions.createPoll(conversationId, { question, options });
+      layer?.v2Close?.();
+      await render?.();
+    } catch (error) {
+      if (submit) submit.disabled = false;
+      openNotice({ title: 'Опрос не создан', message: error instanceof Error ? error.message : 'Не удалось создать опрос', variant: 'technical' });
+    }
+  });
+}
+
+function openThreadMenu({ root, actions, conversationId, render }) {
+  const items = [
     v2ListEntry({ title: 'Поиск', data: 'data-messenger-thread-search', aria: 'Поиск в чате' }),
-  ]), {
+    typeof actions?.createPoll === 'function'
+      ? v2ListEntry({ title: 'Опрос', data: 'data-messenger-thread-poll', aria: 'Создать опрос' })
+      : '',
+  ].filter(Boolean);
+  const layer = mountModal(document.body, modal(v2ListEntries(items), {
     title: 'Чат',
     variant: 'x',
     surface: 'app',
@@ -202,6 +243,10 @@ function openThreadMenu({ root, actions, conversationId }) {
   layer?.querySelector('[data-messenger-thread-search]')?.addEventListener('click', () => {
     layer?.v2Close?.();
     openThreadSearch({ root, actions, conversationId });
+  });
+  layer?.querySelector('[data-messenger-thread-poll]')?.addEventListener('click', () => {
+    layer?.v2Close?.();
+    openPollCreate({ actions, conversationId, render });
   });
 }
 
@@ -223,7 +268,7 @@ async function openEndUserThread(mode, thread) {
       messages,
       viewer: 'account',
       surface,
-      onSettings: () => openThreadMenu({ root: layer, actions, conversationId }),
+      onSettings: () => openThreadMenu({ root: layer, actions, conversationId, render }),
       onSend: async ({ body, attachments, replyToId }) => {
         await sendEndUserChatMessage(tenantId, body, attachments, { conversationId, replyToId });
         await render();
@@ -320,7 +365,7 @@ async function openProfessionalThread(mode, thread) {
       messages,
       viewer: 'profile',
       surface,
-      onSettings: () => openThreadMenu({ root: layer, actions: professionalChatActions, conversationId }),
+      onSettings: () => openThreadMenu({ root: layer, actions: professionalChatActions, conversationId, render }),
       onSend: async ({ body, attachments, replyToId }) => {
         await sendProfessionalChatMessage({ conversationId, phone, uei, body, attachments, replyToId });
         await render();
