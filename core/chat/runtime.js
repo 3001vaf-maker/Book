@@ -62,6 +62,7 @@ export function mountChatList(root, {
   surface,
   onSettings = null,
   onContacts = null,
+  onCreate = null,
   onModeSwitch = null,
   onOpenThread = null,
   threadTitle = (thread) => String(thread?.title || ''),
@@ -71,7 +72,11 @@ export function mountChatList(root, {
   if (typeof surface !== 'function') throw new Error('Chat surface owner is required');
   const values = Array.isArray(threads) ? threads : [];
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
-  const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
+  const c = onCreate
+    ? { kind: 'text', label: '+', data: 'data-chat-create', aria: 'Создать группу' }
+    : onContacts
+      ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' }
+      : null;
   const d = onModeSwitch ? { kind: 'mode', data: 'data-chat-mode-switch', aria: 'Вернуться в приложение' } : null;
   const items = values.map((thread, index) => v2ListEntry({
     title: threadTitle(thread),
@@ -96,6 +101,7 @@ export function mountChatList(root, {
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
+  root.querySelector('[data-chat-create]')?.addEventListener('click', () => onCreate?.());
   root.querySelector('[data-chat-mode-switch]')?.addEventListener('click', () => onModeSwitch?.());
   root.querySelectorAll('[data-chat-thread]').forEach((node) => node.addEventListener('click', () => {
     const thread = values[Number(node.dataset.chatThread)];
