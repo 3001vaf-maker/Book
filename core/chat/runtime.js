@@ -26,6 +26,17 @@ function zSurface(root) {
   return root.closest?.('[data-v2-z],[data-v2-z-layer]') || null;
 }
 
+function bindModeSwitch(root, onModeSwitch = null) {
+  root.querySelector('[data-chat-mode-switch]')?.addEventListener('click', () => {
+    if (typeof onModeSwitch === 'function') {
+      onModeSwitch();
+      return;
+    }
+    if (typeof window === 'undefined' || typeof window.location?.assign !== 'function') return;
+    window.location.assign(`${window.location.origin}/`);
+  });
+}
+
 export function mountChatChannelHeader(root, { channelOptions = [], channel = 'PUSH' } = {}) {
   const options = (Array.isArray(channelOptions) ? channelOptions : [])
     .filter((option) => option?.value)
@@ -61,6 +72,7 @@ export function mountChatList(root, {
   surface,
   onSettings = null,
   onContacts = null,
+  onModeSwitch = null,
   onOpenThread = null,
   threadTitle = (thread) => String(thread?.title || ''),
   threadSubtitle = (thread) => String(thread?.subtitle || ''),
@@ -70,6 +82,7 @@ export function mountChatList(root, {
   const values = Array.isArray(threads) ? threads : [];
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
+  const d = { kind: 'mode', data: 'data-chat-mode-switch', aria: 'Переключить режим' };
   const items = values.map((thread, index) => v2ListEntry({
     title: threadTitle(thread),
     subtitle: threadSubtitle(thread),
@@ -83,11 +96,12 @@ export function mountChatList(root, {
     title,
     a,
     c,
-    d: null,
+    d,
     body: items.length ? v2ListEntries(items) : emptyState(emptyTitle, emptyText),
   });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
+  bindModeSwitch(root, onModeSwitch);
   root.querySelectorAll('[data-chat-thread]').forEach((node) => node.addEventListener('click', () => {
     const thread = values[Number(node.dataset.chatThread)];
     if (thread) onOpenThread?.(thread);
@@ -101,6 +115,7 @@ export function mountChatThread(root, {
   surface,
   onSettings = null,
   onContacts = null,
+  onModeSwitch = null,
   onSend,
   onMessageOpen = null,
   sendErrorMessage = 'Не удалось отправить сообщение',
@@ -112,8 +127,8 @@ export function mountChatThread(root, {
   const normalized = normalizeChatMessages(messages);
   const a = onSettings ? { kind: 'settings', data: 'data-chat-settings', aria: 'Настройки чата' } : null;
   const c = onContacts ? { kind: 'contacts', data: 'data-chat-contacts', aria: 'Контакты' } : null;
-  const d = { kind: 'attachment', data: 'data-chat-attachment', aria: 'Вложения' };
-  const composer = messageComposer({ attachments: true, attachmentTrigger: 'external' });
+  const d = { kind: 'mode', data: 'data-chat-mode-switch', aria: 'Переключить режим' };
+  const composer = messageComposer({ attachments: true });
   const body = `${normalized.length ? messageThread(normalized, { viewer }) : emptyState('Сообщений пока нет', 'Напишите первое сообщение.')}${composer}`;
   surface({
     mode: 'thread',
@@ -127,18 +142,10 @@ export function mountChatThread(root, {
   const selectedChannel = mountChatChannelHeader(root, { channelOptions, channel });
   root.querySelector('[data-chat-settings]')?.addEventListener('click', () => onSettings?.());
   root.querySelector('[data-chat-contacts]')?.addEventListener('click', () => onContacts?.());
+  bindModeSwitch(root, onModeSwitch);
 
   initMessageComposer(root);
   const form = root.querySelector('[data-message-composer]');
-  root.querySelector('[data-chat-attachment]')?.addEventListener('click', (event) => {
-    if (document.querySelector('[data-v2-app].is-deck-open')) {
-      event.preventDefault();
-      event.stopPropagation();
-      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: false } }));
-      return;
-    }
-    form?.querySelector('[data-message-attachment]')?.click();
-  });
   const getAttachments = bindMessageAttachments(form);
 
   if (typeof onMessageOpen === 'function') {
