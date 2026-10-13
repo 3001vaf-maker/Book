@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const guard = readFileSync(new URL('../scripts/check-browser-storage-ownership.mjs', import.meta.url), 'utf8');
 const core = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
+const auth = readFileSync(new URL('../core/auth.js', import.meta.url), 'utf8');
 
 assert.equal(existsSync(new URL('../core/legacy-browser-business.js', import.meta.url)), false);
 assert.equal(existsSync(new URL('../core/workspace-sync.js', import.meta.url)), false);
@@ -29,5 +30,10 @@ assert.match(guard, /core\/account\/index\.js/);
 assert.match(guard, /core\/workplace-context\.js/);
 assert.match(guard, /core\/people\/view-state\.js/);
 assert.doesNotMatch(core, /clearLegacyBusinessStorage|workspace-sync/);
+
+assert.match(auth, /localStorage\.getItem\(TOKEN_KEY\)/, 'professional auth must survive Safari/browser session closure');
+assert.match(auth, /localStorage\.setItem\(TOKEN_KEY, value\)/, 'professional auth token must use persistent browser storage');
+assert.match(auth, /sessionStorage\.getItem\(TOKEN_KEY\)/, 'legacy session token must be migrated without forcing a new login');
+assert.match(auth, /sessionStorage\.removeItem\(TOKEN_KEY\)/, 'legacy session token must be cleaned after migration/logout');
 
 console.log('browser storage autonomy tests: OK');
