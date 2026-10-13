@@ -10,7 +10,6 @@ import {
 } from '../communications/chat.js';
 
 export const INTERNAL_CHAT_CHANNEL = 'CHAT';
-const PROFESSIONAL_INTERNAL_TRANSPORT = 'PUSH';
 
 function internalTransport(value = '') {
   const channel = String(value || '').trim().toUpperCase();
@@ -29,7 +28,7 @@ export async function getProfessionalChatThread(identity = {}) {
 
 export async function sendProfessionalChatMessage({ phone = '', uei = '', body = '', attachments = [] } = {}) {
   return sendCommunicationMessage({
-    channel: PROFESSIONAL_INTERNAL_TRANSPORT,
+    channel: INTERNAL_CHAT_CHANNEL,
     phone,
     uei,
     externalThreadId: '',
