@@ -16,7 +16,7 @@ const rejectText = (source, value, message) => {
 };
 
 const registry = read('core/app-mode/index.js');
-const switchUi = read('ui/app-mode/index.js');
+const switchUi = read('ui/header/mode-switch.js');
 const header = read('ui/v2/header.js');
 const chatUi = read('ui/chat/index.js');
 const chatRuntime = read('core/chat/runtime.js');
