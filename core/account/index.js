@@ -500,16 +500,14 @@ export async function bindAccountTelegramEntry(tenantId, token) {
 }
 
 export async function getAccountNotifications(tenantId) {
-  const payload = await jsonResponse(
+  return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications`, { tenantId, auth: true }),
     'Не удалось загрузить уведомления',
   );
-  setTenantUnread(tenantId, payload?.unreadCount || 0);
-  return payload;
 }
 
 export async function markAccountNotificationRead(tenantId, notificationId) {
-  const payload = await jsonResponse(
+  return jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/notifications/${encodeURIComponent(notificationId)}/read`, {
       tenantId,
       auth: true,
@@ -517,15 +515,15 @@ export async function markAccountNotificationRead(tenantId, notificationId) {
     }),
     'Не удалось открыть уведомление',
   );
-  setTenantUnread(tenantId, Math.max(0, getTenantAccountUnreadCount(tenantId) - 1));
-  return payload;
 }
 
 export async function getAccountChat(tenantId) {
-  return jsonResponse(
+  const payload = await jsonResponse(
     await request(`/online-booking/${encodeURIComponent(tenantId)}/account/chat`, { tenantId, auth: true }),
     'Не удалось загрузить чат',
   );
+  await getGlobalAccountUnreadSummary().catch(() => null);
+  return payload;
 }
 
 export async function getAccountChatSettings(tenantId) {

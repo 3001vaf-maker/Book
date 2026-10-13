@@ -340,7 +340,7 @@ export class OnlineBookingController {
       channel: 'IN_APP',
       body: message,
       attachments,
-      status: 'delivered',
+      status: 'sent',
     });
   }
 
