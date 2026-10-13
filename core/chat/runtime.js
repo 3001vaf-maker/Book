@@ -8,7 +8,7 @@ import {
   v2ListEntries,
   v2ListEntry,
 } from '../../ui/ui.js';
-import { bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
+import { bindMessageActivation, bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
 function chatTime(value) {
   const date = new Date(value || 0);
@@ -195,34 +195,7 @@ export function mountChatThread(root, {
     root.querySelectorAll('[data-message-id]').forEach((node) => {
       const message = normalized.find((item) => String(item?.id || '') === String(node.dataset.messageId || ''));
       if (!message || message.deleted || message.deletedAt) return;
-      let longPressTimer = 0;
-      let longPressed = false;
-      const open = (event) => {
-        if (event?.target?.closest?.('a,video,button,input,textarea')) return;
-        onMessageOpen({ node, message, event, setReply });
-      };
-      node.addEventListener('click', (event) => {
-        if (longPressed) {
-          longPressed = false;
-          return;
-        }
-        open(event);
-      });
-      node.addEventListener('pointerdown', (event) => {
-        if (event.target.closest?.('a,video,button,input,textarea')) return;
-        longPressed = false;
-        longPressTimer = window.setTimeout(() => {
-          longPressed = true;
-          open(event);
-        }, 480);
-      });
-      const cancelLongPress = () => {
-        if (longPressTimer) window.clearTimeout(longPressTimer);
-        longPressTimer = 0;
-      };
-      node.addEventListener('pointerup', cancelLongPress);
-      node.addEventListener('pointercancel', cancelLongPress);
-      node.addEventListener('pointerleave', cancelLongPress);
+      bindMessageActivation(node, (event) => onMessageOpen({ node, message, event, setReply }));
     });
   }
 
