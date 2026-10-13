@@ -30,6 +30,7 @@ requireText(registry, 'origin: USER_ORIGIN', 'consumer mode must use USER_ORIGIN
 requireText(registry, "kind: 'embedded'", 'messenger must remain an embedded mode for now');
 requireText(registry, "label: 'Соцсеть'", 'future social mode label must stay reserved');
 requireText(registry, "visible: false", 'future social mode must not become dead visible UI before implementation');
+requireText(registry, 'force = false', 'domain mode switching must support an explicit same-domain return from messenger');
 
 requireText(header, "role === 'd' ? 'mode'", 'D must be forced to the canonical mode control');
 requireText(header, 'data-app-mode-switch', 'D must expose the mode-switch hook');
@@ -38,7 +39,8 @@ requireText(header, 'Переключить режим', 'D must identify itself
 
 requireText(switchUi, 'visibleAppModes()', 'mode picker must come from the shared registry');
 requireText(switchUi, "variant: 'x'", 'mode picker must use the canonical X modal');
-requireText(switchUi, 'switchDomainAppMode(mode)', 'domain transitions must go through the shared mode registry');
+requireText(switchUi, 'switchDomainAppMode(mode, { force: returningFromMessenger })', 'domain transitions must go through the shared mode registry');
+requireText(switchUi, 'returningFromMessenger', 'selecting the host domain from messenger must leave messenger instead of becoming a no-op');
 requireText(switchUi, "APP_MODE_IDS.MESSENGER", 'mode picker must own the messenger transition');
 rejectText(switchUi, 'accessToken', 'mode switching must not leak access tokens through UI navigation');
 rejectText(switchUi, 'refreshToken', 'mode switching must not leak refresh tokens through UI navigation');
