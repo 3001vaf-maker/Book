@@ -22,6 +22,7 @@ const chatUi = read('ui/chat/index.js');
 const chatRuntime = read('core/chat/runtime.js');
 const messengerMode = read('core/chat/messenger-mode.js');
 const internalChat = read('core/chat/internal-chat.js');
+const dispatch = read('server/src/communication/communication-dispatch.service.ts');
 const zStack = read('ui/v2/z-stack.js');
 const indexHtml = read('index.html');
 
@@ -48,6 +49,8 @@ requireText(chatRuntime, "kind: 'attachment'", 'Messenger Z2 dialog D must be at
 requireText(chatRuntime, 'data-chat-attachment', 'Messenger dialog must connect Header D to the file picker');
 requireText(chatUi, "attachmentTrigger === 'external'", 'dialog attachments must be triggerable from Header D');
 requireText(chatUi, "externalAttachmentTrigger ? ' sr-only'", 'dialog composer attachment button must be hidden when Header D owns attachment');
+requireText(chatRuntime, "channel = 'CHAT'", 'internal Messenger runtime must default to CHAT');
+rejectText(chatRuntime, "channel = 'PUSH'", 'Push must not be a Messenger UI channel');
 
 requireText(messengerMode, "ROOT_CLASS = 'messenger-mode-z'", 'Messenger must have one shared embedded root');
 requireText(messengerMode, 'dismissible: false', 'Messenger Z1 must not be swipe-dismissible');
@@ -60,10 +63,16 @@ requireText(messengerMode, 'getProfessionalChatThreads', 'professional runtime m
 requireText(messengerMode, 'getEndUserChatThreads', 'end-user runtime must use the same shared Messenger owner');
 
 requireText(internalChat, "INTERNAL_CHAT_CHANNEL = 'CHAT'", 'the Messenger internal channel must be CHAT');
-requireText(internalChat, "PROFESSIONAL_INTERNAL_TRANSPORT = 'PUSH'", 'legacy transport mapping must stay isolated behind the internal Chat adapter');
-requireText(internalChat, "channel === 'IN_APP' || channel === 'PUSH' || channel === INTERNAL_CHAT_CHANNEL", 'internal adapter must recognize legacy internal transport without exposing it to Messenger UI');
+requireText(internalChat, 'channel: INTERNAL_CHAT_CHANNEL', 'professional internal sends must request CHAT');
+requireText(internalChat, "channel === 'IN_APP' || channel === 'PUSH' || channel === INTERNAL_CHAT_CHANNEL", 'internal adapter may recognize legacy internal transport only as compatibility input');
+rejectText(internalChat, 'PROFESSIONAL_INTERNAL_TRANSPORT', 'Push must not remain the internal Messenger transport API');
 rejectText(internalChat, 'TELEGRAM', 'internal Chat adapter must not consume Telegram');
 rejectText(internalChat, 'EMAIL', 'internal Chat adapter must not consume Email');
+
+requireText(dispatch, "if (requested === 'PUSH' || requested === 'IN_APP') return 'CHAT'", 'legacy internal channel names must normalize to CHAT at the transport boundary');
+requireText(dispatch, "const channels: string[] = ['CHAT']", 'CHAT must be the canonical internal channel exposed by dispatch');
+requireText(dispatch, "if (channel === 'CHAT')", 'dispatch must route CHAT to the internal message store');
+requireText(dispatch, "channel: 'IN_APP'", 'transport persistence may retain the legacy IN_APP storage value behind the boundary');
 
 requireText(zStack, 'dismissible = true', 'Shared Z owner must support dismissible and non-dismissible roots');
 requireText(zStack, "node.dataset.v2ModeRoot = 'true'", 'non-dismissible Messenger root must own an independent Z stack');
