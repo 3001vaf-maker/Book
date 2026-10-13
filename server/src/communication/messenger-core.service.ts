@@ -405,7 +405,7 @@ export class MessengerCoreService {
     const participant = await this.participant(message.conversationId, actor, identity);
     const poll = objectValue(message.poll);
     if (poll.closed === true) throw new BadRequestException('Опрос закрыт');
-    const options = (Array.isArray(poll.options) ? poll.options : []).map((raw) => {
+    const options: Array<Record<string, any> & { votes: string[] }> = (Array.isArray(poll.options) ? poll.options : []).map((raw) => {
       const option = objectValue(raw);
       const votes = Array.isArray(option.votes) ? option.votes.map(text).filter(Boolean) : [];
       return { ...option, votes: votes.filter((id) => id !== participant.id) };
