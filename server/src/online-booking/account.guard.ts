@@ -54,7 +54,10 @@ export class AccountGuard implements CanActivate {
         `;
 
         const requestPath = String((request as any).path || request.url || '').split('?')[0];
-        if (request.method === 'GET' && /\/account\/chat\/?$/.test(requestPath)) {
+        const legacyThread = request.method === 'GET' && /\/account\/chat\/?$/.test(requestPath);
+        const messengerThread = request.method === 'GET' && /\/account\/messenger\/conversations\/[^/]+\/messages\/?$/.test(requestPath);
+        const conversationId = messengerThread ? String(request.params?.conversationId || '').trim() : '';
+        if (legacyThread || messengerThread) {
           await this.prisma.$executeRaw`
             UPDATE "CommunicationMessage" m
             SET "status" = 'read',
@@ -65,6 +68,7 @@ export class AccountGuard implements CanActivate {
               AND m."purpose" = 'DIRECT'
               AND m."failedAt" IS NULL
               AND m."status" <> 'failed'
+              AND (${conversationId} = '' OR m."conversationId" = ${conversationId})
               AND EXISTS (
                 SELECT 1
                 FROM "AccountContact" c
