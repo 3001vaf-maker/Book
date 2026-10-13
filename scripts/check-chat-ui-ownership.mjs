@@ -10,6 +10,7 @@ const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const headerUi = fs.readFileSync('ui/v2/header.js', 'utf8');
 const settingsSource = fs.readFileSync('settings/settings.js', 'utf8');
 
 const failures = [];
@@ -18,7 +19,7 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 expect(!profileChat.includes('appShell') && !profileChat.includes('appHeader'), 'Professional Chat must not use the legacy appShell/appHeader.');
 expect(profileChat.includes('workspaceHeaderContext({') && profileChat.includes('renderChatSurface('), 'Professional Chat must render inside the canonical V2 workspace.');
 expect(profileChat.includes("a: { kind: 'settings'") || profileChat.includes("data-chat-settings"), 'Professional Chat Header A must own Chat settings.');
-expect(profileChat.includes("kind: 'contacts'") && profileChat.includes("kind: 'attachment'"), 'Professional Chat must use shared Header C contacts and D attachment roles.');
+expect(profileChat.includes("kind: 'contacts'"), 'Professional Chat must use shared Header C contacts.');
 expect(profileChat.includes("from '../core/chat/runtime.js'") && profileChat.includes('mountChatThread(') && profileChat.includes('mountChatList('), 'Professional Chat must use the neutral Core Chat runtime.');
 expect(profileChat.includes('body, attachments'), 'Professional direct thread must send attachments through the neutral Chat runtime.');
 expect(!profileChat.includes('function bindMessageAttachments') && !profileChat.includes('function fileAttachment'), 'Professional Chat must not duplicate Shared Chat attachment logic.');
@@ -36,12 +37,14 @@ expect(!accountChat.includes('accountBottomNavigation') && !accountChat.includes
 expect(!accountChat.includes('<style>') && !accountChat.includes("document.createElement('style')"), 'End-user Chat must not own local styles.');
 
 expect(chatRuntime.includes('export function mountChatList') && chatRuntime.includes('export function mountChatThread'), 'Core Chat runtime must own shared list/thread behavior.');
-expect(chatRuntime.includes("kind: 'contacts'") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own Header C contacts and D attachment roles.');
+expect(chatRuntime.includes("kind: 'contacts'") && chatRuntime.includes("kind: 'mode'"), 'Core Chat runtime must own Header C contacts while D remains the global application mode switch.');
+expect(!chatRuntime.includes('data-chat-attachment'), 'Core Chat runtime must not take Header D for attachments.');
 expect(chatRuntime.includes('bindMessageAttachments(form)') && chatRuntime.includes('messageComposer(') && chatRuntime.includes('messageThread('), 'Core Chat runtime must own composer, attachments, and thread rendering.');
 expect(accountChat.includes("b: 'Обзор'") && accountChat.includes("v2Section('Предстоящие визиты'") && !accountChat.includes("v2Section('Контакты'"), 'End-user Overview must contain upcoming activity only; Contacts must remain their own F root.');
 
 expect(chatUi.includes('messageBubble') && chatUi.includes('messageThread') && chatUi.includes('messageComposer'), 'Shared ui/chat must own message bubbles, thread and composer.');
 expect(chatUi.includes('bindMessageAttachments') && chatUi.includes('initMessageComposer'), 'Shared ui/chat must own attachments and growing composer behavior.');
+expect(chatUi.includes('const externalAttachmentTrigger = false;'), 'Shared Chat attachments must stay inside the message composer and never occupy D.');
 expect(chatUi.includes('Math.min(input.scrollHeight, 116)') && chatCss.includes('overflow-y:hidden'), 'Shared Chat composer must grow with text before internal scrolling.');
 expect(chatCss.includes('.message-attachment--file'), 'Shared ui/chat CSS must render file/PDF attachments.');
 expect(chatCss.includes('.v2-app .message-composer') && chatCss.includes('.v2-app--chat .v2-z'), 'Shared ui/chat CSS must own V2 Chat composer geometry.');
@@ -58,6 +61,8 @@ expect(chatUi.includes("application/pdf"), 'Shared ui/chat must own PDF attachme
 
 expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell'), 'V2 H + Z geometry must be owned by shared ui/v2.');
 expect(v2Css.includes('.v2-header'), 'Shared V2 must continue to own header geometry.');
+expect(headerUi.includes("role === 'd' ? 'mode'"), 'Shared Header D must be reserved for the application mode switch.');
+expect(headerUi.includes('data-app-mode-switch'), 'Shared Header D must expose the global mode-switch hook.');
 
 if (failures.length) {
   failures.forEach((message) => console.error(`chat ui ownership: ${message}`));
