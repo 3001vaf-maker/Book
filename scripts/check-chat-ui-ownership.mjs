@@ -7,9 +7,13 @@ const controller = fs.readFileSync('server/src/communication/communication.contr
 const dispatch = fs.readFileSync('server/src/communication/communication-dispatch.service.ts', 'utf8');
 const chatUi = fs.readFileSync('ui/chat/index.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
+const messengerMode = fs.readFileSync('core/chat/messenger-mode.js', 'utf8');
 const chatCss = fs.readFileSync('ui/chat/chat.css', 'utf8');
 const v2Css = fs.readFileSync('ui/v2/v2.css', 'utf8');
 const v2Ui = fs.readFileSync('ui/v2/index.js', 'utf8');
+const v2Header = fs.readFileSync('ui/v2/header.js', 'utf8');
+const v2Stack = fs.readFileSync('ui/v2/z-stack.js', 'utf8');
+const indexHtml = fs.readFileSync('index.html', 'utf8');
 const settingsSource = fs.readFileSync('settings/settings.js', 'utf8');
 
 const failures = [];
@@ -37,6 +41,7 @@ expect(!accountChat.includes('<style>') && !accountChat.includes("document.creat
 
 expect(chatRuntime.includes('export function mountChatList') && chatRuntime.includes('export function mountChatThread'), 'Core Chat runtime must own shared list/thread behavior.');
 expect(chatRuntime.includes("kind: 'contacts'") && chatRuntime.includes("kind: 'attachment'"), 'Core Chat runtime must own Header C contacts and D attachment roles.');
+expect(chatRuntime.includes("kind: 'mode'") && chatRuntime.includes('data-chat-mode-switch'), 'Messenger Z1 must expose D as the mode exit instead of a back action.');
 expect(chatRuntime.includes('bindMessageAttachments(form)') && chatRuntime.includes('messageComposer(') && chatRuntime.includes('messageThread('), 'Core Chat runtime must own composer, attachments, and thread rendering.');
 expect(accountChat.includes("b: 'Обзор'") && accountChat.includes("v2Section('Предстоящие визиты'") && !accountChat.includes("v2Section('Контакты'"), 'End-user Overview must contain upcoming activity only; Contacts must remain their own F root.');
 
@@ -48,6 +53,20 @@ expect(chatCss.includes('.v2-app .message-composer') && chatCss.includes('.v2-ap
 expect(chatCss.includes('.message-composer__input:focus-visible') && chatCss.includes('outline:none'), 'Shared Chat must suppress native blue focus rings.');
 expect(!fs.existsSync('ui/shell/index.js'), 'Legacy ui/shell owner must be physically removed.');
 expect(!fs.existsSync('ui/shell/shell.css'), 'Legacy ui/shell CSS must be physically removed.');
+
+expect(messengerMode.includes('getCommunicationThreads') && messengerMode.includes('getGlobalAccountRelationships'), 'One Shared Messenger mode owner must serve professional and end-user runtimes.');
+expect(messengerMode.includes("ROOT_CLASS = 'messenger-mode-z'") && messengerMode.includes('dismissible: false'), 'Messenger Z1 must be a non-dismissible mode root.');
+expect(messengerMode.includes("THREAD_CLASS = 'messenger-thread-z'") && messengerMode.includes('stack: true'), 'Messenger dialogs must be Z2+ layers over Messenger Z1.');
+expect(messengerMode.includes(".v2-header__control--chat") && messengerMode.includes('stopImmediatePropagation()'), 'Shared Messenger owner must intercept D chat entry before legacy feature handlers.');
+expect(messengerMode.includes("{ value: 'ALL', label: 'Общий' }") && messengerMode.includes("{ value: 'PUSH', label: 'Чат' }"), 'Professional Messenger must expose Общий and Чат, never Push, as user-facing modes.');
+expect(messengerMode.includes('filteredMessages(messages, filter)'), 'Professional Messenger channel switch must filter the unified conversation.');
+expect(messengerMode.includes('getAccountChat(tenantId)') && !messengerMode.includes('getAccountNotifications'), 'End-user Messenger must show internal Chat messages only, not external/system notification feeds.');
+expect(indexHtml.includes('core/chat/messenger-mode.js'), 'Shared Messenger mode owner must be loaded for both production app domains.');
+
+expect(v2Stack.includes('dismissible = true') && v2Stack.includes("node.dataset.v2ModeRoot = 'true'"), 'Shared Z owner must support a non-dismissible independent mode root.');
+expect(v2Stack.includes("surface.dataset.v2Dismissible === 'false'") && v2Stack.includes('if (dismissible) {'), 'Non-dismissible Messenger Z1 must have no swipe/dismiss affordance.');
+expect(v2Stack.includes('findLastIndex') && v2Stack.includes('modeRootIndex'), 'Messenger Z1/Z2 depth must be independent from the APP Z stack below it.');
+expect(v2Header.includes("kind === 'mode'") && v2Header.includes('v2-header__icon--mode'), 'Header D must have a distinct visible app-mode return icon on Messenger Z1.');
 
 expect(chatApi.includes('attachments = []') && chatApi.includes('body, attachments'), 'Professional communication API must carry attachments.');
 expect(controller.includes('attachments?: unknown'), 'Professional chat controller must accept attachments.');
