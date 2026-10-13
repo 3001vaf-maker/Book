@@ -13,6 +13,16 @@ function removeTelegramEntryFromUrl({ removeBooking = false } = {}) {
   history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
+function continueTelegramEntryToBooking(tenantId) {
+  const tenant = String(tenantId || '').trim();
+  if (!tenant) return;
+  const url = new URL(location.href);
+  url.searchParams.delete('tg_entry');
+  url.searchParams.set('booking', tenant);
+  url.searchParams.set('entry', 'account-booking');
+  location.replace(`${url.pathname}${url.search}${url.hash}`);
+}
+
 function rootTelegramEntryRoute() {
   if (typeof window === 'undefined') return null;
   const path = String(location.pathname || '/').replace(/\/+$/, '') || '/';
@@ -98,8 +108,7 @@ if (rootTelegramRoute) {
     ...rootTelegramRoute,
     onTelegramEntryCompleted: () => {
       disposeRootTelegramRuntime();
-      removeTelegramEntryFromUrl({ removeBooking: true });
-      location.reload();
+      continueTelegramEntryToBooking(rootTelegramRoute.tenantId);
     },
   }).then((dispose) => {
     disposeRootTelegramRuntime = typeof dispose === 'function' ? dispose : () => {};
