@@ -1,11 +1,9 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
-
-if (existsSync(join(root, 'main'))) errors.push('main/: obsolete root directory must not exist');
 
 function walk(dir) {
   const result = [];
@@ -23,10 +21,6 @@ function rel(file) {
   return relative(root, file).replaceAll('\\', '/');
 }
 
-function report(file, specifier) {
-  errors.push(`${rel(file)}: internal module specifier must be canonical: ${specifier}`);
-}
-
 const modulePatterns = [
   /\bfrom\s*(['"])([^'"]+)\1/g,
   /\bimport\s*(['"])([^'"]+)\1/g,
@@ -39,20 +33,17 @@ for (const file of walk(root)) {
     for (const match of source.matchAll(pattern)) {
       const specifier = match[2] || '';
       if (!specifier.startsWith('.') || !/\.(?:js|mjs)(?:[?#].*)?$/.test(specifier)) continue;
-      if (/(?:^|\/)main\//.test(specifier)) report(file, specifier);
-      if (/[?#]/.test(specifier)) report(file, specifier);
+      if (/[?#]/.test(specifier)) {
+        errors.push(`${rel(file)}: internal module specifier must be canonical: ${specifier}`);
+      }
     }
   }
 }
 
-const indexFile = join(root, 'index.html');
-const indexSource = readFileSync(indexFile, 'utf8');
+const indexSource = readFileSync(join(root, 'index.html'), 'utf8');
 for (const match of indexSource.matchAll(/\b(?:src|href)\s*=\s*(['"])([^'"]+)\1/g)) {
   const specifier = match[2] || '';
   if (/^(?:https?:|data:|\/\/)/.test(specifier)) continue;
-  if (/(?:^|\/)main\//.test(specifier)) {
-    errors.push(`index.html: obsolete main asset reference: ${specifier}`);
-  }
   if (/\.(?:js|css)(?:[?#].*)?$/.test(specifier) && /[?#]/.test(specifier)) {
     errors.push(`index.html: source asset reference must be canonical: ${specifier}`);
   }

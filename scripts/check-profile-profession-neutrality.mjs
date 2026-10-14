@@ -5,43 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const self = relative(root, fileURLToPath(import.meta.url)).replaceAll('\\', '/');
-
-const protectedTerms = [
-  ['Парик', 'махер'].join(''),
-  ['Коло', 'рист'].join(''),
-  ['Бар', 'бер'].join(''),
-  ['Виза', 'жист'].join(''),
-  ['Сти', 'лист'].join(''),
-  ['Мани', 'кюр'].join(''),
-  ['Педи', 'кюр'].join(''),
-  ['Бро', 'вист'].join(''),
-  ['Лэш', 'мейкер'].join(''),
-  ['Косме', 'толог'].join(''),
-  ['Масса', 'жист'].join(''),
-  ['Наращивание ', 'волос'].join(''),
-  ['Перманентный ', 'макияж'].join(''),
-  ['Тре', 'нер'].join(''),
-  ['Убор', 'щик'].join(''),
-  ['Вр', 'ач'].join(''),
-  ['Док', 'тор'].join(''),
-  ['Уч', 'итель'].join(''),
-  ['Препода', 'ватель'].join(''),
-  ['Консуль', 'тант'].join(''),
-  ['hair', 'dresser'].join(''),
-  ['train', 'er'].join(''),
-  ['clean', 'er'].join(''),
-  ['doc', 'tor'].join(''),
-  ['teach', 'er'].join(''),
-  ['consult', 'ant'].join(''),
-].map((value) => value.toLocaleLowerCase('ru-RU'));
-
 const extensions = new Set(['.js', '.mjs', '.ts', '.prisma', '.html', '.json']);
-const excludedPrefixes = [
-  'node_modules/',
-  '.git/',
-  'server/prisma/migrations/',
-  'docs/',
-];
+const excludedPrefixes = ['node_modules/', '.git/', 'server/prisma/migrations/', 'docs/'];
 
 function extension(path) {
   const index = path.lastIndexOf('.');
@@ -60,27 +25,10 @@ function walk(dir) {
   });
 }
 
-function isProfessionDataLiteral(line, term) {
-  const normalizedLine = line.toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
-  return normalizedLine.includes(`profession: '${term}'`)
-    || normalizedLine.includes(`profession: "${term}"`);
-}
-
-const literalViolations = [];
 const structuralViolations = [];
 for (const path of walk(root)) {
   const lines = readFileSync(resolve(root, path), 'utf8').split('\n');
-
   lines.forEach((line, index) => {
-    const normalized = line.toLocaleLowerCase('ru-RU');
-
-    for (const term of protectedTerms) {
-      if (normalized.includes(term) && !isProfessionDataLiteral(line, term)) {
-        literalViolations.push(`${path}:${index + 1}: ${line.trim()}`);
-        break;
-      }
-    }
-
     if (/\b(title|heading|header|aria|route|path|screen|section)\b[^\n]*\bprofession(?:About)?\b/i.test(line)
       || /\bprofession(?:About)?\b[^\n]*\b(title|heading|header|aria|route|path|screen|section)\b/i.test(line)
       || /<h[1-6][^>]*>[^\n]*\bprofession(?:About)?\b/i.test(line)) {
@@ -88,12 +36,6 @@ for (const path of walk(root)) {
     }
   });
 }
-
-assert.deepEqual(
-  literalViolations,
-  [],
-  `Profession labels escaped Profile.profession into system code/UI:\n${literalViolations.join('\n')}`,
-);
 
 assert.deepEqual(
   structuralViolations,

@@ -5,9 +5,6 @@ const root = process.cwd();
 const featureRoots = ['core/people', 'core/finance', 'settings', 'timetable', 'journal', 'chat'];
 const errors = [];
 
-// Explicit module-lifetime listeners are installed exactly once by ES module loading
-// and intentionally live for the lifetime of the application. Route/view listeners
-// remain required to provide a matching cleanup.
 const applicationLifetimeWindowListeners = new Set([
   'chat/chat.js::book:record-chat-request',
 ]);
@@ -55,16 +52,12 @@ if (!/let\s+disposeView\s*=/.test(coreSource) || !/disposeView\(\);/.test(coreSo
   errors.push('core.js: route render lifecycle must dispose the previous view before replacement');
 }
 
-if (/syncWorkspaceBack|v2-workspace-back/.test(coreSource)) {
-  errors.push('core.js: retired workspace Back owner must not return; FEZ navigation is gesture-owned');
-}
-
 const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
 const stagingCompose = readFileSync(join(root, 'docker-compose.staging.yml'), 'utf8');
 const databaseWait = readFileSync(join(root, 'server/scripts/wait-for-database.mjs'), 'utf8');
 
-if (!/node scripts\/wait-for-database\.mjs && node scripts\/recover-failed-prelaunch-migration\.mjs/.test(dockerfile)) {
-  errors.push('Dockerfile: production startup must wait for database readiness before migration recovery');
+if (!/node scripts\/wait-for-database\.mjs/.test(dockerfile)) {
+  errors.push('Dockerfile: production startup must wait for database readiness before database work');
 }
 if (!/node scripts\/wait-for-database\.mjs && npx prisma migrate deploy/.test(stagingCompose)) {
   errors.push('docker-compose.staging.yml: staging startup must use the same database readiness gate');

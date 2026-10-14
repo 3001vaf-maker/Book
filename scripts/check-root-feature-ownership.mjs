@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { extname, relative, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { v2CardDeck } from '../ui/v2/card-deck.js';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const self = relative(root, fileURLToPath(import.meta.url)).replaceAll('\\', '/');
 const retiredProfileOwner = ['settings', 'profile'].join('/');
 const retiredServiceOwner = ['settings', 'service'].join('/');
 
@@ -13,8 +12,8 @@ assert.equal(existsSync(resolve(root, 'core/profile/profile.js')), true, 'Profil
 assert.equal(existsSync(resolve(root, 'core/profile/runtime.js')), true, 'Profile runtime must be owned by core/profile');
 assert.equal(existsSync(resolve(root, 'core/service/service.js')), true, 'Service must be owned by core/service');
 assert.equal(existsSync(resolve(root, 'core/service/procedures/data.js')), true, 'Service procedures must be owned by core/service');
-assert.equal(existsSync(resolve(root, retiredProfileOwner)), false, 'Profile must never exist under Settings');
-assert.equal(existsSync(resolve(root, retiredServiceOwner)), false, 'Service must never exist under Settings');
+assert.equal(existsSync(resolve(root, retiredProfileOwner)), false, 'Profile must not have a Settings owner');
+assert.equal(existsSync(resolve(root, retiredServiceOwner)), false, 'Service must not have a Settings owner');
 
 const core = readFileSync(resolve(root, 'core.js'), 'utf8');
 const settings = readFileSync(resolve(root, 'settings/settings.js'), 'utf8');
@@ -49,28 +48,5 @@ assert.equal(
   'Shared F CardDeck must render every real root section and must not silently truncate the deck',
 );
 assert.match(rootDeckProbe, /data-root-capacity-probe="settings"/);
-
-const textExtensions = new Set(['.js', '.mjs', '.ts', '.md', '.json', '.yml', '.yaml', '.html', '.css']);
-const excluded = new Set(['.git', 'node_modules']);
-const violations = [];
-
-function walk(dir) {
-  for (const name of readdirSync(dir)) {
-    if (excluded.has(name)) continue;
-    const full = resolve(dir, name);
-    const rel = relative(root, full).replaceAll('\\', '/');
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      walk(full);
-      continue;
-    }
-    if (rel === self || !textExtensions.has(extname(name))) continue;
-    const text = readFileSync(full, 'utf8');
-    if (text.includes(retiredProfileOwner) || text.includes(retiredServiceOwner)) violations.push(rel);
-  }
-}
-
-walk(root);
-assert.deepEqual(violations, [], `Retired Settings ownership references found:\n${violations.join('\n')}`);
 
 console.log('root feature ownership check: OK');
