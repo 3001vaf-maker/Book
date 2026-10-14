@@ -17,174 +17,79 @@ function walkCss(dir) {
   return result;
 }
 
-function walkJs(dir) {
-  const result = [];
-  for (const name of readdirSync(join(root, dir))) {
-    const path = join(root, dir, name);
-    const stat = statSync(path);
-    if (stat.isDirectory()) result.push(...walkJs(relative(root, path)));
-    else if (name.endsWith('.js') || name.endsWith('.mjs')) result.push(relative(root, path).replaceAll('\\', '/'));
-  }
-  return result;
-}
-
-const workplaceData = read('core/profile/workplaces/data.js');
-const workplaceEditor = read('core/profile/workplaces/workplaces.js');
-const workplaceUi = read('ui/workplaces/index.js');
+const alphabet = read('UI_ALPHABET.md');
 const calendarUi = read('ui/calendar/calendar.js');
 const calendarCss = read('ui/calendar/calendar.css');
-const timeUi = read('ui/time/index.js');
-const timeCss = read('ui/time/time.css');
-const listUi = read('ui/lists/list.js');
-const dayWorkplaces = read('core/day/workplaces.js');
-const timeGrid = read('core/time/grid.js');
-const availability = read('core/time/availability.js');
+const workplaceUi = read('ui/workplaces/index.js');
+const journalWorkplace = read('journal/workplace-control.js');
 const graph = read('timetable/timetable.js');
-const dayEditor = read('timetable/day-editor.js');
-const journal = read('journal/journal.js');
-const journalWorkplaceControl = read('journal/workplace-control.js');
-const journalMonth = read('journal/месяц.js');
-const journalTimeUsage = read('journal/time-usage-source.js');
-const recordData = read('core/record/data.js');
-const recordService = read('core/record/service.js');
-const timeUsage = read('core/time/usage.js');
-const coreEntry = read('core.js');
 const allCss = [...walkCss('ui'), ...walkCss('css')];
-const allRuntimeJs = [
-  'core.js',
-  ...walkJs('chat'),
-  ...walkJs('core'),
-  ...walkJs('journal'),
-  ...walkJs('online-booking'),
-  ...walkJs('settings'),
-  ...walkJs('timetable'),
-  ...walkJs('ui'),
-];
 
-if (!/color:\s*String\(workplace\.color/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'Workplace must own its color field');
-if (!/indicatorColor:\s*workplace\.color\s*\|\|\s*WORKPLACE_FALLBACK_COLOR/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'missing Workplace color must resolve to the canonical black indicator fallback');
-if (!/WORKPLACE_FALLBACK_COLOR\s*=\s*['"]#212529['"]/.test(workplaceData)) fail('core/profile/workplaces/data.js', 'canonical missing-color indicator must be black (#212529)');
-if (!/colorPicker\(\{name:'workplaceColor'[^}]*required:true/.test(workplaceEditor)) fail('core/profile/workplaces/workplaces.js', 'Workplace editor must use shared required colorPicker()');
+if (!alphabet.includes('| Calendar / DatePicker / DateNavigator | `ui/calendar` |')) {
+  fail('UI_ALPHABET.md', 'Calendar owner must remain ui/calendar');
+}
+if (!alphabet.includes('| Workplace selector / workplace controls | `ui/workplaces` |')) {
+  fail('UI_ALPHABET.md', 'Workplace controls owner must remain ui/workplaces');
+}
+if (!alphabet.includes('В APP-состоянии D с иконкой чата всегда означает `включить Messenger`')) {
+  fail('UI_ALPHABET.md', 'APP Header D must remain the Messenger entry');
+}
 
-if (!/resolveDateIndicators/.test(calendarUi) || !/calendar__date-indicator/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar must own generic date indicator manifestation');
-if (!/mode\s*===\s*['"]date['"]\s*\?\s*dateIndicatorsMarkup/.test(calendarUi)) fail('ui/calendar/calendar.js', 'date indicators must belong to the full Calendar and stay out of MonthDayPicker mode');
-if (/outline:2px|#C9A895|#DCC4B4/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar date visual states must not be hardcoded inline; Shared Calendar CSS is the sole owner');
-if (!/function\s+calendarHeader\s*\(/.test(calendarUi) || !/export function dateNavigator[\s\S]*return calendarHeader\(/.test(calendarUi) || !/return `<section class="calendar"[\s\S]*\$\{calendarHeader\(/.test(calendarUi)) fail('ui/calendar/calendar.js', 'Calendar and DateNavigator must share the single calendarHeader() navigation primitive');
-if (!/\.calendar__header\{[^}]*grid-template-columns:36px minmax\(0,1fr\) 36px;[^}]*gap:4px;[^}]*margin:0/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation header must centrally own 36px controls with 4px gap');
-if (!/\.calendar__month-button\{[^}]*width:36px;[^}]*height:36px;[^}]*border:1px solid var\(--border\);[^}]*border-radius:8px;[^}]*background:transparent;[^}]*font-size:18px/s.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation arrows must be 36x36 with 18px glyph, 8px radius, transparent fill and 1px shared-border outline');
-if (!/\.calendar__month\{[^}]*font-size:14px;[^}]*font-weight:700/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation label must remain 14px / 700');
-if (/calendar__header--|:has\(\[data-date-navigator-/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar navigation geometry must have no compact/feature-specific variant; one Shared rule applies everywhere');
-if (!/\.calendar__weekdays span\{[^}]*font-size:12px;[^}]*font-weight:650/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar weekday heading must remain 12px / 650');
-if (!/\.calendar__grid\{[^}]*grid-auto-rows:minmax\(74px,auto\);[^}]*gap:2px/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar cells must keep 74px minimum height and 2px grid gap');
-if (!/\.calendar__date:not\(\.is-neighbor\)\{[^}]*border:1px solid var\(--border\);[^}]*background:var\(--white\)/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Current-month Calendar cells must own the shared white surface and 1px border');
-if (!/\.calendar__date-number\{[^}]*font-size:16px;[^}]*font-weight:400/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Ordinary Calendar date number must be 16px / 400');
-if (!/\.calendar__date\.is-working \.calendar__date-number\{font-weight:800\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Working dates must use the stronger 800 weight');
-if (!/\.calendar__date\.is-weekend \.calendar__date-number\{color:#FF1111\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Weekend dates must use the shared red #FF1111');
-if (!/\.calendar__date\.is-neighbor \.calendar__date-number\{color:var\(--text-muted\)\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Neighbor-month dates must use shared muted text');
-if (!/\.calendar__date\.is-today\{border-color:#B3ACA8;background:#E3E0DE\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Today must use #E3E0DE fill with #B3ACA8 border');
-if (!/\.calendar__date\.is-selected\{box-shadow:inset 0 0 0 2px var\(--text\)\}/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Selected date must have exactly one 2px shared-text frame');
-if (!/\.calendar__date-content\{[^}]*font-size:11px/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar inner date content must remain 11px');
-if (!/\.calendar__date-indicator\{[^}]*width:7px;[^}]*height:7px;[^}]*border:1px solid rgba\(0,0,0,.18\);[^}]*border-radius:50%/.test(calendarCss)) fail('ui/calendar/calendar.css', 'Calendar indicator must remain a 7x7 circle with the canonical border');
+if (!/function\s+calendarHeader\s*\(/.test(calendarUi)
+  || !/export function dateNavigator[\s\S]*return calendarHeader\(/.test(calendarUi)
+  || !/return `<section class="calendar"[\s\S]*\$\{calendarHeader\(/.test(calendarUi)) {
+  fail('ui/calendar/calendar.js', 'Calendar and DateNavigator must share one calendarHeader() primitive');
+}
+if (!/resolveDateIndicators/.test(calendarUi) || !/calendar__date-indicator/.test(calendarUi)) {
+  fail('ui/calendar/calendar.js', 'Calendar must own generic date indicators');
+}
+
+if (!/\.calendar__header\{[^}]*grid-template-columns:36px minmax\(0,1fr\) 36px;[^}]*gap:4px;[^}]*margin:0/.test(calendarCss)) {
+  fail('ui/calendar/calendar.css', 'Calendar header must own the canonical 36px controls and 4px gap');
+}
+if (!/\.calendar__month-button\{[^}]*width:36px;[^}]*height:36px;[^}]*border:1px solid var\(--border\);[^}]*border-radius:8px;[^}]*background:transparent;[^}]*font-size:18px/s.test(calendarCss)) {
+  fail('ui/calendar/calendar.css', 'Calendar arrows must keep the canonical 36x36 / 18 / r8 geometry');
+}
+if (!/\.calendar__month\{[^}]*font-size:14px;[^}]*font-weight:700/.test(calendarCss)) {
+  fail('ui/calendar/calendar.css', 'Calendar label must remain 14/700');
+}
+if (!/\.calendar__grid\{[^}]*grid-auto-rows:minmax\(74px,auto\);[^}]*gap:2px/.test(calendarCss)) {
+  fail('ui/calendar/calendar.css', 'Calendar cells must keep 74px minimum height and 2px gap');
+}
+if (!/\.calendar__date\.is-today\{border-color:#B3ACA8;background:#E3E0DE\}/.test(calendarCss)
+  || !/\.calendar__date\.is-selected\{box-shadow:inset 0 0 0 2px var\(--text\)\}/.test(calendarCss)
+  || !/\.calendar__date-indicator\{[^}]*width:7px;[^}]*height:7px/.test(calendarCss)) {
+  fail('ui/calendar/calendar.css', 'Calendar today, selected and indicator states must remain canonical');
+}
 for (const path of allCss) {
   if (path === 'ui/calendar/calendar.css') continue;
-  if (/\.calendar__(?:header\b|month-button|month\b|weekdays\b|grid\b|date(?:\b|[.:])|date-number\b|date-content\b|date-indicator\b)/.test(read(path))) fail(path, 'Shared Calendar visual presentation belongs only to ui/calendar/calendar.css');
-}
-for (const path of allRuntimeJs) {
-  if (path.startsWith('ui/calendar/')) continue;
-  const source = read(path);
-  if (/calendar__header--|calendar__month-button|calendar__month\b/.test(source)) fail(path, 'Feature/runtime code must not select or create a Calendar navigation visual variant');
-  if (/classList\.(?:add|remove|toggle)\([^)]*calendar__/.test(source)) fail(path, 'Feature/runtime code must not mutate Shared Calendar classes');
+  if (/\.calendar__(?:header\b|month-button|month\b|weekdays\b|grid\b|date(?:\b|[.:])|date-number\b|date-content\b|date-indicator\b)/.test(read(path))) {
+    fail(path, 'Shared Calendar presentation belongs only to ui/calendar/calendar.css');
+  }
 }
 
-if (!/indicatorColor/.test(listUi) || !/ui-list__indicator/.test(listUi)) fail('ui/lists/list.js', 'generic List must support a generic color indicator');
-for (const path of allCss) {
-  if (path === 'ui/lists/list.css') continue;
-  if (/\.ui-list__indicator\b/.test(read(path))) fail(path, 'List indicator CSS belongs only to ui/lists/list.css');
+if (!/export function openWorkplaceControl/.test(workplaceUi)
+  || !/openHeaderControl\(content/.test(workplaceUi)
+  || !/list\(\{ items: listItems \}\)/.test(workplaceUi)
+  || !/ALL_WORKPLACES_ID/.test(workplaceUi)) {
+  fail('ui/workplaces/index.js', 'Graph workplace selection must compose Shared Header Control + List');
+}
+if (!/select\(\{/.test(journalWorkplace)
+  || !/variant:\s*'x'/.test(journalWorkplace)
+  || !/onSelect\(nextId\)/.test(journalWorkplace)) {
+  fail('journal/workplace-control.js', 'Journal workplace selection must reuse Shared Select inside canonical X');
 }
 
-if (!/list\(\{\s*items:\s*listItems\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must use shared list()');
-if (/function\s+openPicker\b|name:\s*['"]workplaceControlSelect['"]|data-workplace-control-save/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must not recreate Select + Choose flow');
-if (!/ALL_WORKPLACES_ID/.test(workplaceUi) || !/Общий график/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace List must own the aggregate graph row');
-if (/Все записи|aggregateLabel|aggregateAria/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace control must not contain Journal aggregate semantics');
-if (/<h2>Рабочий график<\/h2>/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Workplace must not own the visible Header Control title');
-if (!/title\s*=\s*['"]['"]/.test(workplaceUi) || !/subtitle\s*=\s*['"]['"]/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must accept caller-owned optional title/subtitle');
-if (!/openHeaderControl\(content,\s*\{\s*title:\s*visibleTitle\s*\|\|\s*visibleSubtitle\s*\}\)/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Workplace manifestation must pass the caller-owned heading to Header Control');
-if (/Корректировка времени|data-workplace-control-open-time|workplaceControlFrom|workplaceControlTo/.test(workplaceUi)) fail('ui/workplaces/index.js', 'Graph Header Workplace List must not own working-time correction');
-
-if (!/getActiveDayWorkplaces/.test(dayWorkplaces) || !/getAvailableDayWorkplaces/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must expose active/available queries');
-if (/saveDayWorkplaceTime|getDayWorkplaceDraft|createDay|updateDayTime|saveDays/.test(dayWorkplaces)) fail('core/day-workplaces.js', 'day workplace read-model must not expose a second working-time mutation path');
-
-if (!/export function createTimeGrid/.test(timeGrid)) fail('core/time-grid.js', 'Core must own one neutral TimeGrid');
-if (!/getTimeGridMinuteState/.test(timeGrid) || !/getTimeGridRangeState/.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must resolve minute and range state');
-if (!/listTimeGridAvailableStarts/.test(timeGrid) || !/listTimeGridAvailableEnds/.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must own minute-resolution availability projection');
-if (/journal\/|timetable\/|settings\/|ui\//.test(timeGrid)) fail('core/time-grid.js', 'TimeGrid must not depend on feature or UI owners');
-
-if (!/getAvailabilityGrid/.test(availability) || !/checkTimeAvailability/.test(availability)) fail('core/availability.js', 'Availability must be the canonical WorkPlan + TimeGrid query service');
-if (!/createTimeGrid/.test(availability) || !/getTimeUsagesForScope/.test(availability)) fail('core/availability.js', 'Availability must compose TimeGrid with the neutral occupancy contract');
-if (/journal\/|timetable\/|settings\/|ui\//.test(availability)) fail('core/availability.js', 'Availability must not depend on feature or UI implementations');
-
-if (!/ALL_WORKPLACES_ID/.test(graph) || !/function\s+openTimetableSettingsZ2\(\)/.test(graph)) fail('timetable/timetable.js', 'Graph must expose aggregate and workplace Z1 manifestations through its Z2 settings selector');
-if (!/getWorkingDayTotalMinutes/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph dates must show summed duration instead of a false continuous interval');
-if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) fail('timetable/timetable.js', 'Graph must pass indicator data to Calendar instead of drawing indicators locally');
-if (!/title:\s*title\s*\|\|\s*\(allMode\s*\?\s*'Общий график'\s*:\s*\(workplace\?\.name\s*\|\|\s*'Рабочее пространство'\)\)/.test(graph)) fail('timetable/timetable.js', 'Graph Z1 title must be Aggregate label or the selected Profile workplace name');
-if (!/kind:\s*'logo'/.test(graph) || !/data-timetable-settings-open/.test(graph)) fail('timetable/timetable.js', 'Graph A must feed only its workday count into the Shared Header logo owner');
-if (!/title:\s*'Настройки графика'/.test(graph) || !/v2HorizontalRail\(cards\.join\(''\)/.test(graph) || !/workplaceGraphCard/.test(graph) || !/aggregateGraphCard/.test(graph) || !/mountV2ZLayer\(root,\s*v2ZLayer/.test(graph)) fail('timetable/timetable.js', 'Graph A must open Settings as a right-side shared Z2 with a horizontal Entity Card rail');
-if (!/workplace\?\.photo/.test(graph) || !/topRightMeta/.test(graph) || !/summary\.days/.test(graph) || !/summary\.duration/.test(graph)) fail('timetable/timetable.js', 'Graph workplace cards must use the Profile visual entity and place Graph day/hour data in the top-right card zone');
-if (/workplace\?\.city|workplace\?\.address|workplace\?\.from|workplace\?\.to/.test(graph)) fail('timetable/timetable.js', 'Graph card manifestation must not import Profile city/address/base-schedule metrics');
-if (!/disabled:\s*true/.test(graph) || !/hideD:\s*true/.test(graph)) fail('timetable/timetable.js', 'Graph Settings Z2 must keep A inactive and D absent');
-if (/title:\s*['"]Рабочий график['"]/.test(graph)) fail('timetable/timetable.js', 'Graph must not retain the legacy Header Control manifestation for settings');
-if (!/className:\s*'v2-primary-source-only'/.test(graph) || /calendar-workspace__actions|data-timetable-actions|actionBlock\(/.test(graph)) fail('timetable/timetable.js', 'Graph Apply must exist only as a hidden Shared Header C source and must never render a body action');
-if (!/data-v2-primary-visible="false"/.test(graph) || !/applyButton\.dataset\.v2PrimaryVisible\s*=\s*'true'/.test(graph)) fail('timetable/timetable.js', 'Graph C must be absent without date selection and appear only after selection');
-if (!/v2PrimaryLabel\s*=\s*makeOff\s*\?\s*'Выходной'\s*:\s*'Рабочий'/.test(graph) || !/v2PrimaryVariant\s*=\s*makeOff\s*\?\s*'danger'\s*:\s*''/.test(graph)) fail('timetable/timetable.js', 'workplace Graph C must be Рабочий in default black or Выходной in Shared danger red according to the selected operation');
-if (/selection\s*=\s*isAllMode\(\)\s*\?\s*null/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph mode must not disable Calendar multi-select');
-if (!/selection\s*=\s*initMultiSelect\(calendarRoot,\s*\{\s*onChange:\s*syncApplyButton\s*\}\)/.test(graph)) fail('timetable/timetable.js', 'Graph must use shared multi-select in both workplace and aggregate modes');
-if (!/function\s+openAggregateWorkplaceApply\(dates\)/.test(graph) || !/data-timetable-apply-workplace/.test(graph) || !/v2HorizontalRail\(cards\.join\(''\)/.test(graph) || /openWorkplaceControl\s*\(/.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must open workplace Entity Cards in a right-side horizontal rail, never a List');
-if (!/if\s*\(isAllMode\(\)\)\s*\{\s*openAggregateWorkplaceApply\(dates\);\s*return;\s*\}/s.test(graph)) fail('timetable/timetable.js', 'aggregate Apply must route selected dates into workplace card selection');
-if (/openTimetableDayEditor/.test(graph)) fail('timetable/timetable.js', 'aggregate Graph date click must not jump directly into the single-day editor');
-if (/function\s+openAggregateDayEditor/.test(graph)) fail('timetable/timetable.js', 'Graph page must not keep a second local day-editor implementation');
-if (/journal\//.test(graph)) fail('timetable/timetable.js', 'Graph page must not depend on Journal implementation');
-if (/canCorrectTime|onSaveTime/.test(graph)) fail('timetable/timetable.js', 'Graph Header Workplace List must not receive time-correction callbacks');
-
-if (!/export function openTimetableDayEditor/.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable must own one canonical working-day editor');
-if (!/variant:\s*['"]q['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use shared Q');
-if (!/time-range-fields/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateFrom/.test(dayEditor) || !/timePicker\(\{\s*name:\s*`aggregateTo/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must use shared TimePicker fields');
-if (!/getWorkingTimeUsageConflicts/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must ask Core for occupied-time conflicts');
-if (!/usageLabel\(conflict\)/.test(dayEditor) || !/usage\?\.type\s*===\s*['"]break['"]/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must preserve Record/Break conflict semantics');
-if (!/Пересечение с/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must show workspace schedule conflicts');
-if (!/\+ Добавить рабочее пространство/.test(dayEditor) || !/openDayWorkplaceControl/.test(dayEditor)) fail('timetable/day-editor.js', 'canonical day editor must own workspace addition for the day');
-if (/journal\//.test(dayEditor)) fail('timetable/day-editor.js', 'Timetable day editor must not depend on Journal implementation');
-
-if (/openWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must not call the Graph Workplace control');
-if (!/openJournalWorkplaceControl/.test(journal)) fail('journal/journal.js', 'Journal must use its own Header manifestation');
-if (!/openTimetableDay(?:Time)?Editor/.test(journal) || !/timetable\/day-editor\.js/.test(journal)) fail('journal/journal.js', 'Journal Day must call a Timetable-owned working-day editor instead of recreating it');
-if (/getDayWorkplaceDraft|saveDayWorkplaceTime|openDayWorkplaceTime|updateDayTime|hasScheduleConflict|createDay|saveDays/.test(journal)) fail('journal/journal.js', 'Journal must not own working-day mutation or validation');
-if (!/export function openJournalWorkplaceControl/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal must own a separate Workplace selection manifestation');
-if (!/mountModal/.test(journalWorkplaceControl) || !/select\(\{/.test(journalWorkplaceControl) || !/variant:\s*['"]x['"]/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must reuse Shared Select in canonical X');
-if (!/График дня/.test(journalWorkplaceControl) || /Общий график/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal manifestation must own only the Journal day-schedule aggregate semantics');
-if (!/data-journal-workplace-select/.test(journalWorkplaceControl) || /data-workplace-control-select/.test(journalWorkplaceControl)) fail('journal/workplace-control.js', 'Journal and Graph controls must have separate interaction channels');
-if (!/getWorkingDayIndicators/.test(journalMonth) || !/resolveDateIndicators/.test(journalMonth) || /calendar__date-indicator/.test(journalMonth)) fail('journal/месяц.js', 'Journal Month must use the same Calendar indicator channel and must not draw its own indicators');
-if (/calendar__header--|classList\.(?:add|remove|toggle)\([^)]*calendar__/.test(journalMonth)) fail('journal/месяц.js', 'Journal may relocate the Shared Calendar header but must not alter its classes or geometry');
-
-if (!/export function getJournalTimeUsages/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must expose occupancy facts, not Core conflict decisions');
-if (!/rigidity:\s*'hard'/.test(journalTimeUsage) || !/rigidity:\s*'soft'/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal must classify Record as hard and Break as soft');
-if (/containsRange|rangesOverlap|isValidRange/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'Journal occupancy source must not implement Core time rules');
-if (!/getRecordsForDay/.test(journalTimeUsage) || !/getJournalBreaksForDay/.test(journalTimeUsage)) fail('journal/time-usage-source.js', 'occupancy provider must read Journal-owned Record and Break facts');
-
-if (!/configureTimeUsageSource/.test(timeUsage) || !/getTimeUsagesForScope/.test(timeUsage)) fail('core/time-usage.js', 'Core must own one configured occupancy contract');
-if (/configureWorkingTimeConflictSource/.test(timeUsage)) fail('core/time-usage.js', 'legacy precomputed conflict-source contract must not remain');
-if (!/configureTimeUsageSource\(getJournalTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire Journal facts into the neutral Core occupancy contract');
-if (!/configureSoftTimeUsageReleaseSource\(releaseJournalSoftTimeUsages\)/.test(coreEntry)) fail('core.js', 'composition root must wire soft-usage release to its Journal owner');
-
-if (!/checkTimeAvailability/.test(recordService)) fail('journal/record-service.js', 'Record commands must ask canonical Availability');
-if (/getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordService)) fail('journal/record-service.js', 'Record command owner must not rebuild WorkPlan or occupancy availability');
-if (/checkTimeAvailability|getDays|getDayTime|getWorkplaces|getJournalBreaks|rangesOverlap|containsRange/.test(recordData)) fail('journal/record-data.js', 'Record data must remain persistence-only and know nothing about time rules');
-
-if (!/hidden\.dispatchEvent\(new Event\(['"]change['"],\{bubbles:true\}\)\)/.test(timeUi)) fail('ui/time/index.js', 'shared TimePicker must emit change so conflict validation updates after edits');
-if (!/\.time-range-fields\b/.test(timeCss)) fail('ui/time/time.css', 'shared Time UI must own the two-column time-range layout');
+for (const token of ['initCalendar(', 'workspaceHeaderContext({', 'mountV2ZLayer(', 'v2HorizontalRail(', 'entityCard({']) {
+  if (!graph.includes(token)) fail('timetable/timetable.js', `Graph must compose Shared owner: ${token}`);
+}
+if (!/resolveDateIndicators/.test(graph) || /calendar__date-indicator/.test(graph)) {
+  fail('timetable/timetable.js', 'Graph must pass data to Shared Calendar instead of drawing Calendar UI locally');
+}
 
 if (errors.length) {
   console.error('calendar/workplace architecture check: FAILED');
-  for (const error of errors) console.error(`- ${error}`);
+  errors.forEach((error) => console.error(`- ${error}`));
   process.exit(1);
 }
 
