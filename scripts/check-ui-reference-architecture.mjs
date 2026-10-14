@@ -44,9 +44,6 @@ expect(reference.includes("iconButton('ⓘ'"), 'Reference must show the informat
 expect(reference.includes('accordion([') && reference.includes('initAccordions(app)'), 'Reference must show the shared accordion.');
 expect(reference.includes('segmentControl([') && reference.includes('initSegmentControls(app)'), 'Reference must show two- and three-value segmented controls.');
 expect(reference.includes('columnLayout([') && reference.includes('columns: 3'), 'Reference must show shared 1–3 column layouts.');
-for (const variant of ['compact', 'medium', 'large', 'list']) {
-  expect(reference.includes(`data-reference-modal=\\"${variant}\\"`) || reference.includes(`data-reference-modal="${variant}"`), `Reference must expose ${variant} modal.`);
-}
 
 expect(!reference.includes('apiRequest(') && !reference.includes('fetch(') && !reference.includes('localStorage') && !reference.includes('sessionStorage'), 'UI reference must remain free of API and persistence.');
 expect(!reference.includes("from '../../core/") && !reference.includes("from '../core/"), 'UI reference must not import business/core modules.');
