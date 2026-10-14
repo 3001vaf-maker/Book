@@ -199,7 +199,8 @@ function applySettlement(root, settlement = null, { preserve = null, paidTotal =
     const correction = correctionPresentation(item, Math.max(0, numberValue(item.price)));
     row.dataset.paymentPricePercent = percentText(pricePercent);
     row.dataset.paymentCorrectionMode = correction.mode;
-    const { priceInput, percentInput, moneyInput } = rowValues(row);
+    const { priceInput } = rowValues(row);
+    const { percentInput, moneyInput } = rowValues(row);
     if (priceInput && priceInput !== preserve) priceInput.value = moneyText(item.price);
     if (percentInput !== preserve) setPercentDisplay(percentInput, correction.mode === 'percent' ? correction.percent : 0);
     if (moneyInput && moneyInput !== preserve) moneyInput.value = correction.mode === 'money' ? moneyText(correction.money) : '';
