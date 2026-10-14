@@ -35,6 +35,8 @@ assert.doesNotMatch(recordServiceSource, /from ['"][^'"]*finance\/index\.js['"]/
 assert.match(recordServiceSource, /'finance'/);
 assert.match(serverRecordSource, /this\.finance\.upsertSettlement/);
 assert.match(serverRecordSource, /const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/);
+assert.match(serverRecordSource, /const requestedCost = Number\(draft\?\.cost \?\? draft\?\.price\);/);
+assert.match(serverRecordSource, /cost: Number\.isFinite\(requestedCost\) && requestedCost >= 0 \? requestedCost : item\.cost/);
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
 
 const transferSelectorSource = recordViewSource.match(/const openRecordTransferSelector = \(\) => \{([\s\S]*?)\n  \};\n\n  const confirmHardDelete/)?.[1] || '';
@@ -53,6 +55,10 @@ assert.match(recordRuntimeSource, /item\.action \? \{ action: item\.action \}/);
 assert.match(procedureCorrectionSource, /title:\s*'Корректировка'/);
 assert.match(procedureCorrectionSource, /durationPicker\(/);
 assert.match(procedureCorrectionSource, /label:\s*'Процедура'/);
+assert.match(procedureCorrectionSource, /label:\s*'Стоимость'/);
+assert.match(procedureCorrectionSource, /data-record-procedure-correction-cost/);
+assert.match(procedureCorrectionSource, /const cost = editableCost\(costInput\?\.value\)/);
+assert.match(procedureCorrectionSource, /cost,\n\s*duration:/);
 assert.match(procedureCorrectionSource, /Удалить процедуру/);
 assert.match(procedureCorrectionSource, /\+ Добавить процедуру/);
 
@@ -88,6 +94,12 @@ const corrected = updateRecord(record.id, {
 assert.equal(corrected.procedures[0].cost, 8000);
 assert.equal(corrected.finance.serviceTotal, 8000);
 assert.equal(corrected.finance.planTotal, 6400);
+
+// Closing and reopening the Record reads the corrected source price and the same recalculated total.
+const reopenedAfterCorrection = getRecord(record.id);
+assert.equal(reopenedAfterCorrection.procedures[0].cost, 8000);
+assert.equal(reopenedAfterCorrection.finance.serviceTotal, 8000);
+assert.equal(reopenedAfterCorrection.finance.planTotal, 6400);
 
 const moved = moveRecord(record.id, {
   date: '2026-09-21',
