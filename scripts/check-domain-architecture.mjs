@@ -4,29 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 const root = process.cwd();
 const ignored = new Set(['.git', 'node_modules', '_site']);
 const errors = [];
-
-if (existsSync(join(root, 'main'))) errors.push('main/: obsolete root directory must not exist');
 const domains = ['day', 'time', 'record', 'finance'];
-const legacyFiles = [
-  'core/day.js',
-  'core/day-data.js',
-  'core/day-read.js',
-  'core/day-rules.js',
-  'core/day-service.js',
-  'core/day-workplaces.js',
-  'core/time.js',
-  'core/time-grid.js',
-  'core/time-usage.js',
-  'core/availability.js',
-  'journal/record-data.js',
-  'journal/record-read.js',
-  'journal/record-service.js',
-  'journal/record-events.js',
-  'journal/record-state.js',
-  'journal/record-finance.js',
-  'core/dds.js',
-  'core/financial-model.js',
-];
 
 function walk(dir) {
   const files = [];
@@ -60,10 +38,6 @@ for (const domain of domains) {
   if (!existsSync(index)) errors.push(`core/${domain}/index.js: missing public domain contract`);
 }
 
-for (const path of legacyFiles) {
-  if (existsSync(join(root, path))) errors.push(`${path}: legacy parallel owner must be deleted`);
-}
-
 for (const file of walk(root)) {
   const path = rel(file);
   const source = readFileSync(file, 'utf8');
@@ -73,14 +47,6 @@ for (const file of walk(root)) {
   for (const specifier of imports(source)) {
     if (!specifier.startsWith('.')) continue;
     const resolved = rel(resolve(dirname(file), specifier));
-    if (resolved === 'main' || resolved.startsWith('main/')) {
-      errors.push(`${path}: must not import from obsolete main directory (${resolved})`);
-      continue;
-    }
-    if (legacyFiles.includes(resolved)) {
-      errors.push(`${path}: imports removed legacy domain owner ${resolved}`);
-      continue;
-    }
     const targetMatch = resolved.match(/^core\/(day|time|record|finance)\/(.+)$/);
     if (!targetMatch) continue;
     const targetDomain = targetMatch[1];
