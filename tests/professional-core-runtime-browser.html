@@ -985,7 +985,7 @@ await wait(50);
 ddsLayer = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
 ok(Boolean(ddsLayer), 'DDS Articles did not open Z2');
 ok(ddsLayer?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Статьи',
-  'DDS Articles Z2 B title is wrong');
+  'DDS Excel Z2 B title is wrong');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === '+',
   'DDS Articles Z2 C must be Add');
 ok(!document.querySelector('[data-modal][data-v2-layer-kind="bottom"]'),
@@ -1117,15 +1117,105 @@ let paymentZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1
 ok(paymentZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата',
   'Record C must open Payment Z3');
 ok(Boolean(paymentZ?.querySelector('[data-payment-ui]')), 'Payment Z3 shared form missing');
-const paymentPrice = paymentZ?.querySelector('[data-payment-price]');
+let paymentPrice = paymentZ?.querySelector('[data-payment-price]');
 ok(Boolean(paymentPrice), 'Payment Z3 procedure price missing');
-ok(paymentPrice?.readOnly === true || paymentPrice?.hasAttribute('readonly'), 'Payment Z3 base price must be read-only');
+ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'), 'Payment Z3 base price must be read-only is an obsolete contract; existing price field must be editable');
 ok(Boolean(paymentZ?.querySelector('input[data-payment-correction-percent]')), 'Payment Z3 manual percent price correction selector missing');
 ok(Boolean(paymentZ?.querySelector('[data-payment-correction-money]')), 'Payment Z3 manual money price correction field missing');
 ok(!paymentZ?.querySelector('[data-payment-discount-percent],[data-payment-discount-money]'), 'Payment Z3 must not expose retired discount controls');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить',
   'Payment Z3 C must be Pay when data is unchanged');
+
+const originalPaymentFetch = window.fetch;
+let persistedPaymentRecord = null;
+let persistedPaymentSettlement = null;
+const paymentJsonResponse = (body) => new Response(JSON.stringify(body), {
+  status:200,
+  headers:{'Content-Type':'application/json'},
+});
+window.fetch = async (input, init = {}) => {
+  const path = (() => {
+    try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname; }
+    catch { return String(input || ''); }
+  })();
+  const method = String(init.method || (typeof input === 'string' ? '' : input?.method) || 'GET').toUpperCase();
+  if (method === 'PUT' && path.endsWith('/finance/settlements/record/runtime-journal-record')) {
+    persistedPaymentSettlement = JSON.parse(String(init.body || '{}'))?.settlement || null;
+    const base = await originalPaymentFetch('/finance');
+    const state = await base.json();
+    return paymentJsonResponse({
+      ...state,
+      settlements: persistedPaymentSettlement ? [{
+        source:{type:'record',id:'runtime-journal-record'},
+        settlement:persistedPaymentSettlement,
+      }] : [],
+    });
+  }
+  if (method === 'PUT' && path.endsWith('/business-state/records/runtime-journal-record')) {
+    persistedPaymentRecord = JSON.parse(String(init.body || '{}'))?.record || null;
+    return originalPaymentFetch(input, init);
+  }
+  if (method === 'GET' && path.endsWith('/business-state') && persistedPaymentRecord) {
+    const base = await originalPaymentFetch(input, init);
+    const state = await base.json();
+    return paymentJsonResponse({ ...state, records:[persistedPaymentRecord] });
+  }
+  if (method === 'GET' && path.endsWith('/finance') && persistedPaymentSettlement) {
+    const base = await originalPaymentFetch(input, init);
+    const state = await base.json();
+    return paymentJsonResponse({
+      ...state,
+      settlements:[{
+        source:{type:'record',id:'runtime-journal-record'},
+        settlement:persistedPaymentSettlement,
+      }],
+    });
+  }
+  return originalPaymentFetch(input, init);
+};
+
+paymentPrice.value = '2000';
+paymentPrice.dispatchEvent(new Event('input',{bubbles:true}));
+await wait(60);
+ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
+  'Editing existing Payment price must switch Header C to Save');
+ok(paymentZ?.querySelector('[data-payment-summary]')?.textContent.includes('2 000'),
+  'Editing existing Payment price must recalculate amount due');
+
+shell()?.querySelector('[data-v2-workspace-primary]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await waitFor(() => {
+  const savedPrice = paymentZ?.querySelector('[data-payment-price]');
+  return Number(savedPrice?.value) === 2000
+    && shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить';
+}, 'saved editable payment price');
+ok(Number(persistedPaymentRecord?.procedures?.[0]?.cost) === 2000,
+  'Saving Payment price must persist Record procedures[].cost');
+ok(Number(persistedPaymentSettlement?.items?.[0]?.price) === 2000,
+  'Saving Payment price must persist Settlement item price');
+
 mark('journal-record-payment-close');
+paymentZ?.v2Close?.();
+await wait(25);
+recordZ?.v2Close?.();
+await wait(35);
+
+mark('journal-record-payment-reopen');
+const reopenedJournalRecord = shell()?.querySelector('[data-journal-usage="runtime-journal-record"]');
+reopenedJournalRecord?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(60);
+recordZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(/^\s*2\s*000\s*₽\s*$/.test(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent || ''),
+  'Reopened Record must use saved price in amount due');
+shell()?.querySelector('[data-v2-workspace-primary]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(50);
+paymentZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+paymentPrice = paymentZ?.querySelector('[data-payment-price]');
+ok(Number(paymentPrice?.value) === 2000, 'Reopened Payment must show saved price');
+ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'),
+  'Reopened Payment price field must stay editable');
+window.fetch = originalPaymentFetch;
 paymentZ?.v2Close?.();
 await wait(25);
 recordZ?.v2Close?.();

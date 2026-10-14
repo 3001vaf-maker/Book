@@ -55,10 +55,6 @@ assert.match(recordRuntimeSource, /item\.action \? \{ action: item\.action \}/);
 assert.match(procedureCorrectionSource, /title:\s*'Корректировка'/);
 assert.match(procedureCorrectionSource, /durationPicker\(/);
 assert.match(procedureCorrectionSource, /label:\s*'Процедура'/);
-assert.match(procedureCorrectionSource, /label:\s*'Стоимость'/);
-assert.match(procedureCorrectionSource, /data-record-procedure-correction-cost/);
-assert.match(procedureCorrectionSource, /const cost = editableCost\(costInput\?\.value\)/);
-assert.match(procedureCorrectionSource, /cost,\n\s*duration:/);
 assert.match(procedureCorrectionSource, /Удалить процедуру/);
 assert.match(procedureCorrectionSource, /\+ Добавить процедуру/);
 

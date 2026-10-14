@@ -2,7 +2,6 @@ import {
   button,
   durationPicker,
   escapeHtml,
-  field,
   initDurationPickers,
   modal,
   mountModal,
@@ -35,14 +34,6 @@ function defaultCost(procedure, workplaceId) {
   if (!cost || cost.free) return '';
   if (typeof cost === 'number' || typeof cost === 'string') return cost;
   return cost.amount ?? cost.from ?? '';
-}
-
-function editableCost(value) {
-  const raw = String(value ?? '').trim().replace(/\s+/g, '').replace(',', '.');
-  if (raw === '') return '';
-  const amount = Number(raw);
-  if (!Number.isFinite(amount) || amount < 0) return null;
-  return Math.round(amount * 100) / 100;
 }
 
 function catalogProcedure(id) {
@@ -114,14 +105,13 @@ function openProcedureEditor({
     .filter((procedure) => !usedIds.has(String(procedure?.id || '')));
   const initialProcedure = currentId ? (catalogProcedure(currentId) || item) : null;
   const initialDuration = Number(item?.duration ?? initialProcedure?.duration) || 0;
-  const initialCost = item?.cost ?? defaultCost(initialProcedure, workplaceId);
   const canAdd = availableProcedures(workplaceId)
     .some((procedure) => !items.some((entry) => String(entry?.id || '') === String(procedure?.id || '')));
   const options = [
     { value: '', label: 'Без выбора' },
     ...candidates.map((procedure) => ({ value: String(procedure.id || ''), label: procedure.name || 'Процедура' })),
   ];
-  const html = `<div class="modal-title"><h2>${escapeHtml(item?.name || 'Процедура')}</h2><p>${item ? 'Можно заменить процедуру, скорректировать её цену и время или удалить.' : 'Выберите процедуру и задайте её цену и время.'}</p></div>
+  const html = `<div class="modal-title"><h2>${escapeHtml(item?.name || 'Процедура')}</h2><p>${item ? 'Можно заменить процедуру, скорректировать её время или удалить.' : 'Выберите процедуру и задайте её время.'}</p></div>
     <div class="compact-form">
       ${select({
         label: 'Процедура',
@@ -129,14 +119,6 @@ function openProcedureEditor({
         value: currentId,
         options,
         aria: 'Выберите процедуру',
-      })}
-      ${field({
-        label: 'Стоимость',
-        name: 'recordProcedureCorrectionCost',
-        value: initialCost === '' || initialCost == null ? '' : initialCost,
-        inputmode: 'decimal',
-        autocomplete: 'off',
-        data: 'data-record-procedure-correction-cost',
       })}
       ${durationPicker({ name: 'recordProcedureCorrectionDuration', label: 'Время', value: initialDuration })}
       <div class="modal-actions">
@@ -154,23 +136,15 @@ function openProcedureEditor({
   if (!layer) return;
   initDurationPickers(layer);
   const procedureInput = layer.querySelector('input[name="recordProcedureCorrectionValue"]');
-  const costInput = layer.querySelector('[data-record-procedure-correction-cost]');
   procedureInput?.addEventListener('change', () => {
     const next = catalogProcedure(procedureInput.value);
-    if (!next) return;
-    const sameProcedure = Boolean(item && String(next.id || '') === currentId);
-    const assignment = workplaceAssignment(next, workplaceId);
+    if (!next || String(next.id || '') === currentId) return;
     const durationValue = layer.querySelector('[data-duration-value]');
     if (durationValue) {
-      durationValue.value = String(sameProcedure
-        ? (Number(item?.duration ?? next.duration) || 0)
-        : (Number(assignment?.duration ?? next.duration) || 0));
+      const assignment = workplaceAssignment(next, workplaceId);
+      durationValue.value = String(Number(assignment?.duration ?? next.duration) || 0);
       durationValue.dispatchEvent(new Event('input', { bubbles: true }));
       durationValue.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    if (costInput) {
-      const nextCost = sameProcedure ? (item?.cost ?? defaultCost(next, workplaceId)) : defaultCost(next, workplaceId);
-      costInput.value = nextCost === '' || nextCost == null ? '' : String(nextCost);
     }
   });
   layer.querySelector('[data-record-procedure-correction-add]')?.addEventListener('click', () => {
@@ -184,18 +158,13 @@ function openProcedureEditor({
       openNotice({ title: 'Процедура', message: 'Выберите процедуру.' });
       return;
     }
-    const cost = editableCost(costInput?.value);
-    if (cost === null) {
-      openNotice({ title: 'Стоимость', message: 'Введите корректную стоимость не меньше 0.' });
-      return;
-    }
     const durationValue = Number(layer.querySelector('[data-duration-value]')?.value);
     const assignment = workplaceAssignment(nextProcedure, workplaceId);
     const nextItem = {
       ...(item || {}),
       id: String(nextProcedure.id || ''),
       name: String(nextProcedure.name || 'Процедура'),
-      cost,
+      cost: nextId === currentId && item ? item.cost : defaultCost(nextProcedure, workplaceId),
       duration: Number.isFinite(durationValue)
         ? durationValue
         : (Number(assignment?.duration ?? nextProcedure.duration) || 0),
