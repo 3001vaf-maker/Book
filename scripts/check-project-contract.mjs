@@ -77,6 +77,12 @@ for (const file of allFiles) {
   }
 }
 
+const buildPagesSource = fs.readFileSync(path.join(root, 'scripts/build-pages.mjs'), 'utf8');
+const pwaRendererSource = fs.readFileSync(path.join(root, 'scripts/render-pwa-icons.mjs'), 'utf8');
+const generatedHtmlAssets = new Map([
+  ['/icon-192.png', buildPagesSource.includes('renderPwaIcons(out)') && pwaRendererSource.includes("output: 'icon-192.png'")],
+]);
+
 const htmlFiles = walk(root).filter((file) => file.endsWith('.html'));
 const referencedCss = new Set();
 for (const file of htmlFiles) {
@@ -89,6 +95,7 @@ for (const file of htmlFiles) {
       ? path.join(root, clean.replace(/^\/+/, ''))
       : path.resolve(path.dirname(file), clean);
     if (!fs.existsSync(target)) {
+      if (generatedHtmlAssets.get(clean) === true) continue;
       failures.push(`${rel(file)}: HTML local asset reference is missing: ${reference}`);
     } else if (clean.endsWith('.css')) {
       referencedCss.add(rel(target));
