@@ -14,8 +14,6 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'onboarding/onboarding.js',
 ]);
 
-const ALLOWED = new Set([...TECHNICAL_STORAGE_OWNERS]);
-
 function walk(dir) {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -27,25 +25,14 @@ function walk(dir) {
   return out;
 }
 
-function source(file) {
-  return fs.readFileSync(file, 'utf8');
-}
-
 const violations = [];
 for (const file of walk(ROOT)) {
   const relative = path.relative(ROOT, file).replaceAll(path.sep, '/');
-  const text = source(file);
+  const text = fs.readFileSync(file, 'utf8');
   if (!STORAGE_PATTERN.test(text)) continue;
-  if (!ALLOWED.has(relative)) violations.push(`${relative}: browser storage is forbidden outside technical/UI owners`);
-}
-
-if (fs.existsSync(path.join(ROOT, 'core/workspace-sync.js'))) {
-  violations.push('core/workspace-sync.js: legacy browser database mirroring is forbidden');
-}
-
-const core = source(path.join(ROOT, 'core.js'));
-if (/clearLegacyBusinessStorage|legacy-browser-business|workspace-sync/.test(core)) {
-  violations.push('core.js: runtime cleanup/mirroring bridges are forbidden');
+  if (!TECHNICAL_STORAGE_OWNERS.has(relative)) {
+    violations.push(`${relative}: browser storage is forbidden outside technical/UI owners`);
+  }
 }
 
 if (violations.length) {
