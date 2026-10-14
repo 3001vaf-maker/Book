@@ -1,5 +1,6 @@
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { renderPwaIcons } from './render-pwa-icons.mjs';
 
 const root = process.cwd();
 const out = join(root, '_site');
@@ -46,6 +47,7 @@ function copyTree(source, target) {
 }
 
 copyTree(root, out);
+renderPwaIcons(out);
 
 function versionModuleSpecifier(specifier) {
   if (!/^\.{1,2}\/.+\.(?:js|mjs)$/.test(specifier)) return specifier;
