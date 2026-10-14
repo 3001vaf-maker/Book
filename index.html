@@ -4,8 +4,22 @@
   <meta charset="utf-8">
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F5F5F3">
-  <title>Рабочее пространство</title>
+  <meta name="theme-color" content="#2F3338">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Кабинет">
+  <title>Кабинет</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/app-icon.svg">
+  <script>
+    {
+      const appTitle = location.hostname === 'user.va-tools.ru' ? 'Запись' : 'Кабинет';
+      document.title = appTitle;
+      document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', appTitle);
+    }
+  </script>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="ui/page/page.css">
   <link rel="stylesheet" href="ui/accordion/accordion.css">
