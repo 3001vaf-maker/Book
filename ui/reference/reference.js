@@ -317,11 +317,11 @@ function modalsScreen() {
     media: '',
     body: `<div class="ui-reference-stack">
       ${section('4 модальных окна', `<div class="ui-reference-actions">
-        ${button('Compact', { variant: 'outline', data: 'data-reference-modal="compact"' })}
-        ${button('Medium', { variant: 'outline', data: 'data-reference-modal="medium"' })}
-        ${button('Large', { variant: 'outline', data: 'data-reference-modal="large"' })}
-        ${button('List', { variant: 'outline', data: 'data-reference-modal="list"' })}
-      </div>`, 'Все ограничены общей шириной Book 390 px.')}
+        ${button('Q', { variant: 'outline', data: 'data-reference-modal="q"' })}
+        ${button('X', { variant: 'outline', data: 'data-reference-modal="x"' })}
+        ${button('S', { variant: 'outline', data: 'data-reference-modal="s"' })}
+        ${button('Technical', { variant: 'outline', data: 'data-reference-modal="technical"' })}
+      </div>`, 'Q / X / S / technical — реальные общие варианты.')}
     </div>`,
   };
 }
@@ -448,9 +448,12 @@ function openInfoReference() {
 }
 
 function openModalReference(variant) {
-  const isList = variant === 'list';
-  const content = `<div class="ui-reference-modal-content"><div class="modal-title"><h2>${variant}</h2><p>Эталон размера модального окна.</p></div>${isList ? folderList([{ title: 'Строка 1' }, { title: 'Строка 2' }, { title: 'Строка 3' }]) : `<div class="form-grid">${field({ label: 'Поле', name: `referenceModal${variant}`, value: 'Значение' })}${button('Действие')}</div>`}</div>`;
-  mountModal(document.body, modal(content, { variant, surface: 'app', title: `Модальное окно ${variant}` }));
+  const label = variant === 'technical' ? 'Technical' : String(variant || '').toUpperCase();
+  const body = variant === 's'
+    ? '<p>Информационный модал без действий.</p>'
+    : `<div class="form-grid">${field({ label: 'Поле', name: `referenceModal${variant}`, value: 'Значение' })}${button('Действие')}</div>`;
+  const content = `<div class="ui-reference-modal-content"><div class="modal-title"><h2>${label}</h2><p>Общий вариант модального окна.</p></div>${body}</div>`;
+  mountModal(document.body, modal(content, { variant, surface: 'app', title: `Модальное окно ${label}` }));
 }
 
 function bindReferenceEvents() {
