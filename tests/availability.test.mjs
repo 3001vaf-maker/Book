@@ -36,7 +36,7 @@ assert.equal(starts.includes('10:00'), false);
 assert.equal(starts.includes('11:00'), true);
 assert.equal(starts.includes('12:00'), false);
 
-const personGrid = createTimeGrid({
+const occupiedHourGrid = createTimeGrid({
   date: '2026-10-16',
   workplaceId: 'studio',
   plan: { from: '11:00', to: '15:00' },
@@ -44,12 +44,30 @@ const personGrid = createTimeGrid({
     { type: 'record', rigidity: 'hard', sourceId: 'record-12', from: '12:00', to: '13:00' },
   ],
 });
-const personRows = new Map(buildPersonRecordTimeRows(personGrid, 60).map((row) => [row.value, row]));
-assert.equal(personRows.get('11:00')?.available, true, '11:00 must stay selectable when a one-hour procedure ends at 12:00');
-assert.equal(personRows.get('11:05')?.occupied, true, 'duration overlap with the 12:00 record must be occupied');
-assert.equal(personRows.get('11:05')?.disabled, true, 'duration overlap must be disabled');
-assert.equal(personRows.get('12:00')?.occupied, true, '12:00 must stay visible as occupied');
-assert.equal(personRows.get('12:00')?.disabled, true, 'occupied 12:00 must never be selectable');
-assert.equal(personRows.get('13:00')?.available, true, '13:00 must be free after the existing record ends');
+const occupiedHourRows = new Map(buildPersonRecordTimeRows(occupiedHourGrid, 60).map((row) => [row.value, row]));
+assert.equal(occupiedHourRows.get('11:00')?.available, true, '11:00 must stay selectable when a one-hour procedure ends at 12:00');
+assert.equal(occupiedHourRows.has('11:05'), false, 'five-minute synthetic booking steps must not exist');
+assert.equal(occupiedHourRows.get('12:00')?.occupied, true, '12:00 must stay visible as occupied');
+assert.equal(occupiedHourRows.get('12:00')?.disabled, true, 'occupied 12:00 must never be selectable');
+assert.equal(occupiedHourRows.get('13:00')?.available, true, '13:00 must be free after the existing record ends');
+
+const naturalBoundaryGrid = createTimeGrid({
+  date: '2026-10-17',
+  workplaceId: 'studio',
+  plan: { from: '12:00', to: '21:00' },
+  usages: [
+    { type: 'record', rigidity: 'hard', sourceId: 'record-half', from: '12:00', to: '12:30' },
+  ],
+});
+const naturalBoundaryRows = buildPersonRecordTimeRows(naturalBoundaryGrid, 60);
+assert.deepEqual(
+  naturalBoundaryRows.map((row) => row.value),
+  ['12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'],
+  'without a configured step, show exact hours plus real occupied-interval end boundaries',
+);
+assert.equal(naturalBoundaryRows.find((row) => row.value === '12:00')?.disabled, true);
+assert.equal(naturalBoundaryRows.find((row) => row.value === '12:30')?.available, true);
+assert.equal(naturalBoundaryRows.some((row) => row.value === '12:05'), false);
+assert.equal(naturalBoundaryRows.some((row) => row.value === '12:15'), false);
 
 console.log('availability tests: OK');
