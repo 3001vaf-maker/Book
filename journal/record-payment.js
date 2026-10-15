@@ -226,13 +226,14 @@ function bindPaymentChat(layer, record) {
 
 function mountPaymentQ(record, {
   title = 'Оплата',
+  modalTitle = title,
   context = '',
   className = '',
   hostData = 'data-record-payment-q-host',
 } = {}) {
   const layer = mountModal(document.body, modal(
     `${context || blankPaymentContext(record, title)}<div class="record-screen record-screen--state-view" ${hostData}></div>`,
-    { variant: 'q', surface: 'app', title, className },
+    { variant: 'q', surface: 'app', title: modalTitle, className },
   ));
   if (!layer) return null;
   bindPaymentChat(layer, record);
@@ -297,6 +298,7 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
   ]);
   const layer = mountPaymentQ(current, {
     title: 'Оплата',
+    modalTitle: 'Проведение оплаты',
     className: 'record-payment-allocation-q',
     hostData: 'data-record-payment-allocation-host',
   });
