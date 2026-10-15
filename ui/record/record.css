@@ -15,7 +15,7 @@
 .record-confirmation-mini-card .mini-card__line:nth-child(8){grid-column:1;grid-row:5}
 .record-confirmation-mini-card .mini-card__line:nth-child(9){grid-column:2;grid-row:5}
 .record-confirmation-view__procedures{margin-top:0;min-width:0}
-.record-confirmation-view__procedures .read-only-sheet{gap:0;padding:0}.record-confirmation-view__procedures .read-only-sheet__groups{border-top:1px solid var(--border)}.record-confirmation-view__procedures .read-only-sheet__group{padding:0}.record-confirmation-view__procedures .read-only-sheet__group+.record-confirmation-view__procedures .read-only-sheet__group{margin:0;padding-top:0}.record-confirmation-view__procedures .read-only-sheet__row{min-height:44px;padding:9px 0;font-size:13px}
+.record-confirmation-view__procedures .read-only-sheet{gap:0;padding:0}.record-confirmation-view__procedures .read-only-sheet__groups{border-top:1px solid var(--border)}.record-confirmation-view__procedures .read-only-sheet__group{padding:0}.record-confirmation-view__procedures .read-only-sheet__group+.read-only-sheet__group{margin:0;padding-top:0}.record-confirmation-view__procedures .read-only-sheet__row{min-height:44px;padding:9px 0;font-size:13px}
 
 .list-entry--record-person{background:#fff}
 .list-entry--record-person .list-entry__background{background:#fff;background-image:none}
