@@ -50,6 +50,29 @@ assert.match(booking, /step: 'time'/);
 assert.match(booking, /step: 'confirmation'/);
 assert.doesNotMatch(booking, /mountV2ZLayer|booking-step-z|v2Header\(|v2Shell\(/);
 
+// Public booking must not serialize independent startup/legal network requests.
+assert.match(booking, /Promise\.all\(\[\s*refreshContext\(state\),\s*getAccount\(state\.tenantId\),\s*\]\)/);
+assert.match(booking, /Promise\.all\(\[\s*getAccountPlatformState\(state\.tenantId\),\s*getAccountConsentState\(state\.tenantId\)/);
+
+// Date -> time uses one row calculation, not a second duplicate free-slot pass.
+const publicTimesStart = booking.indexOf('function renderTimes(state)');
+const publicTimesEnd = booking.indexOf('function confirmationCard', publicTimesStart);
+const publicTimes = booking.slice(publicTimesStart, publicTimesEnd);
+assert.match(publicTimes, /getBookingTimeRows\(/);
+assert.doesNotMatch(publicTimes, /getBookingSlots\(/);
+
+// Confirmation reacts immediately and relies on server-side conflict validation instead of a pre-submit context round-trip.
+const finalizeStart = booking.indexOf('async function finalizeBookingRequest');
+const finalizeEnd = booking.indexOf('function startBookingFlow', finalizeStart);
+const finalizeBlock = booking.slice(finalizeStart, finalizeEnd);
+const createIndex = finalizeBlock.indexOf('await createBookingRequest');
+assert.ok(createIndex > 0, 'booking confirmation must submit through createBookingRequest');
+assert.doesNotMatch(finalizeBlock.slice(0, createIndex), /await refreshContext\(/);
+assert.match(finalizeBlock, /if \(state\.confirming\) return/);
+assert.match(finalizeBlock, /action\.textContent = 'Записываем…'/);
+assert.match(booking, /action\.textContent = 'Сохраняем…'/);
+assert.match(booking, /submit\.textContent = 'Входим…'/);
+
 const context = {
   workplaces: [{ key: 'w1', name: 'A', timeZone: 'Europe/Moscow', from: '10:00', to: '14:00' }],
   procedures: [{ id: 'p1', name: 'P', duration: 30, workplaces: [{ workplaceId: 'w1' }] }],
