@@ -1,31 +1,43 @@
 import { getTimeGridRangeState, minutesToTime, timeToMinutes } from '../time/index.js';
 
-export const PERSON_RECORD_TIME_STEP = 5;
-
-export function buildPersonRecordTimeRows(grid, duration, { step = PERSON_RECORD_TIME_STEP } = {}) {
+function candidateMinutes(grid) {
   const start = timeToMinutes(grid?.plan?.from);
   const end = timeToMinutes(grid?.plan?.to);
-  const minutes = Math.max(0, Number(duration) || 0);
-  const increment = Math.max(1, Number(step) || PERSON_RECORD_TIME_STEP);
-  if (start == null || end == null || end <= start || minutes <= 0) return [];
+  if (start == null || end == null || end <= start) return [];
 
-  const rows = [];
-  for (let minute = Math.ceil(start / increment) * increment; minute < end; minute += increment) {
+  const values = new Set();
+
+  // Until a configurable booking step exists, the neutral baseline is one exact clock hour.
+  for (let minute = Math.ceil(start / 60) * 60; minute < end; minute += 60) values.add(minute);
+
+  // A real occupied interval can create an additional natural start when it ends.
+  // Example: a record ending at 12:30 exposes 12:30, then the next baseline is 13:00.
+  (Array.isArray(grid?.usages) ? grid.usages : []).forEach((usage) => {
+    const usageEnd = timeToMinutes(usage?.to);
+    if (usageEnd != null && usageEnd > start && usageEnd < end) values.add(usageEnd);
+  });
+
+  return [...values].sort((left, right) => left - right);
+}
+
+export function buildPersonRecordTimeRows(grid, duration) {
+  const minutes = Math.max(0, Number(duration) || 0);
+  if (minutes <= 0) return [];
+
+  return candidateMinutes(grid).map((minute) => {
     const from = minutesToTime(minute);
     const to = minutesToTime(minute + minutes);
-    if (!from) continue;
-    const availability = to
+    const availability = from && to
       ? getTimeGridRangeState(grid, { from, to })
       : { ok: false, reason: 'outside-working-time' };
-    rows.push({
-      value: from,
-      label: from,
+    return {
+      value: from || '',
+      label: from || '',
       available: Boolean(availability.ok),
       occupied: availability.reason === 'occupied',
       disabled: !availability.ok,
       state: availability.ok ? 'free' : availability.reason === 'occupied' ? 'occupied' : 'unavailable',
-      emphasized: minute % 30 === 0,
-    });
-  }
-  return rows;
+      emphasized: true,
+    };
+  }).filter((row) => row.value);
 }
