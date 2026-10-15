@@ -1,5 +1,6 @@
 import { button } from '../buttons/index.js';
 import { modal, mountModal } from '../modals/index.js';
+import { timeSlots } from '../time/index.js';
 
 const STEP_TITLES = {
   workplace: 'Рабочее пространство',
@@ -12,6 +13,41 @@ const STEP_TITLES = {
 
 export function recordCreationStepTitle(step = '') {
   return STEP_TITLES[String(step || '')] || 'Запись';
+}
+
+export function recordCreationTimeRows(items = [], {
+  data = 'data-record-creation-time',
+  empty = 'Времени нет.',
+  selected = '',
+} = {}) {
+  const values = (Array.isArray(items) ? items : [])
+    .map((item) => typeof item === 'object' ? { ...item } : { value: String(item || ''), label: String(item || '') })
+    .map((item) => ({
+      ...item,
+      value: String(item.value ?? item.from ?? item.label ?? ''),
+      label: String(item.label ?? item.value ?? item.from ?? ''),
+    }))
+    .filter((item) => item.value);
+  if (!values.length) return `<div class="muted">${String(empty || 'Времени нет.')}</div>`;
+
+  const groups = new Map();
+  values.forEach((item) => {
+    const hour = String(item.value).split(':')[0] || '';
+    if (!groups.has(hour)) groups.set(hour, []);
+    groups.get(hour).push(item);
+  });
+
+  return `<div class="record-creation-time-rows">${[...groups.entries()].map(([hour, slots]) => `
+    <section class="record-creation-time-row">
+      <div class="record-creation-time-row__hour">${hour}</div>
+      ${timeSlots({
+        values: slots,
+        selected,
+        data,
+        ariaLabel: `Выбор времени ${hour}:00`,
+        className: 'time-slots--hour-rows',
+      })}
+    </section>`).join('')}</div>`;
 }
 
 export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
