@@ -93,7 +93,7 @@ export function renderJournalDay(root, {
   initJournalDayTimeline(contentRoot, {
     onWorkFieldClick: () => onWorkplaceFieldClick(workplaceId),
     onUsageClick: ({ usageId }) => { void openUsage(usageById.get(String(usageId || '')), rerender); },
-    onSlotClick: async ({ from, to }) => {
+    onSlotClick: async ({ from }) => {
       const minuteState = getTimeAvailabilityAt({ date: dayDate, workplaceId, time: from });
       if (minuteState.state === 'occupied' && minuteState.usage) {
         const usage = usageById.get(String(minuteState.usage.sourceId || '')) || minuteState.usage;
@@ -101,8 +101,8 @@ export function renderJournalDay(root, {
         return;
       }
       if (minuteState.state !== 'free') return;
-      const { openRecordCreation } = await import('./record.js');
-      openRecordCreation({ date, workplaceId, from, to });
+      const { openRecordCreation } = await import('./record-creation-x.js');
+      openRecordCreation({ date, workplaceId, from, onCreated: rerender });
     },
   });
 }

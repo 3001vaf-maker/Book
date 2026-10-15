@@ -27,3 +27,10 @@
 
 .record-status-controls{display:grid;gap:8px}.record-status-controls .segment-control{margin-bottom:0}
 
+.modal-sheet.modal--bottom.record-creation-x{height:min(92dvh,760px);max-height:calc(100dvh - 12px);padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:hidden}
+.record-creation-flow{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px}
+.record-creation-flow__title{margin:0}.record-creation-flow__body{min-height:0;overflow:auto;overscroll-behavior:contain}.record-creation-flow__action:empty{display:none}
+.record-creation-time-rows{display:grid;gap:14px}.record-creation-time-row{display:grid;gap:8px}.record-creation-time-row__hour{font-size:14px;font-weight:750}
+.record-creation-x[data-record-creation-step="date"] .record-creation-flow__body{overflow:hidden}
+.record-creation-x[data-record-creation-step="person"] .record-screen--people{height:100%;min-height:0;padding:0}.record-creation-x[data-record-creation-step="person"] .record-person-list{min-height:0;overflow:auto}
+.record-creation-x .record-screen{padding-left:0;padding-right:0;padding-bottom:0}
