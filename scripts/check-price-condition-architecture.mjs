@@ -49,7 +49,7 @@ if (!paymentUi.includes("label: 'Условие'") || !paymentUi.includes('disab
 
 const browserRuntime = readFileSync('tests/professional-core-runtime-browser.html', 'utf8');
 for (const assertion of [
-  'existing price field must be editable',
+  'Payment Q1 base price must remain editable',
   'Editing existing Payment price must switch Header C to Save',
   'Editing existing Payment price must recalculate amount due',
   'Saving Payment price must persist Record procedures[].cost',
