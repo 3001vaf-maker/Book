@@ -49,7 +49,6 @@ export function recordCreationTimeRows(items = [], {
     selected,
     data,
     ariaLabel: 'Выбор времени',
-    className: 'time-slots--record-vertical',
   });
 }
 
