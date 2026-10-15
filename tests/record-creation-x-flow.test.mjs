@@ -8,17 +8,21 @@ const booking = fs.readFileSync('online-booking/booking-x.js', 'utf8');
 const day = fs.readFileSync('journal/день.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
 
-assert.match(owner, /variant: 'x'/);
+assert.match(owner, /variant: 'q'/);
+assert.doesNotMatch(owner, /variant: 'x'|xRole:/);
 assert.match(owner, /data-record-creation-body/);
-assert.doesNotMatch(owner, /mountV2ZLayer|variant: 'q'/);
+assert.doesNotMatch(owner, /mountV2ZLayer/);
 assert.match(owner, /workplace: 'Выбор пространства'/);
 assert.match(owner, /procedures: 'Выбор процедур'/);
 assert.match(owner, /date: 'Выбор даты'/);
 assert.match(owner, /time: 'Выбор времени'/);
 assert.match(owner, /person: 'Выбор клиента'/);
 assert.match(owner, /confirmation: 'Подтверждение записи'/);
+assert.match(owner, /'Выбор времени начала', 'Выбор времени С'/);
+assert.match(owner, /'Выбор времени до скольки', 'Выбор времени До'/);
 assert.doesNotMatch(owner, /record-creation-time-row__hour/);
 assert.match(recordCss, /record-creation-flow__title h2\{[^}]*font-size:20px/);
+assert.doesNotMatch(recordCss, /modal--bottom[^\n{]*record-creation|record-creation[^\n{]*modal--bottom|92dvh/);
 assert.match(day, /import\('\.\/record-creation-x\.js'\)/);
 assert.match(journal, /label: 'Запись'/);
 assert.match(journal, /label: 'Занять время'/);
@@ -59,4 +63,4 @@ assert.equal(occupied?.occupied, true, 'occupied slot must be explicitly marked'
 assert.equal(occupied?.disabled, true, 'occupied slot must not be selectable');
 assert.equal(free?.available, true, 'adjacent free slot must remain selectable');
 
-console.log('RecordCreation X flow tests passed');
+console.log('RecordCreation Q flow tests passed');
