@@ -138,10 +138,13 @@ async function refreshContext(state) {
 }
 
 async function loadLegalState(state) {
-  const platform = await getAccountPlatformState(state.tenantId);
-  state.accountTerms = platform?.document || state.accountTerms || await getAccountTerms();
+  const [platform, tenant] = await Promise.all([
+    getAccountPlatformState(state.tenantId),
+    getAccountConsentState(state.tenantId).catch(() => ({ pdnActive: false, consents: [] })),
+  ]);
+  state.accountTerms = platform?.document || state.accountTerms || null;
+  if (!state.accountTerms) state.accountTerms = await getAccountTerms();
   state.accountTermsAccepted = Boolean(platform?.accepted);
-  const tenant = await getAccountConsentState(state.tenantId).catch(() => ({ pdnActive: false, consents: [] }));
   seedTenantConsents(state, tenant?.consents || []);
   return { platform, tenant };
 }
@@ -203,6 +206,11 @@ function renderAccountEntry(root, state) {
       renderAccountEntry(root, state);
       return;
     }
+    const submit = root.querySelector('button[form="booking-x-entry-form"]');
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = 'Входим…';
+    }
     const data = new FormData(authForm);
     const identifier = String(data.get('identifier') || '').trim();
     const password = String(data.get('password') || '');
@@ -259,6 +267,11 @@ function renderAccountDetails(root, state) {
       state.error = 'Пароли не совпадают.';
       renderAccountDetails(root, state);
       return;
+    }
+    const submit = root.querySelector('button[form="booking-x-register-form"]');
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = 'Проверяем…';
     }
     const email = String(data.get('email') || '').trim().toLowerCase();
     const phone = String(data.get('phone') || '').trim();
@@ -321,8 +334,11 @@ function renderLegal(root, state, { registration = false } = {}) {
     state.consents[id] = !state.consents[id];
     renderLegal(root, state, { registration });
   }));
-  root.querySelector('[data-booking-x-legal-continue]')?.addEventListener('click', async () => {
+  root.querySelector('[data-booking-x-legal-continue]')?.addEventListener('click', async (event) => {
     if (!canContinue) return;
+    const action = event.currentTarget;
+    action.disabled = true;
+    action.textContent = 'Сохраняем…';
     try {
       if (!state.account) {
         const payload = await registerAccount(state.tenantId, {
@@ -375,6 +391,7 @@ function ensureBookingOwner(state) {
       state.date = '';
       state.from = '';
       state.to = '';
+      state.confirming = false;
       if (state.entry === 'account-booking') exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
     },
   });
@@ -474,12 +491,6 @@ function renderDates(state) {
 
 function renderTimes(state) {
   const owner = ensureBookingOwner(state);
-  const freeSlots = getBookingSlots(state.context, {
-    workplaceKey: state.workplaceKey,
-    date: state.date,
-    procedureIds: state.procedureIds,
-    step: state.settings.slotStep,
-  });
   const rows = getBookingTimeRows(state.context, {
     workplaceKey: state.workplaceKey,
     date: state.date,
@@ -493,7 +504,7 @@ function renderTimes(state) {
       : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.'),
   });
   view?.body?.querySelectorAll('[data-booking-x-time]:not(:disabled)').forEach((node) => node.addEventListener('click', () => {
-    const slot = freeSlots.find((item) => String(item.from) === String(node.dataset.bookingXTime));
+    const slot = rows.find((item) => item.available && String(item.from) === String(node.dataset.bookingXTime));
     if (!slot) return;
     state.from = slot.from;
     state.to = slot.to;
@@ -533,12 +544,23 @@ function renderConfirmation(state) {
   const view = owner?.render({
     step: 'confirmation',
     body: `${confirmationCard(state)}${formError(state.error)}`,
-    action: { label: 'Подтвердить', data: 'data-booking-x-confirm' },
+    action: {
+      label: state.confirming ? 'Записываем…' : 'Подтвердить',
+      data: 'data-booking-x-confirm',
+      disabled: state.confirming,
+    },
   });
   view?.action?.addEventListener('click', () => { void finalizeBookingRequest(state); });
 }
 
 async function finalizeBookingRequest(state) {
+  if (state.confirming) return;
+  state.confirming = true;
+  const action = state.flowOwner?.layer?.querySelector('[data-booking-x-confirm]');
+  if (action) {
+    action.disabled = true;
+    action.textContent = 'Записываем…';
+  }
   const stillAvailable = () => getBookingSlots(state.context, {
     workplaceKey: state.workplaceKey,
     date: state.date,
@@ -546,14 +568,6 @@ async function finalizeBookingRequest(state) {
     step: state.settings.slotStep,
   }).some((slot) => String(slot.from || '') === String(state.from || ''));
   try {
-    await refreshContext(state);
-    if (!stillAvailable()) {
-      state.error = 'Выбранное время уже недоступно. Выберите другое.';
-      state.from = '';
-      state.to = '';
-      renderTimes(state);
-      return;
-    }
     await createBookingRequest(state.tenantId, {
       workplaceKey: state.workplaceKey,
       date: state.date,
@@ -562,12 +576,14 @@ async function finalizeBookingRequest(state) {
     });
     state.flowOwner?.commit();
     state.flowOwner = null;
+    state.confirming = false;
     if (!exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId })) {
       document.querySelector('#app')?.replaceChildren();
       openNotice({ title: 'Запись создана', message: 'Запись отправлена специалисту.' });
     }
   } catch (error) {
     await refreshContext(state).catch(() => {});
+    state.confirming = false;
     if (state.from && !stillAvailable()) {
       state.error = 'Выбранное время уже занято или стало недоступно. Выберите другое.';
       state.from = '';
@@ -627,6 +643,7 @@ export async function renderOnlineBookingX(root, {
     accountTermsAccepted: false,
     consents: {},
     error: '',
+    confirming: false,
     entry: String(entry || ''),
     onExitToAccount,
     flowOwner: null,
@@ -639,8 +656,11 @@ export async function renderOnlineBookingX(root, {
 
   root.innerHTML = emptyState('Онлайн-запись', 'Загрузка…');
   try {
-    await refreshContext(state);
-    state.account = await getAccount(state.tenantId);
+    const [, account] = await Promise.all([
+      refreshContext(state),
+      getAccount(state.tenantId),
+    ]);
+    state.account = account;
     if (state.entry === 'account-booking') {
       if (state.account) await continueAfterIdentity(root, state);
       else renderAccountEntry(root, state);
