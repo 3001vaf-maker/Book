@@ -7,7 +7,7 @@ export const BOOKING_SLOT_STEPS = Object.freeze([5, 10, 15, 30, 60]);
 export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
   welcomeTitle: 'Рады видеть вас',
   welcomeText: 'Выберите удобное время для встречи — запись займёт всего пару минут.',
-  slotStep: 15
+  slotStep: 0
 });
 
 
