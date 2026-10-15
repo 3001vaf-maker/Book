@@ -14,12 +14,12 @@ export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
 export function normalizeBookingSettings(value = {}) {
   const source = value && typeof value === 'object' ? value : {};
   const defaults = DEFAULT_BOOKING_SETTINGS;
-  const slotStep = Number(source.slotStep);
   return {
     welcomeTitle: String(source.welcomeTitle || defaults.welcomeTitle).trim().slice(0, 90),
     welcomeText: String(source.welcomeText || defaults.welcomeText).trim().slice(0, 500),
-    slotStep: BOOKING_SLOT_STEPS.includes(slotStep) ? slotStep : defaults.slotStep
-
+    // Step configuration is intentionally inactive for now. Public booking uses
+    // natural starts: exact hours plus real occupied-interval end boundaries.
+    slotStep: 0
   };
 }
 
