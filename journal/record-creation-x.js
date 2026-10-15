@@ -2,21 +2,30 @@ import {
   durationText,
   field,
   initMultiSelect,
+  initViewNavigation,
+  miniCard,
   openNotice,
   openRecordCreationOwner,
   recordConfirmationMiniCard,
   recordCreationTimeRows,
   recordPersonList,
   recordProcedureList,
+  viewNavigation,
 } from '../ui/ui.js';
 import { createRecord } from '../core/record/index.js';
+import { createJournalBreak } from './break-service.js';
 import { getPeople } from '../core/people/data.js';
 import { personDisplay } from '../core/people/presentation.js';
 import { getProcedures } from '../core/service/procedures/data.js';
-import { checkTimeAvailability, getTimeAvailabilityAt, minutesToTime, timeToMinutes } from '../core/time/index.js';
+import { checkTimeAvailability, getTimeAvailabilityAt, listAvailableEndTimes, minutesToTime, timeToMinutes } from '../core/time/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../core/finance/index.js';
 import { journalRecordActionContext } from './record-action-context.js';
+
+const RECORD_MODES = [
+  { id: 'record', label: 'Запись' },
+  { id: 'block', label: 'Занять время' },
+];
 
 const people = () => getPeople();
 const procedures = () => getProcedures();
@@ -109,6 +118,7 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
     date: dateKey(date),
     workplaceId: String(workplaceId || ''),
     hourHint: String(from || ''),
+    mode: 'record',
     from: '',
     to: '',
     procedures: [],
@@ -336,18 +346,104 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
     render();
   };
 
+  const renderBreakConfirmation = () => {
+    const card = miniCard({
+      className: 'record-break-mini-card',
+      lines: [
+        { value: 'Перерыв', strong: true },
+        { value: formatDate(state.date), align: 'right' },
+        { value: `${state.from} - ${state.to}`, align: 'right' },
+      ],
+    });
+    const view = owner.render({
+      step: 'break-confirmation',
+      title: 'Подтверждение перерыва',
+      body: `<div class="record-screen record-screen--state-view">${card}</div>`,
+      action: { label: 'Подтвердить', data: 'data-record-break-confirm' },
+    });
+    view?.action?.addEventListener('click', () => {
+      const availability = checkTimeAvailability({
+        date: state.date,
+        workplaceId: state.workplaceId,
+        from: state.from,
+        to: state.to,
+      });
+      if (!availability.ok) {
+        openNotice({
+          title: 'Перерыв',
+          message: availability.reason === 'occupied' ? 'Это время уже занято.' : 'Это время находится вне рабочего периода.',
+        });
+        return;
+      }
+      const created = createJournalBreak({
+        workplaceId: state.workplaceId,
+        date: state.date,
+        from: state.from,
+        to: state.to,
+      });
+      if (!created) return;
+      owner.commit();
+      onCreated?.(created);
+    });
+  };
+
+  const renderBlockEnd = () => {
+    const values = listAvailableEndTimes({
+      date: state.date,
+      workplaceId: state.workplaceId,
+      from: state.from,
+      step: 5,
+    });
+    const view = owner.render({
+      step: 'break-end',
+      title: 'Выбор времени до скольки',
+      body: `<div class="record-screen record-screen--time">${recordCreationTimeRows(values, {
+        data: 'data-record-break-end',
+        empty: 'Свободного времени нет.',
+      })}</div>`,
+    });
+    view?.body?.querySelectorAll('[data-record-break-end]:not(:disabled)').forEach((node) => node.addEventListener('click', () => {
+      state.to = String(node.dataset.recordBreakEnd || '');
+      if (!state.to) return;
+      renderBreakConfirmation();
+    }));
+  };
+
   const renderTime = () => {
     const slots = hourSlots({ date: state.date, workplaceId: state.workplaceId, hint: state.hourHint });
+    const toggle = viewNavigation({
+      views: RECORD_MODES,
+      activeView: state.mode,
+      className: 'segment-control--two',
+      ariaLabel: 'Режим времени',
+    });
     const view = owner.render({
       step: 'time',
-      body: `<div class="record-screen record-screen--time">${recordCreationTimeRows(slots, {
+      title: state.mode === 'block' ? 'Выбор времени начала' : 'Выбор времени',
+      body: `<div class="record-screen record-screen--time">${toggle}${recordCreationTimeRows(slots, {
         data: 'data-record-create-time',
         empty: 'В этом часу нет рабочего времени.',
       })}</div>`,
     });
-    view?.body?.querySelectorAll('[data-record-create-time]:not(:disabled)').forEach((node) => node.addEventListener('click', () => {
+    if (!view?.body) return;
+    initViewNavigation(view.body, {
+      views: RECORD_MODES,
+      activeView: state.mode,
+      onChange: (nextMode) => {
+        if (!RECORD_MODES.some((item) => item.id === nextMode)) return;
+        state.mode = nextMode;
+        state.from = '';
+        state.to = '';
+        renderTime();
+      },
+    });
+    view.body.querySelectorAll('[data-record-create-time]:not(:disabled)').forEach((node) => node.addEventListener('click', () => {
       state.from = String(node.dataset.recordCreateTime || '');
       if (!state.from) return;
+      if (state.mode === 'block') {
+        renderBlockEnd();
+        return;
+      }
       renderProcedures();
     }));
   };
