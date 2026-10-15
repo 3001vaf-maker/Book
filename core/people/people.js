@@ -48,6 +48,7 @@ import { getPersonMetadata } from './metadata.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
+import { openPersonRecordCreation } from './record-creation.js';
 import { canUseRealPersonalData } from '../access.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
@@ -225,16 +226,24 @@ function openPersonDocuments(root, person) {
   return layer;
 }
 
-function historyItems(person, mode = 'all') {
+function historyItems(person, query = '') {
   const items = getPersonHistory(person.key);
-  return mode === 'record' ? items.filter((item) => item.kind === 'record')
-    : mode === 'finance' ? items.filter((item) => item.kind === 'finance')
-    : items;
+  const needle = String(query || '').trim().toLocaleLowerCase('ru');
+  if (!needle) return items;
+  return items.filter((item) => {
+    const kind = item.kind === 'finance' ? 'Продажа операция' : 'Запись';
+    const amount = item.amount == null ? '' : money(item.amount);
+    const moment = shortDateTime(item.occurredAt, '');
+    return [kind, item.title || '', item.subtitle || '', amount, moment]
+      .join(' ')
+      .toLocaleLowerCase('ru')
+      .includes(needle);
+  });
 }
 
-function personHistoryMarkup(person, mode = 'all') {
-  const items = historyItems(person, mode);
-  if (!items.length) return emptyState('Истории пока нет', 'Здесь появятся записи, продажи и связанные события.');
+function personHistoryMarkup(person, query = '') {
+  const items = historyItems(person, query);
+  if (!items.length) return emptyState(query ? 'Ничего не найдено' : 'Истории пока нет', query ? 'Измените запрос.' : 'Здесь появятся записи, продажи и связанные события.');
   return v2ListEntries(items.map((item, index) => v2ListEntry({
     overline: item.kind === 'finance' ? 'Продажа / операция' : 'Запись',
     title: item.title || (item.kind === 'finance' ? 'Финансовая операция' : 'Запись'),
@@ -256,8 +265,8 @@ function personQContext(person, { c = null } = {}) {
       image: person.photo || '',
       initials: initials(person),
       settingsTag: true,
-      data: 'data-person-consents',
-      aria: `Согласия ${name(person)}`,
+      data: 'data-person-settings',
+      aria: `Настройки ${name(person)}`,
     },
     c,
     d: {
@@ -285,26 +294,66 @@ function openPersonHistoryItemQ(root, person, item, options = {}) {
   return layer;
 }
 
-function bindPersonHistorySection(scope, person, options = {}) {
-  const picker = scope.querySelector('[data-person-history-filter]');
-  const host = scope.querySelector('[data-person-history-host]');
-  const bindRows = () => {
-    const items = historyItems(person, picker?.value || 'all');
+function openPersonHistoryQ(root, person, options = {}) {
+  const layer = mountModal(root, modal(`${personQContext(person)}<div data-person-history-host></div>`, {
+    title: 'История',
+    variant: 'q',
+    surface: 'app',
+    className: 'people-history-q',
+  }));
+  if (!layer) return null;
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (header) {
+    header.innerHTML = `<div class="people-history-search ui-search-field">
+      ${field({ name: 'personHistorySearch', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'data-person-history-search' })}
+      <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
+    </div>`;
+  }
+  const host = layer.querySelector('[data-person-history-host]');
+  const search = layer.querySelector('[data-person-history-search]');
+  const render = () => {
+    const query = String(search?.value || '').trim();
+    const items = historyItems(person, query);
+    if (host) host.innerHTML = personHistoryMarkup(person, query);
     host?.querySelectorAll('[data-person-history-item]').forEach((node) => {
       node.addEventListener('click', () => {
         const item = items[Number(node.dataset.personHistoryItem)];
-        if (item) openPersonHistoryItemQ(scope, person, item, options);
+        if (item) openPersonHistoryItemQ(layer, person, item, options);
       });
     });
   };
-  picker?.addEventListener('change', () => {
-    if (!host) return;
-    host.innerHTML = personHistoryMarkup(person, picker.value || 'all');
-    bindRows();
-  });
-  bindRows();
+  search?.addEventListener('input', render);
+  bindPersonContext(layer, person, options);
+  render();
+  return layer;
 }
 
+function openPersonSettings(root, person, options = {}) {
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Документы', { variant: 'secondary', data: 'data-person-settings-documents' })}
+    ${button('История', { variant: 'secondary', data: 'data-person-settings-history' })}
+    ${button('Запись', { variant: 'secondary', data: 'data-person-settings-record' })}
+  </div>`, {
+    title: 'Настройки',
+    variant: 'x',
+    surface: 'app',
+    xRole: 'action',
+  }));
+  if (!layer) return null;
+  layer.querySelector('[data-person-settings-documents]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPersonDocuments(root, person);
+  });
+  layer.querySelector('[data-person-settings-history]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPersonHistoryQ(root, person, options);
+  });
+  layer.querySelector('[data-person-settings-record]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPersonRecordCreation({ person });
+  });
+  return layer;
+}
 
 function birthMonth(value = '') {
   const match = String(value || '').match(/^(?:\d{4}-)?(\d{2})-(\d{2})$/);
@@ -629,8 +678,8 @@ function personContext(person) {
 }
 
 function bindPersonContext(root, person, options = {}) {
-  root.querySelector('[data-person-consents]')?.addEventListener('click', () => {
-    openPersonDocuments(root, person);
+  root.querySelector('[data-person-settings]')?.addEventListener('click', () => {
+    openPersonSettings(root, person, options);
   });
   root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
     options.onDirectChat?.(person.key);
@@ -661,19 +710,10 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   layer.innerHTML = page([
     personContext(person),
     relationships.markup,
-    v2Section('История', `<div class="form-grid">
-      ${select({ value: 'all', options: [
-        { value: 'all', label: 'Вся история' },
-        { value: 'record', label: 'Записи' },
-        { value: 'finance', label: 'Продажи / операции' },
-      ], aria: 'Фильтр истории', data: 'data-person-history-filter' })}
-      <div data-person-history-host>${personHistoryMarkup(person)}</div>
-    </div>`),
   ]);
   setV2ZHeaderRows(layer, [overviewCard(person)]);
   bindPersonContext(layer, person, options);
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
-  bindPersonHistorySection(layer, person, options);
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(layer, baseRoot, person.key, options, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
@@ -806,7 +846,6 @@ function saveBusinessEntries(all, ownerKey, fieldName, entries, memberKeys) {
     if (person) person[fieldName] = valuesBySource.get(key) || [];
   }
 }
-
 
 function savePersonUei(root, key) {
   const all = getAllPeople();
