@@ -6,7 +6,7 @@ import {
 } from '../core/booking-settings/index.js';
 
 assert.deepEqual(BOOKING_SLOT_STEPS, [5, 10, 15, 30, 60]);
-assert.equal(DEFAULT_BOOKING_SETTINGS.slotStep, 15);
+assert.equal(DEFAULT_BOOKING_SETTINGS.slotStep, 0);
 
 const settings = normalizeBookingSettings({
   welcomeTitle: 'Привет',
@@ -15,10 +15,10 @@ const settings = normalizeBookingSettings({
 });
 
 assert.equal(settings.welcomeTitle, 'Привет');
-assert.equal(settings.slotStep, 60);
+assert.equal(settings.slotStep, 0, 'booking step stays inactive until the feature is explicitly returned');
 assert.equal('theme' in settings, false);
 
 const invalid = normalizeBookingSettings({ slotStep: 7 });
-assert.equal(invalid.slotStep, 15);
+assert.equal(invalid.slotStep, 0);
 
 console.log('booking settings tests passed');
