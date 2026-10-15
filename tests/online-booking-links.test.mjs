@@ -69,8 +69,8 @@ assert.match(bookingSource, /label: 'Приветствие'/);
 assert.doesNotMatch(bookingSource, /label: 'Настройки уведомлений'/);
 assert.match(bookingSource, /variant: 'q'/);
 assert.match(bookingSource, /data-online-booking-welcome-save/);
-assert.match(bookingSource, /<span>Шаг записи<\/span>/);
-assert.match(bookingSource, /smallActionButton\(\{[\s\S]*icon: 'info'/);
+assert.doesNotMatch(bookingSource, /Шаг записи|data-online-booking-slot-step|data-online-booking-slot-info/);
+assert.doesNotMatch(bookingSource, /smallActionButton\(\{[\s\S]*icon: 'info'/);
 assert.doesNotMatch(bookingSource, /iconButton\(|v2ListEntry\(|v2ListEntries\(|twoColumnLayout\(/);
 assert.doesNotMatch(bookingSource, /label: 'Порядок отправки'|label: 'Канал 1'|label: 'Канал 2'|label: 'Канал 3'|getNotificationRouting|saveNotificationRouting/);
 assert.match(notificationSource, /data-notification-delivery-settings-open/);
@@ -84,5 +84,5 @@ assert.doesNotMatch(notificationSource, /initV2ListReorder|data-notification-mod
 assert.doesNotMatch(bookingSource, /Внешний вид|renderAppearance|BOOKING_SHAPES|BOOKING_CHOICE_STYLES|bookingThemePreview/);
 assert.doesNotMatch(settingsSource, /'communications', 'Уведомления'/);
 
-assert.match(bookingSource, /field-inline-label/);
+assert.doesNotMatch(bookingSource, /field-inline-label/);
 assert.match(bookingSource, /input-action-row/);

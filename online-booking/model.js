@@ -1,4 +1,11 @@
-import { createTimeGrid, listTimeGridAvailableStarts, timeToMinutes, minutesToTime, zonedDateTimeParts } from '../core/time/index.js';
+import {
+  buildNaturalBookingTimeRows,
+  createTimeGrid,
+  listTimeGridAvailableStarts,
+  timeToMinutes,
+  minutesToTime,
+  zonedDateTimeParts,
+} from '../core/time/index.js';
 
 function key(value) {
   return String(value || '');
@@ -84,7 +91,7 @@ export function getBookingOccupancy(context = {}, workplaceKey = '', date = '') 
     }));
 }
 
-function bookingTimeContext(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 15, notBefore = '', now = new Date() } = {}) {
+function bookingTimeContext(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 0, notBefore = '', now = new Date() } = {}) {
   const duration = bookingDuration(context, workplaceKey, procedureIds);
   const plan = getBookingDayPlan(context, workplaceKey, date);
   const workplace = getBookingWorkplace(context, workplaceKey);
@@ -108,12 +115,13 @@ function bookingTimeContext(context = {}, { workplaceKey = '', date = '', proced
     plan,
     usages: occupancy,
   });
+  const numericStep = Number(step);
   return {
     duration,
     plan,
     minimum,
     occupancy,
-    step: Math.max(1, Number(step) || 15),
+    step: Number.isFinite(numericStep) && numericStep > 0 ? numericStep : 0,
     grid,
   };
 }
@@ -121,6 +129,11 @@ function bookingTimeContext(context = {}, { workplaceKey = '', date = '', proced
 export function getBookingSlots(context = {}, options = {}) {
   const setup = bookingTimeContext(context, options);
   if (!setup) return [];
+  if (setup.step === 0) {
+    return buildNaturalBookingTimeRows(setup.grid, setup.duration, { notBefore: setup.minimum })
+      .filter((row) => row.available)
+      .map((row) => ({ from: row.from, to: row.to }));
+  }
   return listTimeGridAvailableStarts(setup.grid, {
     duration: setup.duration,
     step: setup.step,
@@ -134,6 +147,10 @@ export function getBookingSlots(context = {}, options = {}) {
 export function getBookingTimeRows(context = {}, options = {}) {
   const setup = bookingTimeContext(context, options);
   if (!setup) return [];
+  if (setup.step === 0) {
+    return buildNaturalBookingTimeRows(setup.grid, setup.duration, { notBefore: setup.minimum });
+  }
+
   const free = new Set(listTimeGridAvailableStarts(setup.grid, {
     duration: setup.duration,
     step: setup.step,

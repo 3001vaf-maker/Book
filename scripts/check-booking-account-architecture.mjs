@@ -98,7 +98,7 @@ expect(settings.includes("openSharedProfileSettingsMenu({") && settings.includes
 expect(!settings.includes('Внешний вид') && !settings.includes('renderAppearance') && !settings.includes('BOOKING_SHAPES') && !settings.includes('BOOKING_CHOICE_STYLES'), 'Legacy online-booking appearance customization must stay removed.');
 expect(!fs.existsSync('ui/booking/index.js') && !fs.existsSync('ui/booking/account-theme.css'), 'Legacy online-booking appearance code and stylesheet must stay physically removed.');
 expect(settings.includes('data-v2-primary-visible="false"') && settings.includes('setWelcomeSaveVisible') && settings.includes("label: 'Сохранить'"), 'Welcome Q Header C Save must appear only after a draft change.');
-expect(settings.includes('BOOKING_SLOT_STEPS.map') && settings.includes('<span>Шаг записи</span>') && settings.includes("value === 60 ? '1 час'") && settings.includes("label: ''"), 'Online booking Z1 must use the full-width canonical 5/10/15/30/60 Shared Select with the shared small info control in its label row.');
+expect(!settings.includes('BOOKING_SLOT_STEPS.map') && !settings.includes('<span>Шаг записи</span>') && !settings.includes('data-online-booking-slot-step'), 'Online booking Z1 must not expose a slot-step control while step configuration is inactive; time candidates stay natural until the feature is explicitly configured.');
 expect(notificationSettings.includes("data: 'data-notification-delivery-settings-open'")
   && notificationSettings.includes("label: 'Порядок отправки'")
   && notificationSettings.includes("label: 'Канал 1'")
@@ -107,7 +107,7 @@ expect(notificationSettings.includes("data: 'data-notification-delivery-settings
   && notificationSettings.includes('Push — всегда')
   && notificationSettings.includes("className: 'modal--form-sheet'"),
   'Notifications A/X must own one compact delivery policy; Push stays outside the Telegram/Email order.');
-expect(settings.includes('smallActionButton({') && settings.includes("icon: 'info'") && !settings.includes('v2ListEntry(') && !settings.includes('iconButton(') && !settings.includes('twoColumnLayout('), 'Online booking must reuse the one Shared small action control for info/copy and must not restore beige icon buttons or framed Push rows.');
+expect(!settings.includes("icon: 'info'") && !settings.includes('data-online-booking-slot-info') && !settings.includes('openSlotStepInfo'), 'Online booking must not expose slot-step help while step configuration is inactive.');
 expect(serverSync.includes("apiRequest('/business-state')"), 'Open Book must refresh from canonical server business state.');
 expect(v2Ui.includes('v2Header') && v2Ui.includes('v2Shell') && v2Ui.includes('v2CardDeck') && !v2Ui.includes('v2FDeck'), 'Shared ui/v2 must own one CardDeck geometry for F/E inside V2 H/Z.');
 expect(v2Css.includes('.v2-z') && v2Css.includes('border-radius:var(--v2-z-radius) 0 0 0'), 'Shared V2 CSS must keep only the Z upper-left corner rounded.');

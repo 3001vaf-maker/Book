@@ -18,8 +18,7 @@ import { procedureCostForWorkplace, proceduresForWorkplace } from '../service/pr
 import { checkTimeAvailability, getAvailabilityGrid, minutesToTime, timeToMinutes } from '../time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../workplace-time.js';
 import { personDisplay } from './presentation.js';
-
-const STEP_MINUTES = 5;
+import { buildPersonRecordTimeRows } from './record-time.js';
 
 function personSnapshot(person = {}) {
   return {
@@ -70,28 +69,7 @@ function totalDuration(selected = []) {
 
 function timeRows({ date, workplaceId, duration }) {
   const grid = getAvailabilityGrid({ date, workplaceId });
-  const start = timeToMinutes(grid?.plan?.from);
-  const end = timeToMinutes(grid?.plan?.to);
-  if (start == null || end == null || end <= start || duration <= 0) return [];
-  const rows = [];
-  for (let minute = Math.ceil(start / STEP_MINUTES) * STEP_MINUTES; minute < end; minute += STEP_MINUTES) {
-    const from = minutesToTime(minute);
-    const to = minutesToTime(minute + duration);
-    if (!from) continue;
-    const availability = to
-      ? checkTimeAvailability({ date, workplaceId, from, to })
-      : { ok: false, reason: 'outside-working-time' };
-    rows.push({
-      value: from,
-      label: from,
-      available: Boolean(availability.ok),
-      occupied: availability.reason === 'occupied',
-      disabled: !availability.ok,
-      state: availability.ok ? 'free' : availability.reason === 'occupied' ? 'occupied' : 'unavailable',
-      emphasized: minute % 30 === 0,
-    });
-  }
-  return rows;
+  return buildPersonRecordTimeRows(grid, duration);
 }
 
 export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) {
@@ -193,6 +171,17 @@ export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) 
       const start = timeToMinutes(from);
       const to = start == null ? '' : minutesToTime(start + duration);
       if (!from || !to) return;
+      const availability = checkTimeAvailability({
+        date: state.date,
+        workplaceId: state.workplaceId,
+        from,
+        to,
+      });
+      if (!availability.ok) {
+        openNotice({ title: 'Запись недоступна', message: 'Это время уже занято или стало недоступно.' });
+        renderTimes();
+        return;
+      }
       state.from = from;
       state.to = to;
       renderConfirmation();
