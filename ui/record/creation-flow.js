@@ -3,16 +3,30 @@ import { modal, mountModal } from '../modals/index.js';
 import { timeSlots } from '../time/index.js';
 
 const STEP_TITLES = {
-  workplace: 'Рабочее пространство',
-  procedures: 'Процедуры',
-  date: 'Дата',
-  time: 'Время',
-  person: 'Человек',
-  confirmation: 'Подтверждение',
+  workplace: 'Выбор пространства',
+  procedures: 'Выбор процедур',
+  date: 'Выбор даты',
+  time: 'Выбор времени',
+  person: 'Выбор клиента',
+  confirmation: 'Подтверждение записи',
+  'break-start': 'Выбор времени С',
+  'break-end': 'Выбор времени До',
+  'break-confirmation': 'Подтверждение перерыва',
 };
+
+const TITLE_ALIASES = new Map([
+  ['Выбор времени начала', 'Выбор времени С'],
+  ['Выбор времени до скольки', 'Выбор времени До'],
+]);
 
 export function recordCreationStepTitle(step = '') {
   return STEP_TITLES[String(step || '')] || 'Запись';
+}
+
+function resolveRecordCreationTitle(step = '', title = '') {
+  const explicit = String(title || '');
+  if (TITLE_ALIASES.has(explicit)) return TITLE_ALIASES.get(explicit);
+  return explicit || recordCreationStepTitle(step);
 }
 
 export function recordCreationTimeRows(items = [], {
@@ -39,7 +53,6 @@ export function recordCreationTimeRows(items = [], {
 
   return `<div class="record-creation-time-rows">${[...groups.entries()].map(([hour, slots]) => `
     <section class="record-creation-time-row">
-      <div class="record-creation-time-row__hour">${hour}</div>
       ${timeSlots({
         values: slots,
         selected,
@@ -58,11 +71,10 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
       <div class="record-creation-flow__action" data-record-creation-action></div>
     </div>`,
     {
-      variant: 'x',
+      variant: 'q',
       surface: 'app',
       title: 'Запись',
-      className: 'record-creation-x',
-      xRole: 'editor',
+      className: 'record-creation-q',
     },
   ));
   if (!layer) return null;
@@ -82,13 +94,13 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
 
   const render = ({
     step = '',
-    title = recordCreationStepTitle(step),
+    title = '',
     body = '',
     action = null,
   } = {}) => {
     if (!bodyHost || !actionHost || !titleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
-    titleHost.textContent = String(title || recordCreationStepTitle(step));
+    titleHost.textContent = resolveRecordCreationTitle(step, title);
     bodyHost.innerHTML = body;
     actionHost.innerHTML = action?.label
       ? button(action.label, {
