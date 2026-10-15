@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { hydrateDaysFromServer } from '../core/day/index.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
-import { checkTimeAvailability, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
+import { checkTimeAvailability, createTimeGrid, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
+import { buildPersonRecordTimeRows } from '../core/people/record-time.js';
 
 globalThis.window = { dispatchEvent() {} };
 
@@ -34,5 +35,21 @@ assert.equal(starts.includes('09:30'), true);
 assert.equal(starts.includes('10:00'), false);
 assert.equal(starts.includes('11:00'), true);
 assert.equal(starts.includes('12:00'), false);
+
+const personGrid = createTimeGrid({
+  date: '2026-10-16',
+  workplaceId: 'studio',
+  plan: { from: '11:00', to: '15:00' },
+  usages: [
+    { type: 'record', rigidity: 'hard', sourceId: 'record-12', from: '12:00', to: '13:00' },
+  ],
+});
+const personRows = new Map(buildPersonRecordTimeRows(personGrid, 60).map((row) => [row.value, row]));
+assert.equal(personRows.get('11:00')?.available, true, '11:00 must stay selectable when a one-hour procedure ends at 12:00');
+assert.equal(personRows.get('11:05')?.occupied, true, 'duration overlap with the 12:00 record must be occupied');
+assert.equal(personRows.get('11:05')?.disabled, true, 'duration overlap must be disabled');
+assert.equal(personRows.get('12:00')?.occupied, true, '12:00 must stay visible as occupied');
+assert.equal(personRows.get('12:00')?.disabled, true, 'occupied 12:00 must never be selectable');
+assert.equal(personRows.get('13:00')?.available, true, '13:00 must be free after the existing record ends');
 
 console.log('availability tests: OK');
