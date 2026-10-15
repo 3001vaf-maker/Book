@@ -93,4 +93,20 @@ assert.equal(occupied?.occupied, true, 'occupied slot must be explicitly marked'
 assert.equal(occupied?.disabled, true, 'occupied slot must not be selectable');
 assert.equal(free?.available, true, 'adjacent free slot must remain selectable');
 
+const naturalRows = getBookingTimeRows(context, {
+  workplaceKey: 'w1',
+  date: '2026-10-20',
+  procedureIds: ['p1'],
+  step: 0,
+  now: new Date('2026-10-19T08:00:00Z'),
+});
+assert.deepEqual(
+  naturalRows.map((row) => row.from),
+  ['10:00', '11:00', '11:30', '12:00', '13:00'],
+  'without an explicit booking step, public booking must show exact hours plus real occupied-end boundaries',
+);
+assert.equal(naturalRows.find((row) => row.from === '11:00')?.disabled, true);
+assert.equal(naturalRows.find((row) => row.from === '11:30')?.available, true);
+assert.equal(naturalRows.some((row) => row.from === '10:15'), false);
+
 console.log('RecordCreation Q flow tests passed');
