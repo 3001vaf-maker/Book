@@ -64,9 +64,12 @@ assert.match(recordViewSource, /\.\.\.state\.products\.map/);
 assert.match(recordViewSource, /name:\s*item\.name\s*\|\|\s*''/);
 assert.match(recordPaymentSource, /products:\s*sourcesFromSettlement/);
 assert.match(recordPaymentSource, /saveSettlementSnapshot/);
-// Payment uses the shared Z flow; product support must not restore the retired 88px sheet.
-assert.match(recordPaymentSource, /mountV2ZLayer\(/);
-assert.match(recordPaymentSource, /className: 'record-payment-z'/);
+// Payment is an action contour over the record: Q1/Q2 must cover Z without creating more Z layers.
+assert.match(recordPaymentSource, /mountPaymentQ\(/);
+assert.match(recordPaymentSource, /variant: 'q'/);
+assert.match(recordPaymentSource, /className: 'record-payment-q'/);
+assert.match(recordPaymentSource, /className: 'record-payment-allocation-q'/);
+assert.doesNotMatch(recordPaymentSource, /mountV2ZLayer|v2ZLayer|record-payment-z|record-payment-allocation-z/);
 assert.match(recordPaymentSource, /paymentForm\(/);
 assert.doesNotMatch(recordPaymentSource, /modal-bottom-action/);
 

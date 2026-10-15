@@ -7,7 +7,6 @@ import {
   initPaymentMethods,
   modal,
   mountModal,
-  mountV2ZLayer,
   openNotice,
   openSharedProfileSettingsMenu,
   paymentForm,
@@ -15,7 +14,6 @@ import {
   select,
   setRecordPrimaryAction,
   shortDate,
-  v2ZLayer,
   workspaceHeaderContext,
 } from '../ui/ui.js';
 import {
@@ -226,6 +224,22 @@ function bindPaymentChat(layer, record) {
   });
 }
 
+function mountPaymentQ(record, {
+  title = 'Оплата',
+  modalTitle = title,
+  context = '',
+  className = '',
+  hostData = 'data-record-payment-q-host',
+} = {}) {
+  const layer = mountModal(document.body, modal(
+    `${context || blankPaymentContext(record, title)}<div class="record-screen record-screen--state-view" ${hostData}></div>`,
+    { variant: 'q', surface: 'app', title: modalTitle, className },
+  ));
+  if (!layer) return null;
+  bindPaymentChat(layer, record);
+  return layer;
+}
+
 function paymentItems(settlement) {
   return (Array.isArray(settlement?.items) ? settlement.items : []).map((item) => ({
     sourceType: item.sourceType || 'procedure',
@@ -282,12 +296,13 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
     depositsForRecord(current),
     personalAccountForRecord(current, settlement, total),
   ]);
-  const layer = mountV2ZLayer(parentLayer, v2ZLayer(
-    `${blankPaymentContext(current)}<div class="record-screen record-screen--state-view" data-record-payment-allocation-host></div>`,
-    { className: 'record-payment-allocation-z' },
-  ), { stack: true });
+  const layer = mountPaymentQ(current, {
+    title: 'Оплата',
+    modalTitle: 'Проведение оплаты',
+    className: 'record-payment-allocation-q',
+    hostData: 'data-record-payment-allocation-host',
+  });
   if (!layer) return null;
-  bindPaymentChat(layer, current);
   const host = layer.querySelector('[data-record-payment-allocation-host]');
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
@@ -304,8 +319,9 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
       label: 'Оплатить',
       onClick: async () => {
         const dateValue = String(host.querySelector('input[name="recordPaymentDate"]')?.value || '');
+        let completed = null;
         try {
-          const completed = await recordPaymentIncome({
+          completed = await recordPaymentIncome({
             source: { type: 'record', id: current.id },
             workplace: workplaceName(current.workplaceId),
             person: recordPerson(current),
@@ -319,14 +335,23 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
             tips: allocationState.tips,
             occurredAt: recordPaymentOccurredAt(current, dateValue),
           });
-          if (!completed) return;
-          setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
-          await flushBusinessPersistence();
-          await refreshRecordsFromServer();
-          layer.v2Close?.();
-          onCompleted?.();
         } catch (error) {
           openNotice({ message: String(error?.message || 'Не удалось провести оплату') });
+          return;
+        }
+        if (!completed) return;
+
+        layer.v2Close?.();
+        onCompleted?.();
+        setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
+        try {
+          await flushBusinessPersistence();
+          await Promise.all([refreshRecordsFromServer(), refreshFinanceState()]);
+        } catch {
+          await Promise.all([
+            refreshRecordsFromServer().catch(() => null),
+            refreshFinanceState().catch(() => null),
+          ]);
         }
       },
     });
@@ -345,12 +370,12 @@ async function openPaymentCorrection(parentLayer, record, payment, onSaved) {
   const initialAllocations = paymentAllocations(payment);
   const initialDepositAllocations = paymentDepositAllocations(payment);
   const deposits = await depositsForRecord(record, payment);
-  const layer = mountV2ZLayer(parentLayer, v2ZLayer(
-    `${blankPaymentContext(record, 'Корректировка оплаты')}<div class="record-screen record-screen--state-view" data-record-payment-correction-host></div>`,
-    { className: 'record-payment-correction-z' },
-  ), { stack: true });
+  const layer = mountPaymentQ(record, {
+    title: 'Корректировка оплаты',
+    className: 'record-payment-correction-q',
+    hostData: 'data-record-payment-correction-host',
+  });
   if (!layer) return null;
-  bindPaymentChat(layer, record);
   const host = layer.querySelector('[data-record-payment-correction-host]');
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'Оплата', value: money(payment.total), strong: true }] })}
@@ -511,11 +536,17 @@ function renderPaymentLayer(layer, recordId) {
   const state = paymentStateForRecord(current);
   const payment = paymentFromRecord(current);
   const settlement = payment.settlement;
-  layer.innerHTML = `${paymentLayerContext(current, state)}
-    <div class="record-screen record-screen--state-view">
-      ${paymentForm({ workplace: payment.workplace, date: payment.date, time: payment.time, person: payment.person || {}, procedures: paymentItems(settlement), total: state.remaining, showActions: false })}
-    </div>`;
-  bindPaymentChat(layer, current);
+  const host = layer.querySelector('[data-record-payment-q-host]');
+  if (!host) { layer.v2Close?.(); return; }
+  host.innerHTML = paymentForm({
+    workplace: payment.workplace,
+    date: payment.date,
+    time: payment.time,
+    person: payment.person || {},
+    procedures: paymentItems(settlement),
+    total: state.remaining,
+    showActions: false,
+  });
   let formState = { settlement, total: state.remaining, dirty: false };
   const syncPrimary = () => {
     if (formState.dirty) {
@@ -534,11 +565,11 @@ function renderPaymentLayer(layer, recordId) {
     setRecordPrimaryAction(layer, {
       label: 'Оплатить',
       onClick: () => openPaymentAllocationLayer(layer, current, formState.settlement, () => {
-        if (layer.isConnected) renderPaymentLayer(layer, current.id);
+        layer.v2Close?.();
       }),
     });
   };
-  initPaymentForm(layer.querySelector('[data-payment-ui]'), {
+  initPaymentForm(host.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     paidTotal: state.paidTotal,
     onChange: (next) => { formState = next; syncPrimary(); },
@@ -547,14 +578,20 @@ function renderPaymentLayer(layer, recordId) {
     openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), () => {
       if (layer.isConnected) renderPaymentLayer(layer, current.id);
     });
-  });
+  }, { once: true });
   syncPrimary();
 }
 
-export function openRecordPayment(record, { host = null } = {}) {
+export function openRecordPayment(record) {
   if (!record?.id) return null;
   const current = getRecord(record.id) || record;
-  const layer = mountV2ZLayer(host || document.querySelector('[data-v2-workspace-surface]'), v2ZLayer('', { className: 'record-payment-z' }), { stack: true });
+  const state = paymentStateForRecord(current);
+  const layer = mountPaymentQ(current, {
+    title: 'Оплата',
+    context: paymentLayerContext(current, state),
+    className: 'record-payment-q',
+    hostData: 'data-record-payment-q-host',
+  });
   if (!layer) return null;
   renderPaymentLayer(layer, current.id);
   return layer;
