@@ -17,6 +17,7 @@ export {
   listTimeGridAvailableEnds,
   listTimeGridAvailableStarts,
 } from './grid.js';
+export { buildNaturalBookingTimeRows } from './booking-candidates.js';
 export {
   configureSoftTimeUsageReleaseSource,
   configureTimeUsageSource,
