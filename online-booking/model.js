@@ -84,33 +84,92 @@ export function getBookingOccupancy(context = {}, workplaceKey = '', date = '') 
     }));
 }
 
-export function getBookingSlots(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 15, notBefore = '', now = new Date() } = {}) {
+function bookingTimeContext(context = {}, { workplaceKey = '', date = '', procedureIds = [], step = 15, notBefore = '', now = new Date() } = {}) {
   const duration = bookingDuration(context, workplaceKey, procedureIds);
   const plan = getBookingDayPlan(context, workplaceKey, date);
   const workplace = getBookingWorkplace(context, workplaceKey);
-  if (!plan || duration <= 0 || !workplace) return [];
+  if (!plan || duration <= 0 || !workplace) return null;
 
   const clock = zonedDateTimeParts(now, workplace.timeZone);
   const dayKey = String(date || '').slice(0, 10);
-  if (dayKey < clock.date) return [];
+  if (dayKey < clock.date) return null;
 
   let minimum = String(notBefore || '');
   if (!minimum && dayKey === clock.date) {
     const minute = clock.minuteOfDay + (clock.second > 0 ? 1 : 0);
-    if (minute >= 24 * 60) return [];
+    if (minute >= 24 * 60) return null;
     minimum = minutesToTime(minute) || '';
   }
 
+  const occupancy = getBookingOccupancy(context, workplaceKey, date);
   const grid = createTimeGrid({
     date,
     workplaceId: workplaceKey,
     plan,
-    usages: getBookingOccupancy(context, workplaceKey, date),
+    usages: occupancy,
   });
-  return listTimeGridAvailableStarts(grid, { duration, step, from: minimum }).map((from) => ({
+  return {
+    duration,
+    plan,
+    minimum,
+    occupancy,
+    step: Math.max(1, Number(step) || 15),
+    grid,
+  };
+}
+
+export function getBookingSlots(context = {}, options = {}) {
+  const setup = bookingTimeContext(context, options);
+  if (!setup) return [];
+  return listTimeGridAvailableStarts(setup.grid, {
+    duration: setup.duration,
+    step: setup.step,
+    from: setup.minimum,
+  }).map((from) => ({
     from,
-    to: minutesToTime((timeToMinutes(from) ?? 0) + duration),
+    to: minutesToTime((timeToMinutes(from) ?? 0) + setup.duration),
   }));
+}
+
+export function getBookingTimeRows(context = {}, options = {}) {
+  const setup = bookingTimeContext(context, options);
+  if (!setup) return [];
+  const free = new Set(listTimeGridAvailableStarts(setup.grid, {
+    duration: setup.duration,
+    step: setup.step,
+    from: setup.minimum,
+  }));
+  const start = timeToMinutes(setup.plan.from);
+  const end = timeToMinutes(setup.plan.to);
+  const minimum = timeToMinutes(setup.minimum);
+  if (start == null || end == null || end <= start) return [];
+
+  const rows = [];
+  for (let minute = start; minute < end; minute += setup.step) {
+    if (minimum != null && minute < minimum) continue;
+    const from = minutesToTime(minute);
+    const to = minutesToTime(minute + setup.duration);
+    if (!from) continue;
+    const overlaps = setup.occupancy.some((usage) => {
+      const usageFrom = timeToMinutes(usage.from);
+      const usageTo = timeToMinutes(usage.to);
+      if (usageFrom == null || usageTo == null) return false;
+      return minute < usageTo && minute + setup.duration > usageFrom;
+    });
+    const available = free.has(from);
+    rows.push({
+      from,
+      to: to || '',
+      value: from,
+      label: from,
+      available,
+      occupied: overlaps,
+      disabled: !available,
+      state: available ? 'free' : overlaps ? 'occupied' : 'unavailable',
+      emphasized: minute % 30 === 0,
+    });
+  }
+  return rows;
 }
 
 export function requiredBookingDocuments(context = {}) {
