@@ -332,7 +332,7 @@ function openPersonSettings(root, person, options = {}) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Документы', { variant: 'secondary', data: 'data-person-settings-documents' })}
     ${button('История', { variant: 'secondary', data: 'data-person-settings-history' })}
-    ${button('Запись', { variant: 'secondary', data: 'data-person-settings-record' })}
+    ${button('Записать', { data: 'data-person-settings-record' })}
   </div>`, {
     title: 'Настройки',
     variant: 'x',
