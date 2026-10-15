@@ -66,12 +66,18 @@ assert.match(buildPages, /renderPwaIcons\(out\)/);
 assert.match(iconRenderer, /output: 'icon-192\.png'/);
 assert.match(iconRenderer, /output: 'pwa\/user\/icon-192\.png'/);
 
-// Approved C4 artwork: exact traced geometry must not be replaced by a look-alike.
-assert.match(appIconSvg, /M112 58 L161 148 L102 111 L168 156 Z/);
-assert.match(appIconSvg, /M141 154 L58 153 L103 86 L52 156 Z/);
+// Device-refined C4 artwork: keep the approved booking mark, readable open cabinet apex, and outer air.
+assert.match(appIconSvg, /rx="90\.5" ry="90\.5"/);
+assert.match(userIconSvg, /rx="90\.5" ry="90\.5"/);
+assert.match(appIconSvg, /M66\.2 150\.7 L108\.2 78\.7 L105\.8 77\.3 L63\.8 149\.3 Z/);
+assert.match(appIconSvg, /M113\.8 62\.7 L161\.8 150\.7 L164\.2 149\.3 L116\.2 61\.3 Z/);
+assert.match(appIconSvg, /M65 151\.4 L163 151\.4 L163 148\.6 L65 148\.6 Z/);
+assert.match(appIconSvg, /M101\.2 109\.2 L162\.2 151\.2 L163\.8 148\.8 L102\.8 106\.8 Z/);
 assert.match(userIconSvg, /M66 65 L110 162 L123 110 L111 143 Z/);
 assert.match(userIconSvg, /M111 80 L153 114 L123 148 L172 115 Z/);
-assert.match(iconRenderer, /\[\[112, 58\], \[161, 148\], \[102, 111\], \[168, 156\]\]/);
+assert.match(iconRenderer, /const RING_RX = 90\.5;/);
+assert.match(iconRenderer, /const RING_RY = 90\.5;/);
+assert.match(iconRenderer, /\[\[66\.2, 150\.7\], \[108\.2, 78\.7\], \[105\.8, 77\.3\], \[63\.8, 149\.3\]\]/);
 assert.match(iconRenderer, /\[\[66, 65\], \[110, 162\], \[123, 110\], \[111, 143\]\]/);
 
 assert.match(dockerfile, /COPY --from=frontend-build \/app\/_site \/app\/site/);

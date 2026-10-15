@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { v2ModalPortalGeometry } from '../ui/v2/geometry.js';
+import { currentVisualViewport, v2ModalPortalGeometry } from '../ui/v2/geometry.js';
 
 const baseHost={left:16,top:72,right:390,width:374,height:772,bottom:844};
 
@@ -28,6 +28,25 @@ const shiftedViewport=v2ModalPortalGeometry(
 );
 assert.equal(shiftedViewport.bottom,844);
 assert.equal(shiftedViewport.left,28);
+
+const originalWindow=globalThis.window;
+const originalDocument=globalThis.document;
+const originalGetComputedStyle=globalThis.getComputedStyle;
+globalThis.window={
+  visualViewport:{offsetLeft:0,offsetTop:0,width:390,height:508},
+  innerWidth:390,
+  innerHeight:844,
+};
+globalThis.document={documentElement:{}};
+globalThis.getComputedStyle=()=>({
+  getPropertyValue:(name)=>name==='--app-stable-vh'?'844px':name==='--app-stable-vw'?'390px':'',
+});
+const keyboardViewport=currentVisualViewport();
+assert.equal(keyboardViewport.width,390);
+assert.equal(keyboardViewport.height,508);
+if (originalWindow===undefined) delete globalThis.window; else globalThis.window=originalWindow;
+if (originalDocument===undefined) delete globalThis.document; else globalThis.document=originalDocument;
+if (originalGetComputedStyle===undefined) delete globalThis.getComputedStyle; else globalThis.getComputedStyle=originalGetComputedStyle;
 
 const core=fs.readFileSync(new URL('../core.js',import.meta.url),'utf8');
 const selectors=fs.readFileSync(new URL('../ui/selectors/index.js',import.meta.url),'utf8');

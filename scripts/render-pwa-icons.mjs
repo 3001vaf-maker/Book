@@ -7,13 +7,19 @@ const SIZE = 192;
 const SS = 4;
 const HI = SIZE * SS;
 const SCALE = BASE / HI;
+const RING_CX = 113.5;
+const RING_CY = 110.5;
+const RING_RX = 90.5;
+const RING_RY = 90.5;
 
 const ICONS = {
   cabinet: {
     output: 'icon-192.png',
     polygons: [
-      [[112, 58], [161, 148], [102, 111], [168, 156]],
-      [[141, 154], [58, 153], [103, 86], [52, 156]],
+      [[66.2, 150.7], [108.2, 78.7], [105.8, 77.3], [63.8, 149.3]],
+      [[113.8, 62.7], [161.8, 150.7], [164.2, 149.3], [116.2, 61.3]],
+      [[65, 151.4], [163, 151.4], [163, 148.6], [65, 148.6]],
+      [[101.2, 109.2], [162.2, 151.2], [163.8, 148.8], [102.8, 106.8]],
     ],
   },
   booking: {
@@ -87,12 +93,8 @@ function samplePixel(x, y, polygons) {
     color = mix(color, [91, 94, 100], edgeAlpha);
   }
 
-  const cx = 113.5;
-  const cy = 110.5;
-  const rx = 98.5;
-  const ry = 98.5;
-  const normalized = Math.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2);
-  const ringDistance = Math.abs(normalized - 1) * ((rx + ry) / 2);
+  const normalized = Math.sqrt(((x - RING_CX) / RING_RX) ** 2 + ((y - RING_CY) / RING_RY) ** 2);
+  const ringDistance = Math.abs(normalized - 1) * ((RING_RX + RING_RY) / 2);
 
   if (ringDistance < 6.5) {
     const glow = Math.exp(-(ringDistance * ringDistance) / 7.5) * 0.24;

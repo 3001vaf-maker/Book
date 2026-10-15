@@ -32,7 +32,7 @@ export function currentVisualViewport() {
   return {
     offsetLeft: Number(vv?.offsetLeft ?? 0),
     offsetTop: Number(vv?.offsetTop ?? 0),
-    width: Number(stableWidth || vv?.width || window.innerWidth || 0),
-    height: Number(stableHeight || vv?.height || window.innerHeight || 0),
+    width: Number(vv?.width || stableWidth || window.innerWidth || 0),
+    height: Number(vv?.height || stableHeight || window.innerHeight || 0),
   };
 }
