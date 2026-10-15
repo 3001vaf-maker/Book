@@ -35,6 +35,8 @@ const journalBreakViewUi = read('journal/break-view.js');
 const sharedRecordUi = read('ui/record/runtime.js');
 const sharedRecordCss = read('ui/record/record.css');
 const sharedInputsCss = read('ui/inputs/inputs.css');
+const sharedListEntryUi = read('ui/lists/list-entry.js');
+const sharedListEntryCss = read('ui/lists/list-entry.css');
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
   errors.push('core/record/data.js: Record data must remain persistence-only');
@@ -144,17 +146,17 @@ const sharedProcedureListSource = sharedRecordUi.slice(
   sharedRecordUi.indexOf('export function recordProcedureList'),
   sharedRecordUi.indexOf('export function recordPersonList')
 );
-if (!/v2-sticker-list/.test(sharedProcedureListSource)
-  || !/v2-service-sticker/.test(sharedProcedureListSource)
-  || !/v2-service-sticker__selector/.test(sharedProcedureListSource)
-  || !/aria-pressed/.test(sharedProcedureListSource)
-  || !/\.v2-sticker-list\{[^}]*gap:\s*10px/.test(sharedRecordCss)
-  || !/--record-procedure-name-size/.test(sharedProcedureListSource)
-  || !/\.v2-service-sticker\{[^}]*background:#fff/.test(sharedRecordCss)
-  || /\.v2-service-sticker\{[^}]*background:var\(--v2-beige\)/.test(sharedRecordCss)
-  || !/\.v2-service-sticker__text strong\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*clip/.test(sharedRecordCss)
-  || !/\.v2-service-sticker\.is-selected \.v2-service-sticker__selector::after\{content:'✓'\}/.test(sharedRecordCss)) {
-  errors.push('Shared Record procedure selection must use a neutral white sticker surface, keep full procedure names on one line without ellipsis, preserve spacing, and show the selected checkmark');
+if (!/v2ListEntry\(\{/.test(sharedProcedureListSource)
+  || !/v2ListEntries\(rows\)/.test(sharedProcedureListSource)
+  || !/selectable:\s*true/.test(sharedProcedureListSource)
+  || !/rightTop:/.test(sharedProcedureListSource)
+  || /v2-service-sticker|v2-sticker-list--services/.test(sharedProcedureListSource + sharedRecordCss)
+  || !/selectable\s*=\s*false/.test(sharedListEntryUi)
+  || !/list-entry__selector/.test(sharedListEntryUi)
+  || !/\.list-entry\{[^}]*min-height:78px[^}]*border:0[^}]*box-shadow:-9px 8px 14px -11px/.test(sharedListEntryCss)
+  || !/\.list-entry__selector\{[^}]*width:24px[^}]*height:24px/.test(sharedListEntryCss)
+  || !/\.list-entry\.is-selectable\.is-selected \.list-entry__selector::after\{content:'✓'\}/.test(sharedListEntryCss)) {
+  errors.push('Shared Record procedure selection must consume the canonical V2 List Entry sticker presentation and selected checkmark without a parallel service-sticker owner');
 }
 
 const procedureSettingsSource = journalRecordUi.slice(
@@ -181,7 +183,7 @@ for (const [name, source] of [
   ['Online booking procedure picker', onlineBookingProcedureSource],
 ]) {
   if (!/recordProcedureList\(/.test(source)) {
-    errors.push(`${name} must consume the Shared Record procedure sticker owner`);
+    errors.push(`${name} must consume the Shared Record procedure V2 List Entry adapter`);
   }
 }
 if (/function\s+openConfirmationProcedurePicker|function\s+openAddProcedurePicker/.test(journalRecordUi + journalRecordViewUi)) {

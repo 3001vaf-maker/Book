@@ -43,6 +43,7 @@ export function v2ListEntry({
   deleteAria = 'Удалить',
   reorderHandle = false,
   reorderAria = 'Переместить',
+  selectable = false,
   selected = false
 } = {}) {
   const columnValues = (Array.isArray(columns) ? columns : []).slice(0, 3);
@@ -69,15 +70,18 @@ export function v2ListEntry({
   const reorderAction = reorderHandle
     ? `<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="${escapeHtml(reorderAria)}"><span aria-hidden="true">⋮⋮</span></span>`
     : '';
+  const selectionAction = selectable
+    ? `<span class="list-entry__selector" aria-hidden="true"></span>`
+    : '';
   const firstLine = overline ? `<strong>${escapeHtml(overline)}</strong>` : '';
-  const classes = ['list-entry', image ? 'has-image' : '', columnMode ? 'list-entry--columns' : '', selected ? 'is-selected' : '', className].filter(Boolean).join(' ');
+  const classes = ['list-entry', image ? 'has-image' : '', columnMode ? 'list-entry--columns' : '', selectable ? 'is-selectable' : '', selected ? 'is-selected' : '', className].filter(Boolean).join(' ');
 
   if (columnMode) {
     return `<${tag} class="${classes}"${attrs}${style}>
       <span class="list-entry__background" aria-hidden="true"></span>
       <span class="list-entry__content">
         ${reorderAction}<span class="list-entry__columns">${columnValues.map((column, index) => `<span class="list-entry__column list-entry__column--${index + 1}">${columnLines(column)}</span>`).join('')}</span>
-        ${action}${deleteAction}
+        ${action}${deleteAction}${selectionAction}
       </span>
     </${tag}>`;
   }
@@ -86,7 +90,7 @@ export function v2ListEntry({
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
       ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
-      ${right}${toggleAction}${action}${deleteAction}
+      ${right}${toggleAction}${action}${deleteAction}${selectionAction}
     </span>
   </${tag}>`;
 }
