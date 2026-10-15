@@ -3,12 +3,12 @@ import { modal, mountModal } from '../modals/index.js';
 import { timeSlots } from '../time/index.js';
 
 const STEP_TITLES = {
-  workplace: 'Рабочее пространство',
-  procedures: 'Процедуры',
-  date: 'Дата',
-  time: 'Время',
-  person: 'Человек',
-  confirmation: 'Подтверждение',
+  workplace: 'Выбор пространства',
+  procedures: 'Выбор процедур',
+  date: 'Выбор даты',
+  time: 'Выбор времени',
+  person: 'Выбор клиента',
+  confirmation: 'Подтверждение записи',
 };
 
 export function recordCreationStepTitle(step = '') {
@@ -39,7 +39,6 @@ export function recordCreationTimeRows(items = [], {
 
   return `<div class="record-creation-time-rows">${[...groups.entries()].map(([hour, slots]) => `
     <section class="record-creation-time-row">
-      <div class="record-creation-time-row__hour">${hour}</div>
       ${timeSlots({
         values: slots,
         selected,
