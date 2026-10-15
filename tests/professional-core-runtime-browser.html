@@ -1113,18 +1113,20 @@ mark('journal-record-payment');
 shell()?.querySelector('[data-v2-workspace-primary]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(50);
-let paymentZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(paymentZ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата',
-  'Record C must open Payment Z3');
-ok(Boolean(paymentZ?.querySelector('[data-payment-ui]')), 'Payment Z3 shared form missing');
-let paymentPrice = paymentZ?.querySelector('[data-payment-price]');
-ok(Boolean(paymentPrice), 'Payment Z3 procedure price missing');
-ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'), 'Payment Z3 base price must be read-only is an obsolete contract; existing price field must be editable');
-ok(Boolean(paymentZ?.querySelector('input[data-payment-correction-percent]')), 'Payment Z3 manual percent price correction selector missing');
-ok(Boolean(paymentZ?.querySelector('[data-payment-correction-money]')), 'Payment Z3 manual money price correction field missing');
-ok(!paymentZ?.querySelector('[data-payment-discount-percent],[data-payment-discount-money]'), 'Payment Z3 must not expose retired discount controls');
+let paymentQ = [...document.querySelectorAll('[data-v2-q="true"]')].at(-1);
+ok(paymentQ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата',
+  'Record C must open Payment Q1 over the existing Record Z2');
+ok(Boolean(paymentQ?.querySelector('[data-payment-ui]')), 'Payment Q1 shared form missing');
+ok([...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1) === recordZ,
+  'Payment Q1 must cover Record Z2 without creating another Z');
+let paymentPrice = paymentQ?.querySelector('[data-payment-price]');
+ok(Boolean(paymentPrice), 'Payment Q1 procedure price missing');
+ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'), 'Payment Q1 base price must remain editable');
+ok(Boolean(paymentQ?.querySelector('input[data-payment-correction-percent]')), 'Payment Q1 manual percent price correction selector missing');
+ok(Boolean(paymentQ?.querySelector('[data-payment-correction-money]')), 'Payment Q1 manual money price correction field missing');
+ok(!paymentQ?.querySelector('[data-payment-discount-percent],[data-payment-discount-money]'), 'Payment Q1 must not expose retired discount controls');
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить',
-  'Payment Z3 C must be Pay when data is unchanged');
+  'Payment Q1 C must be Pay when data is unchanged');
 
 const originalPaymentFetch = window.fetch;
 let persistedPaymentRecord = null;
@@ -1179,13 +1181,13 @@ paymentPrice.dispatchEvent(new Event('input',{bubbles:true}));
 await wait(60);
 ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
   'Editing existing Payment price must switch Header C to Save');
-ok(paymentZ?.querySelector('[data-payment-summary]')?.textContent.includes('2 000'),
+ok(paymentQ?.querySelector('[data-payment-summary]')?.textContent.includes('2 000'),
   'Editing existing Payment price must recalculate amount due');
 
 shell()?.querySelector('[data-v2-workspace-primary]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await waitFor(() => {
-  const savedPrice = paymentZ?.querySelector('[data-payment-price]');
+  const savedPrice = paymentQ?.querySelector('[data-payment-price]');
   return Number(savedPrice?.value) === 2000
     && shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить';
 }, 'saved editable payment price');
@@ -1195,7 +1197,7 @@ ok(Number(persistedPaymentSettlement?.items?.[0]?.price) === 2000,
   'Saving Payment price must persist Settlement item price');
 
 mark('journal-record-payment-close');
-paymentZ?.v2Close?.();
+paymentQ?.v2Close?.();
 await wait(25);
 recordZ?.v2Close?.();
 await wait(35);
@@ -1210,13 +1212,27 @@ ok(/^\s*2\s*000\s*₽\s*$/.test(shell()?.querySelector('[data-v2-workspace-prima
 shell()?.querySelector('[data-v2-workspace-primary]')
   ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 await wait(50);
-paymentZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-paymentPrice = paymentZ?.querySelector('[data-payment-price]');
+paymentQ = [...document.querySelectorAll('[data-v2-q="true"]')].at(-1);
+paymentPrice = paymentQ?.querySelector('[data-payment-price]');
 ok(Number(paymentPrice?.value) === 2000, 'Reopened Payment must show saved price');
 ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'),
   'Reopened Payment price field must stay editable');
+
+mark('journal-record-payment-q2');
+shell()?.querySelector('[data-v2-workspace-primary]')
+  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+await wait(80);
+const paymentQs = [...document.querySelectorAll('[data-v2-q="true"]')];
+const paymentQ2 = paymentQs.at(-1);
+ok(paymentQs.length === 2, 'Pay must open Q2 over Q1');
+ok(paymentQ2 !== paymentQ && Boolean(paymentQ2?.querySelector('[data-record-payment-allocation-host]')),
+  'Q2 payment allocation form missing');
+ok([...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1) === recordZ,
+  'Q2 must cover the same Record Z2 without creating Z3/Z4');
+paymentQ2?.v2Close?.();
+await wait(25);
 window.fetch = originalPaymentFetch;
-paymentZ?.v2Close?.();
+paymentQ?.v2Close?.();
 await wait(25);
 recordZ?.v2Close?.();
 await wait(35);

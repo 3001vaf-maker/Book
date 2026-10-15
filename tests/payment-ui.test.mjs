@@ -211,7 +211,10 @@ assert.doesNotMatch(recordViewSource, /openRecordPaymentEntry|openPaidState|data
 assert.doesNotMatch(journalDaySource, /openRecordPaymentEntry/);
 
 assert.match(recordPaymentSource, /export function openRecordPayment/);
-assert.match(recordPaymentSource, /className: 'record-payment-z'/);
+assert.match(recordPaymentSource, /className: 'record-payment-q'/);
+assert.match(recordPaymentSource, /className: 'record-payment-allocation-q'/);
+assert.match(recordPaymentSource, /variant: 'q'/);
+assert.doesNotMatch(recordPaymentSource, /mountV2ZLayer|v2ZLayer|record-payment-z|record-payment-allocation-z|record-payment-correction-z/);
 assert.match(recordPaymentSource, /title: 'Оплата'/);
 assert.match(recordPaymentSource, /settingsTag:\s*true/);
 assert.match(recordPaymentSource, /hideD:\s*false/);
@@ -251,8 +254,8 @@ assert.match(recordPaymentSource, /readOnlyReceipt/);
 assert.doesNotMatch(recordPaymentSource, /datetime-local|refundOccurredAt|cancelOccurredAt|paymentOccurredAt/);
 assert.doesNotMatch(recordPaymentSource, /openRecordPaymentEntry|paymentEntryContent|openPaymentModal|openPaidState/);
 
-assert.match(recordPaymentSource, /blankPaymentContext\(current\)/);
-assert.match(recordPaymentSource, /blankPaymentContext\(record, 'Корректировка оплаты'\)/);
+assert.match(recordPaymentSource, /mountPaymentQ\(current/);
+assert.match(recordPaymentSource, /mountPaymentQ\(record/);
 assert.match(recordPaymentSource, /serviceAmount:\s*allocationState\.applied/);
 assert.match(recordPaymentSource, /tips:\s*allocationState\.tips/);
 assert.match(recordPaymentSource, /setRecordPrimaryAction\(layer, \{\s*label: 'Оплатить'/s);
