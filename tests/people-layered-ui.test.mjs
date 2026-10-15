@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
+const personRecord = readFileSync(new URL('../core/people/record-creation.js', import.meta.url), 'utf8');
+const procedureSelection = readFileSync(new URL('../core/service/procedures/selection.js', import.meta.url), 'utf8');
 const programs = readFileSync(new URL('../core/people/programs.js', import.meta.url), 'utf8');
 const viewState = readFileSync(new URL('../core/people/view-state.js', import.meta.url), 'utf8');
 const v2 = ['z-stack.js','modal-portal.js','swipe.js','workspace-navigation.js'].map((file) => readFileSync(new URL(`../ui/v2/${file}`, import.meta.url), 'utf8')).join('\n');
@@ -60,17 +62,63 @@ assert.match(people, /function openCreateX/);
 assert.match(people, /personCreateForm\(preset\)/);
 assert.doesNotMatch(people, /function openCreateZ2/);
 
-// Client overview stays Z2. A is the client photo/settings manifestation and opens only consents/documents X -> S.
+// Client overview stays Z2. A opens one action X; Documents remain their existing X -> S flow.
 assert.match(people, /mountV2ZLayer\([\s\S]*stack:\s*true/);
 assert.match(people, /people-overview-layer/);
 assert.match(people, /kind:\s*'avatar'/);
 assert.match(people, /settingsTag:\s*true/);
-assert.match(people, /data-person-consents/);
+assert.match(people, /data-person-settings/);
+assert.doesNotMatch(people, /data-person-consents/);
+assert.match(people, /function openPersonSettings/);
+assert.match(people, /title: 'Настройки',[\s\S]*variant: 'x',[\s\S]*xRole: 'action'/);
+assert.match(people, /button\('Документы'/);
+assert.match(people, /button\('История'/);
+assert.match(people, /button\('Запись'/);
 assert.match(people, /title: 'Документы \/ согласия', variant: 'x'/);
 assert.match(people, /variant: 's'/);
 assert.doesNotMatch(people, /openSharedProfileSettingsMenu\(/);
 assert.doesNotMatch(people, /id: 'code', label: 'Код'/);
-assert.doesNotMatch(people, /id: 'history', label: 'История'/);
+
+const personSettingsStart = people.indexOf('function openPersonSettings');
+const personSettingsEnd = people.indexOf('function birthMonth', personSettingsStart);
+const personSettings = people.slice(personSettingsStart, personSettingsEnd);
+assert.doesNotMatch(personSettings, /Удалить|Коррект/);
+
+// History is no longer embedded in the client body. It opens as Q: Q Header search + Q Body list.
+const overviewStart = people.indexOf('async function renderPersonOverview');
+const overviewEnd = people.indexOf('function openPersonRelationshipQ', overviewStart);
+const overview = people.slice(overviewStart, overviewEnd);
+assert.doesNotMatch(overview, /История|data-person-history/);
+assert.match(people, /function openPersonHistoryQ/);
+assert.match(people, /title: 'История'/);
+assert.match(people, /variant: 'q'/);
+assert.match(people, /data-v2-q-header-content/);
+assert.match(people, /data-person-history-search/);
+assert.match(people, /data-person-history-host/);
+assert.match(people, /personHistoryMarkup\(person, query\)/);
+assert.doesNotMatch(people, /data-person-history-filter/);
+assert.match(people, /people-history-q/);
+
+// Record action uses the canonical RecordCreation Q owner with a known person: no person-selection step.
+assert.match(people, /openPersonRecordCreation\(\{ person \}\)/);
+assert.match(personRecord, /openRecordCreationOwner\(\)/);
+assert.match(personRecord, /workplaces\.length === 1/);
+assert.match(personRecord, /step: 'workplace'/);
+assert.match(personRecord, /step: 'procedures'/);
+assert.match(personRecord, /step: 'date'/);
+assert.match(personRecord, /step: 'time'/);
+assert.match(personRecord, /step: 'confirmation'/);
+assert.match(personRecord, /getWorkplaceWorkingDates\(state\.workplaceId\)/);
+assert.match(personRecord, /initCalendar\(calendarRoot/);
+assert.match(personRecord, /recordCreationTimeRows\(rows/);
+assert.match(personRecord, /checkTimeAvailability\(/);
+assert.match(personRecord, /createRecord\(\{/);
+assert.match(personRecord, /person:\s*personSnapshot\(person\)/);
+assert.match(personRecord, /owner\.commit\(\)/);
+assert.doesNotMatch(personRecord, /step: 'person'|recordPersonList|data-person-record-person/);
+assert.doesNotMatch(personRecord, /mountV2ZLayer|v2ZLayer\(|variant:\s*'x'/);
+assert.match(procedureSelection, /procedureCostForWorkplace/);
+assert.match(procedureSelection, /procedureWorkplaceAssignment/);
 
 // Client card is canonical; its configured appearance is not duplicated in the client A menu.
 assert.match(people, /data-person-card/);
@@ -81,7 +129,7 @@ assert.match(people, /allowPhoto: false/);
 assert.doesNotMatch(people, /openPersonPhotoEditor/);
 assert.doesNotMatch(people, /metricRail\(/);
 
-// Z2 sections: programs, optional linked finance, and vertical history with built-in filter.
+// Z2 body keeps programs and optional linked finance; history moved out to its Q.
 assert.match(programs, /v2Section\('Программы', entityCardRail\(programCards\)\)/);
 assert.match(programs, /personalAccountVisualCard\(/);
 assert.match(programs, /\.\.\.deposits\.map\(depositCard\)/);
@@ -92,21 +140,16 @@ assert.match(programs, /\.\.\.bonuses\.map\(bonusCard\)/);
 assert.match(programs, /financeCards\.length \? v2Section\('Инвестиции \/ Займы'/);
 assert.match(programs, /cashEntityCardAppearance\(/);
 assert.match(programs, /cashEntityCardPhoto\(/);
-assert.match(people, /v2Section\('История'/);
-assert.match(people, /data-person-history-filter/);
-assert.match(people, /Вся история/);
-assert.match(people, /Продажи \/ операции/);
-assert.match(people, /people-history-q/);
+assert.doesNotMatch(overview, /v2Section\('История'/);
 
 // Program/finance cards and client data open Q, not another stacked Z.
 assert.match(people, /function openPersonRelationshipQ/);
 assert.match(people, /people-program-q/);
-assert.match(people, /variant: 'q'/);
 assert.match(people, /people-edit-q/);
 assert.doesNotMatch(people, /people-edit-layer/);
 assert.doesNotMatch(people, /data-person-z3-action/);
 
-// Client Q editor: UEI at the top, existing data sections retained, Save only when dirty, Delete only in body.
+// Client Q editor stays unchanged: Save when dirty; Delete remains in the Q body.
 const dataFieldsStart = people.indexOf('function personDataFields');
 const dataFieldsEnd = people.indexOf('function formSnapshot', dataFieldsStart);
 const dataFields = people.slice(dataFieldsStart, dataFieldsEnd);
