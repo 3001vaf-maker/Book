@@ -49,8 +49,8 @@ const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigi
 function personForRecord(record) {
   const source = record?.person || {};
   const people = getAllPeople();
-  return people.find((item) => String(item?.key ?? '') === String(source?.key ?? ''))
-    || people.find((item) => String(item?.id ?? '') === String(source?.id ?? ''))
+  return people.find((item) => String(item.key ?? '') === String(source?.key ?? ''))
+    || people.find((item) => String(item.id ?? '') === String(source?.id ?? ''))
     || source;
 }
 
@@ -304,8 +304,9 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
       label: 'Оплатить',
       onClick: async () => {
         const dateValue = String(host.querySelector('input[name="recordPaymentDate"]')?.value || '');
+        let completed = null;
         try {
-          const completed = await recordPaymentIncome({
+          completed = await recordPaymentIncome({
             source: { type: 'record', id: current.id },
             workplace: workplaceName(current.workplaceId),
             person: recordPerson(current),
@@ -319,14 +320,23 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
             tips: allocationState.tips,
             occurredAt: recordPaymentOccurredAt(current, dateValue),
           });
-          if (!completed) return;
-          setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
-          await flushBusinessPersistence();
-          await refreshRecordsFromServer();
-          layer.v2Close?.();
-          onCompleted?.();
         } catch (error) {
           openNotice({ message: String(error?.message || 'Не удалось провести оплату') });
+          return;
+        }
+        if (!completed) return;
+
+        layer.v2Close?.();
+        onCompleted?.();
+        setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
+        try {
+          await flushBusinessPersistence();
+          await Promise.all([refreshRecordsFromServer(), refreshFinanceState()]);
+        } catch {
+          await Promise.all([
+            refreshRecordsFromServer().catch(() => null),
+            refreshFinanceState().catch(() => null),
+          ]);
         }
       },
     });
@@ -534,7 +544,7 @@ function renderPaymentLayer(layer, recordId) {
     setRecordPrimaryAction(layer, {
       label: 'Оплатить',
       onClick: () => openPaymentAllocationLayer(layer, current, formState.settlement, () => {
-        if (layer.isConnected) renderPaymentLayer(layer, current.id);
+        layer.v2Close?.();
       }),
     });
   };
