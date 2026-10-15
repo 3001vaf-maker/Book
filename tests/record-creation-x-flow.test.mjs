@@ -7,6 +7,7 @@ const journal = fs.readFileSync('journal/record-creation-x.js', 'utf8');
 const booking = fs.readFileSync('online-booking/booking-x.js', 'utf8');
 const day = fs.readFileSync('journal/день.js', 'utf8');
 const recordCss = fs.readFileSync('ui/record/record.css', 'utf8');
+const timeCss = fs.readFileSync('ui/time/time.css', 'utf8');
 
 assert.match(owner, /variant: 'q'/);
 assert.doesNotMatch(owner, /variant: 'x'|xRole:/);
@@ -24,8 +25,8 @@ assert.match(owner, /'break-end': 'Выбор времени До'/);
 assert.match(owner, /'Выбор времени начала', 'Выбор времени С'/);
 assert.match(owner, /'Выбор времени до скольки', 'Выбор времени До'/);
 assert.doesNotMatch(owner, /record-creation-time-row__hour/);
-assert.match(owner, /time-slots--record-vertical/);
-assert.doesNotMatch(owner, /const groups = new Map|time-slots--hour-rows/);
+assert.doesNotMatch(owner, /time-slots--record-vertical|const groups = new Map|time-slots--hour-rows/);
+assert.match(timeCss, /\.time-slots\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 assert.match(recordCss, /record-creation-flow__title h2\{[^}]*font-size:20px/);
 assert.match(recordCss, /grid-template-rows:auto minmax\(0,1fr\) auto/);
 assert.doesNotMatch(recordCss, /modal--bottom[^\n{]*record-creation|record-creation[^\n{]*modal--bottom|92dvh/);
