@@ -11,6 +11,8 @@ assert.match(source, /className: 'record-payment-q'/,
   'payment calculation and correction surface must be Q1');
 assert.match(source, /className: 'record-payment-allocation-q'/,
   'payment allocation surface must be Q2');
+assert.match(source, /modalTitle: 'Проведение оплаты'/,
+  'Q2 must have a distinct application-modal key from Q1 so the shared Q owner does not reject it as a duplicate');
 
 const allocationStart = source.indexOf('async function openPaymentAllocationLayer');
 const correctionStart = source.indexOf('async function openPaymentCorrection');
