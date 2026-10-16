@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { isStartupCallAwaitedBeforeWorkspaceRender } from './runtime-startup-contract.mjs';
 
 function read(path) {
   return fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -14,7 +15,7 @@ const serverRecord = read('server/src/record/record.service.ts');
 const app = read('server/src/app.module.ts');
 const schema = read('server/prisma/schema.prisma');
 
-if (!core.includes('await loadBusinessState()')) failures.push('Authenticated runtime must hydrate People/UEI/Record from server before rendering.');
+if (!isStartupCallAwaitedBeforeWorkspaceRender(core, 'loadBusinessState()')) failures.push('Authenticated runtime must hydrate People/UEI/Record from server before rendering.');
 if (!people.includes('hydratePeopleFromServer') || !people.includes('queuePersonUpsert')) failures.push('Person owner must use server-hydrated runtime state and server writes.');
 if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) failures.push('UEI owner must use server-hydrated runtime state and server writes.');
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');
