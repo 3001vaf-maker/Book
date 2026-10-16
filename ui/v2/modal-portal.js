@@ -192,10 +192,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
   mountHost.appendChild(node);
   node.v2Portal = portalOwner?.portal || null;
-  if (qLayer) {
-    app?.classList.add('has-v2-q-modal');
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
-  }
+  if (qLayer) app?.classList.add('has-v2-q-modal');
 
   let disposeGesture = () => {};
   let veilDismissTimer = 0;
@@ -249,7 +246,6 @@ export function mountV2Layer(html, { root = null } = {}) {
       releaseHeaderLock();
       if (qLayer) app?.classList.remove('has-v2-q-modal');
     }
-    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
   const dismissThroughVeil = () => {
