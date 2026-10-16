@@ -11,8 +11,12 @@ const online = read('server/src/online-booking/online-booking.service.ts');
 const runtime = read('core/runtime/operational-state.js');
 const server = read('server/src/business-state/business-state.service.ts');
 const schema = read('server/prisma/schema.prisma');
+const authenticatedRuntime = core.slice(
+  core.indexOf('async function renderAuthenticated'),
+  core.indexOf('\nfunction renderLogin'),
+);
 
-if (!core.includes('await loadOperationalState()')) failures.push('Runtime must hydrate operational booking facts before rendering.');
+if (!/await Promise\.all\(\[[\s\S]*loadOperationalState\(\)[\s\S]*\]\);[\s\S]*renderWorkspace\(\)/.test(authenticatedRuntime)) failures.push('Runtime must hydrate operational booking facts before rendering.');
 if (!day.includes('hydrateDaysFromServer') || !day.includes("queueOperationalDataset('days'")) failures.push('Day must become server-owned after migration.');
 if (!breaks.includes('hydrateBreaksFromServer') || !breaks.includes('configureBreakPersistence') || !runtime.includes("queueOperationalDataset('breaks'")) failures.push('Break must become server-owned after migration.');
 if (!procedures.includes('hydrateProceduresFromServer') || !procedures.includes("queueOperationalDataset('procedures'")) failures.push('Procedures must become server-owned after migration.');
