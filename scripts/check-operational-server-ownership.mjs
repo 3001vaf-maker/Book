@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { isStartupCallAwaitedBeforeWorkspaceRender } from './runtime-startup-contract.mjs';
 
 function read(path) { return fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'); }
 const failures = [];
@@ -12,7 +13,7 @@ const runtime = read('core/runtime/operational-state.js');
 const server = read('server/src/business-state/business-state.service.ts');
 const schema = read('server/prisma/schema.prisma');
 
-if (!core.includes('await loadOperationalState()')) failures.push('Runtime must hydrate operational booking facts before rendering.');
+if (!isStartupCallAwaitedBeforeWorkspaceRender(core, 'loadOperationalState()')) failures.push('Runtime must hydrate operational booking facts before rendering.');
 if (!day.includes('hydrateDaysFromServer') || !day.includes("queueOperationalDataset('days'")) failures.push('Day must become server-owned after migration.');
 if (!breaks.includes('hydrateBreaksFromServer') || !breaks.includes('configureBreakPersistence') || !runtime.includes("queueOperationalDataset('breaks'")) failures.push('Break must become server-owned after migration.');
 if (!procedures.includes('hydrateProceduresFromServer') || !procedures.includes("queueOperationalDataset('procedures'")) failures.push('Procedures must become server-owned after migration.');
