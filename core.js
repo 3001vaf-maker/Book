@@ -710,9 +710,15 @@ function startRegularPlatformNotices() {
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
   await loadProfileState();
-  await loadBusinessState();
-  await loadOperationalState();
-  await loadAuxiliaryState();
+  await Promise.all([
+    (async () => {
+      await loadBusinessState();
+    })(),
+    (async () => {
+      await loadOperationalState();
+    })(),
+    loadAuxiliaryState(),
+  ]);
   await activateBookDemo();
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();
