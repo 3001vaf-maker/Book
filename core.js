@@ -670,14 +670,18 @@ function startRegularPlatformNotices() {
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
   await loadProfileState();
-  await loadBusinessState();
-  await loadOperationalState();
-  await loadTenantDocumentArchive();
-  await syncRknGuideIfReady().catch((error) => {
+
+  const documentStartup = loadTenantDocumentArchive().then(() => syncRknGuideIfReady().catch((error) => {
     console.error('RKN guide initial sync failed', error);
-  });
-  await loadAuxiliaryState();
-  await activateBookDemo();
+  }));
+  await Promise.all([
+    loadBusinessState(),
+    loadOperationalState(),
+    loadAuxiliaryState(),
+    activateBookDemo(),
+    documentStartup,
+  ]);
+
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
