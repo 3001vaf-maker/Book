@@ -15,6 +15,7 @@ import { loadBusinessState } from './core/runtime/business-state.js';
 import { loadOperationalState } from './core/runtime/operational-state.js';
 import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState } from './core/runtime/auxiliary-state.js';
+import { ensureProfessionalFeatureState } from './core/runtime/feature-readiness.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
@@ -482,8 +483,12 @@ function syncWorkspaceHeader(surface) {
   });
 }
 
-function renderActiveWorkspaceSurface(surface) {
+async function renderActiveWorkspaceSurface(surface, expectedRenderVersion) {
   const section = state.activeSection;
+  const child = ['finance', 'inventory', 'loyalty', 'settings'].includes(section) ? ensureSecondary(section) : '';
+  await ensureProfessionalFeatureState(section, child);
+  if (!surface?.isConnected || expectedRenderVersion !== workspaceRenderVersion || state.activeSection !== section) return () => {};
+
   const openNavigation = () => setNavigationOpen(true);
   if (section === 'people') return renderPeople(surface, {
     onDirectChat: (personKey) => navigate('chat', { navigationOpen: false, chatPersonKey: personKey }),
@@ -648,7 +653,7 @@ function renderWorkspace() {
     attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible', 'data-v2-primary-label', 'data-v2-primary-variant'],
   });
 
-  const result = surface && state.activeSection ? renderActiveWorkspaceSurface(surface) : null;
+  const result = surface && state.activeSection ? renderActiveWorkspaceSurface(surface, renderVersion) : null;
   Promise.resolve(result).then((nextDispose) => {
     if (disposed || renderVersion !== workspaceRenderVersion) {
       if (typeof nextDispose === 'function') nextDispose();
