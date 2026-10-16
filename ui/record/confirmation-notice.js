@@ -32,7 +32,6 @@ export function openRecordConfirmationNotice({
     free: Boolean(procedure?.free),
   }));
   const hasVariablePrice = Boolean(variable || rows.some((row) => row.variable));
-  const hasTotal = total != null || rows.length > 0;
   const resolvedTotal = total == null
     ? rows.reduce((sum, row) => sum + numberValue(row.value), 0)
     : numberValue(total);
@@ -45,7 +44,7 @@ export function openRecordConfirmationNotice({
     ${headline ? `<h2 class="record-confirmation-notice__headline">${escapeHtml(headline)}</h2>` : ''}
     ${moment ? `<div class="record-confirmation-notice__moment">${escapeHtml(moment)}</div>` : ''}
     ${rowsHtml ? `<div class="record-confirmation-notice__procedures">${rowsHtml}</div>` : ''}
-    ${hasTotal ? `<div class="record-confirmation-notice__total"><span>Итого</span><strong>${hasVariablePrice ? 'от ' : ''}${money(resolvedTotal)}</strong></div>` : ''}
+    <div class="record-confirmation-notice__total"><span>Итого</span><strong>${hasVariablePrice ? 'от ' : ''}${money(resolvedTotal)}</strong></div>
     <strong class="record-confirmation-notice__status">Запись подтверждена</strong>
   </div>`;
   return mountModal(document.body, modal(content, {

@@ -60,8 +60,6 @@ const modals=fs.readFileSync(new URL('../ui/modals/index.js',import.meta.url),'u
 const modalCss=fs.readFileSync(new URL('../ui/modals/modal.css',import.meta.url),'utf8');
 
 assert.match(core,/if \(target\.closest\('\[data-v2-layer\]'\)\) return;/);
-assert.match(core,/function activeWorkspaceSurface\(surface\) \{\s*const layers = \[\.\.\.app\.querySelectorAll\('\[data-v2-z-layer\]'\)\]/);
-assert.doesNotMatch(core,/activeWorkspaceSurface[\s\S]{0,240}data-v2-q/);
 assert.match(selectors,/mountModal\(trigger, modal\(content, \{ variant: 'x', title: 'Выбор', xRole: 'picker' \}\)\)/);
 assert.match(inputs,/searchable:\s*true/);
 assert.match(sharedProfile,/xRole:\s*'action'/);
@@ -83,12 +81,9 @@ assert.match(v2,/modalHeaderLocks/);
 assert.doesNotMatch(v2,/closeApplicationLayer\(current\)/);
 assert.match(v2,/document\.addEventListener\('click', handleOutsideClick, true\)/);
 assert.match(v2,/event\.stopImmediatePropagation\(\)/);
-assert.doesNotMatch(v2,/\.v2-header__slot--c \.v2-header__control/);
-assert.doesNotMatch(v2,/\.v2-header__slot--d \.v2-header__control/);
-assert.doesNotMatch(v2,/allowContextActions/);
-assert.match(v2,/lockModalHeader\(app\)/);
-assert.match(modals,/function bindQWorkspaceContext\(layer\)/);
-assert.match(modals,/data-modal-q-context-action/);
+assert.match(v2,/\.v2-header__slot--c \.v2-header__control/);
+assert.match(v2,/\.v2-header__slot--d \.v2-header__control/);
+assert.match(v2,/lockModalHeader\(app, \{ allowContextActions: true \}\)/);
 assert.match(css,/\.v2-layer-portal--viewport\{position:fixed/);
 assert.match(modals,/const X_ROLES = new Set\(\['action', 'editor', 'picker'\]\)/);
 assert.match(modals,/data-v2-x-role/);
@@ -98,6 +93,5 @@ assert.doesNotMatch(modals,/data-notice-close|action = 'ОК'/);
 assert.match(modals,/variant === 'x'\) return 'bottom'/);
 assert.match(modals,/variant === 's'\) return 'top'/);
 assert.match(modalCss,/modal--bottom\.modal--form-sheet/);
-assert.match(modalCss,/\.modal-q-context\{/);
 
 console.log('modal bottom geometry tests passed');

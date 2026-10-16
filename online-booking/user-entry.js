@@ -88,17 +88,13 @@ function numericCost(value) {
 async function showOnlineBookingConfirmation(route) {
   const records = await getGlobalAccountRecords().catch(() => []);
   const record = latestConfirmedRecord(records, route.tenantId);
-  if (!record) {
-    openRecordConfirmationNotice({ headline: 'Вы записаны' });
-    return;
-  }
-  const workplaceId = String(record.workplaceId || record.workplaceKey || route.workplaceKey || '');
+  const workplaceId = String(record?.workplaceId || record?.workplaceKey || route.workplaceKey || '');
   const context = route.tenantId
     ? await getBookingContext(route.tenantId, workplaceId).catch(() => ({}))
     : {};
   const catalog = new Map((Array.isArray(context?.procedures) ? context.procedures : [])
     .map((procedure) => [String(procedure?.id || ''), procedure]));
-  const recordedProcedures = Array.isArray(record.procedures) ? record.procedures : [];
+  const recordedProcedures = Array.isArray(record?.procedures) ? record.procedures : [];
   const fallbackIds = Array.isArray(route.procedureIds) ? route.procedureIds.map(String) : [];
   const procedureSources = recordedProcedures.length
     ? recordedProcedures
@@ -114,13 +110,13 @@ async function showOnlineBookingConfirmation(route) {
       free: pricing.free,
     };
   });
-  const finance = record.finance && typeof record.finance === 'object' ? record.finance : {};
+  const finance = record?.finance && typeof record.finance === 'object' ? record.finance : {};
   const calculated = procedures.reduce((sum, procedure) => sum + numericCost(procedure.value), 0);
-  const total = finance.planTotal ?? finance.serviceTotal ?? (procedures.length ? calculated : null);
+  const total = finance.planTotal ?? finance.serviceTotal ?? calculated;
   openRecordConfirmationNotice({
     headline: 'Вы записаны',
-    date: String(record.date || ''),
-    time: String(record.from || ''),
+    date: String(record?.date || ''),
+    time: String(record?.from || ''),
     procedures,
     total,
     variable: procedures.some((procedure) => procedure.variable),

@@ -35,7 +35,6 @@ expect(alphabet.includes('В корне Messenger Z1 D меняется на я�
 expect(alphabet.includes('Для обычного диалога D — скрепка/вложения'), 'UI alphabet must reserve dialog D for attachment.');
 expect(alphabet.includes('Информационный control `I`') && alphabet.includes('всегда находится в правой зоне `Z Header`'), 'UI alphabet must keep I on the right side of the surface header.');
 expect(alphabet.includes('S — только информационное/техническое сообщение'), 'UI alphabet must keep S informational only.');
-expect(alphabet.includes('Модалы Q/X/S не владеют A/B/C/D и не меняют Header приложения под собой'), 'UI alphabet must keep application Header ownership below modals.');
 expect(alphabet.includes('Текущее выбранное значение в закрытом select всегда визуально центрировано'), 'UI alphabet must keep selector values centered.');
 
 expect(shell.includes('data-v2-app style="--v2-base:#000000"'), 'Shared H owner must keep the application background black.');
@@ -89,12 +88,7 @@ expect(horizontalAffordance.includes('rail.children.length > 1') && horizontalAf
 expect(horizontalAffordanceCss.includes('.v2-section.has-v2-horizontal-rail') && horizontalAffordanceCss.includes('content:"→"') && horizontalAffordanceCss.includes('opacity:.72'), 'Horizontal rail cue must be clearly visible and visually distinct from the Z dismiss chevron.');
 expect(accountShell.includes('if (!canReuseScene) {') && accountShell.includes('root.innerHTML = v2Shell({'), 'End-user surfaces must keep the persistent Shared FEZ scene.');
 
-expect(
-  modalPortal.includes('// A/B/C/D always belong to the underlying screen, never to a modal.')
-    && !modalPortal.includes('allowContextActions')
-    && !modalPortal.includes('qHeaderAction'),
-  'Q veil must keep all A/B/C/D owned by the underlying screen and prevent Header actions through the veil.',
-);
+expect(modalPortal.includes('.v2-header__slot--c .v2-header__control, [data-v2-header] .v2-header__slot--d .v2-header__control'), 'Q veil must leave both Header C and D interactive.');
 expect(modalPortal.includes("if (qLayer && event.target.closest('[data-v2-z-dismiss]')) node.v2Close?.();"), 'Q Shared dismiss affordance must close only the active Q layer.');
 expect(modals.includes('S_INTERACTIVE_CONTENT') && modals.includes('S modal is informational only'), 'Shared S owner must reject buttons/forms/editors/pickers.');
 expect(modalCss.includes('.modal-sheet.modal--top > .document-tiles:has(+ .entity-details){display:none}'), 'Document S modal must show facts only and never duplicate the source document tile.');

@@ -98,15 +98,23 @@ function retainModalHeaderTarget(target) {
   };
 }
 
-function lockModalHeader(app) {
+function lockModalHeader(app, { allowContextActions = false } = {}) {
   const header = app?.querySelector?.('[data-v2-header]');
   if (!header) return () => {};
 
-  // A/B/C/D always belong to the underlying screen, never to a modal.
-  // Keep the Header pointer-addressable so any tap on the veil can dismiss
-  // the active modal, while the capture handler prevents the Header action.
-  const release = retainModalHeaderTarget(header);
-  return () => release();
+  const targets = allowContextActions
+    ? [
+        header.querySelector('.v2-header__slot--a'),
+        header.querySelector('.v2-header__title'),
+      ].filter(Boolean)
+    : [header];
+
+  // Header remains pointer-addressable on purpose: outside input must reach the
+  // Shared modal owner so the veil can dismiss the active modal. The capture
+  // handler below consumes that input before any underlying Header action runs.
+  // Using inert here would make locked Header zones dead instead of veil-dismiss zones.
+  const releases = targets.map(retainModalHeaderTarget);
+  return () => releases.forEach((release) => release());
 }
 
 function applicationLayers() {
@@ -174,7 +182,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const releaseHeaderLock = technical
     ? () => {}
     : (qLayer
-        ? lockModalHeader(app)
+        ? lockModalHeader(app, { allowContextActions: true })
         : (locksHeader
             ? () => {
                 if (!header) return;
@@ -192,7 +200,10 @@ export function mountV2Layer(html, { root = null } = {}) {
   }
   mountHost.appendChild(node);
   node.v2Portal = portalOwner?.portal || null;
-  if (qLayer) app?.classList.add('has-v2-q-modal');
+  if (qLayer) {
+    app?.classList.add('has-v2-q-modal');
+    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  }
 
   let disposeGesture = () => {};
   let veilDismissTimer = 0;
@@ -215,7 +226,10 @@ export function mountV2Layer(html, { root = null } = {}) {
     const foreignLayer = event.target.closest?.('[data-v2-layer]');
     if (foreignLayer && foreignLayer !== node) return true;
     const sheet = node.querySelector(':scope > .v2-layer');
-    return Boolean(sheet?.contains(event.target));
+    if (sheet?.contains(event.target)) return true;
+    if (!qLayer) return false;
+    const qHeaderAction = event.target.closest?.('[data-v2-header] .v2-header__slot--c .v2-header__control, [data-v2-header] .v2-header__slot--d .v2-header__control');
+    return Boolean(qHeaderAction && app?.contains?.(qHeaderAction));
   };
 
   const resetVeilPointer = () => {
@@ -246,6 +260,7 @@ export function mountV2Layer(html, { root = null } = {}) {
       releaseHeaderLock();
       if (qLayer) app?.classList.remove('has-v2-q-modal');
     }
+    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
   };
 
   const dismissThroughVeil = () => {

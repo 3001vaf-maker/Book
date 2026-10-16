@@ -186,21 +186,21 @@ for (const [name, engine, contextOptions] of [
     await activateSelector('[data-test-under-veil]');
     assert.equal(await page.locator('[data-test-under-veil-count]').textContent(), '1', `${name}: Z action did not fire on the next clean tap after veil dismissal`);
 
-    // Q owns no application Header actions. A/B/C/D remain part of the underlying
-    // screen, so tapping any actionable Header slot dismisses Q through the veil
-    // and must never fire that underlying action.
-    for (const [selector, counter] of [
-      ['[data-test-header-c]', '[data-test-header-c-count]'],
-      ['[data-test-header-d]', '[data-test-header-d-count]'],
-      ['[data-test-header-a]', '[data-test-header-a-count]'],
-    ]) {
-      await tapOrClick(page.locator('[data-test-open-q]'));
-      await page.locator('[data-test-q-content]').waitFor();
-      assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
-      await activateSelector(selector);
-      await page.locator('[data-modal]').waitFor({ state: 'detached' });
-      assert.equal(await page.locator(counter).textContent(), '0', `${name}: underlying Header action fired through Q veil`);
-    }
+    // Q keeps contextual Header C active. This isolated fixture does not load the Messenger owner,
+    // so raw Header D remains locally addressable and must not destroy Q.
+    await tapOrClick(page.locator('[data-test-open-q]'));
+    await page.locator('[data-test-q-content]').waitFor();
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q missing or duplicated`);
+    await activateSelector('[data-test-header-c]');
+    assert.equal(await page.locator('[data-test-header-c-count]').textContent(), '1', `${name}: Q-owned Header C did not fire`);
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: Q-owned Header C dismissed Q`);
+    await activateSelector('[data-test-header-d]');
+    assert.equal(await page.locator('[data-test-header-d-count]').textContent(), '1', `${name}: raw fixture Header D did not fire`);
+    assert.equal(await page.locator('[data-modal]').count(), 1, `${name}: raw fixture Header D destroyed Q`);
+    assert.equal(await page.locator('[data-test-q-content]').count(), 1, `${name}: Q was lost after raw fixture Header D`);
+    await activateSelector('[data-test-header-a]');
+    await page.locator('[data-modal]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('[data-test-header-a-count]').textContent(), '0', `${name}: Header A fired through Q veil`);
 
     // Journal selector is a picker X over its editor X, then the selected workplace commits the owning control.
     for (let cycle = 0; cycle < 3; cycle += 1) {
@@ -238,7 +238,7 @@ for (const [name, engine, contextOptions] of [
     }
     assert.deepEqual(errors, [], `${name}: browser errors`);
     results.push({ name, result: 'PASS' });
-    console.log(`${name}: PASS (stable Z Header/Body, X action→editor→picker, Journal time discard/save, selectors, veil ownership, Q header independence, 10 sheet variants)`);
+    console.log(`${name}: PASS (stable Z Header/Body, X action→editor→picker, Journal time discard/save, selectors, veil ownership, Q C/D, 10 sheet variants)`);
   } finally {
     await browser.close();
   }
