@@ -13,7 +13,7 @@ import { getWorkplaces as getWorkplaceEntities } from './core/profile/workplaces
 import { loadProfileState } from './core/profile/runtime.js';
 import { loadBusinessState } from './core/runtime/business-state.js';
 import { loadOperationalState } from './core/runtime/operational-state.js';
-import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
+import { ensureRknGuide, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState } from './core/runtime/auxiliary-state.js';
 import { ensureProfessionalFeatureState } from './core/runtime/feature-readiness.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
@@ -712,10 +712,6 @@ async function renderAuthenticated(account = authenticatedAccount) {
   await loadProfileState();
   await loadBusinessState();
   await loadOperationalState();
-  await loadTenantDocumentArchive();
-  await syncRknGuideIfReady().catch((error) => {
-    console.error('RKN guide initial sync failed', error);
-  });
   await loadAuxiliaryState();
   await activateBookDemo();
   if (getBookAccess().status === 'SUSPENDED') {
