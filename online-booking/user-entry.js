@@ -152,7 +152,7 @@ async function renderPublicBooking(route) {
       const confirmed = recordCreationCommitted;
       recordCreationCommitted = false;
       history.replaceState({}, '', '/');
-      await renderGlobalClientRoot(confirmed ? { tab: 'home' } : target);
+      await renderGlobalClientRoot(target);
       if (confirmed) await showOnlineBookingConfirmation(route);
     },
   });
