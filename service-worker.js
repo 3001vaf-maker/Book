@@ -7,23 +7,31 @@ function versionedStaticRequest(request) {
   return /\.(?:js|mjs|css)$/i.test(url.pathname);
 }
 
-async function cachedVersionedAsset(request) {
-  const url = new URL(request.url);
-  const build = String(url.searchParams.get('build') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'build';
-  const cacheName = `${STATIC_CACHE_PREFIX}${build}`;
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) return cached;
+function versionedAssetResponse(request, event) {
+  let cacheWrite = Promise.resolve();
+  const responsePromise = (async () => {
+    const url = new URL(request.url);
+    const build = String(url.searchParams.get('build') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'build';
+    const cacheName = `${STATIC_CACHE_PREFIX}${build}`;
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
 
-  const response = await fetch(request);
-  if (response.ok) {
-    await cache.put(request, response.clone());
-    const names = await caches.keys();
-    await Promise.all(names
-      .filter((name) => name.startsWith(STATIC_CACHE_PREFIX) && name !== cacheName)
-      .map((name) => caches.delete(name)));
-  }
-  return response;
+    const response = await fetch(request);
+    if (response.ok) {
+      cacheWrite = (async () => {
+        await cache.put(request, response.clone());
+        const names = await caches.keys();
+        await Promise.all(names
+          .filter((name) => name.startsWith(STATIC_CACHE_PREFIX) && name !== cacheName)
+          .map((name) => caches.delete(name)));
+      })();
+    }
+    return response;
+  })();
+
+  event.waitUntil(responsePromise.then(() => cacheWrite).catch(() => {}));
+  return responsePromise;
 }
 
 self.addEventListener('install', () => {
@@ -36,7 +44,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (!versionedStaticRequest(event.request)) return;
-  event.respondWith(cachedVersionedAsset(event.request));
+  event.respondWith(versionedAssetResponse(event.request, event));
 });
 
 async function syncAppBadge(count) {
