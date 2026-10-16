@@ -39,13 +39,13 @@ const END_USER_APP_HOSTS = new Set([
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
-  { id: 'finance', label: 'Финансы', capability: '' },
-  { id: 'inventory', label: 'Склад', capability: '' },
-  { id: 'loyalty', label: 'Лояльность', capability: '' },
-  { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
+  { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'service', label: 'Сервис', capability: 'services.access' },
+  { id: 'loyalty', label: 'Лояльность', capability: '' },
+  { id: 'finance', label: 'Финансы', capability: '' },
+  { id: 'inventory', label: 'Склад', capability: '' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
