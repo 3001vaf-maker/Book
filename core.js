@@ -718,8 +718,8 @@ async function renderAuthenticated(account = authenticatedAccount) {
       await loadOperationalState();
     })(),
     loadAuxiliaryState(),
+    activateBookDemo(),
   ]);
-  await activateBookDemo();
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
