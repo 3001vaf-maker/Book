@@ -9,12 +9,13 @@ import {
   recordProcedureList,
   recordWorkplaceCards,
 } from '../../ui/ui.js';
+import { openRecordConfirmationNotice } from '../../ui/record/confirmation-notice.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
 import { getProfile } from '../profile/data.js';
 import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../profile/card-presentation.js';
 import { createRecord } from '../record/index.js';
 import { getProcedures } from '../service/procedures/data.js';
-import { procedureCostForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
+import { procedureCostForWorkplace, procedurePricingForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
 import { checkTimeAvailability, getAvailabilityGrid, minutesToTime, timeToMinutes } from '../time/index.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../workplace-time.js';
 import { personDisplay } from './presentation.js';
@@ -152,8 +153,24 @@ export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) 
         openNotice({ title: 'Запись недоступна', message: 'Не удалось создать запись.' });
         return;
       }
+      const noticeProcedures = state.procedures.map((entry) => {
+        const pricing = procedurePricingForWorkplace(entry.procedure, state.workplaceId);
+        return {
+          name: entry.procedure?.name || '',
+          value: entry.cost === '' || entry.cost == null ? pricing.value : entry.cost,
+          variable: pricing.variable,
+          free: pricing.free,
+        };
+      });
       owner.commit();
       onCreated?.(created);
+      openRecordConfirmationNotice({
+        date: state.date,
+        time: state.from,
+        procedures: noticeProcedures,
+        total: settlement.planTotal,
+        variable: noticeProcedures.some((entry) => entry.variable),
+      });
     });
   };
 

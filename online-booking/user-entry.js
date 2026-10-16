@@ -1,4 +1,6 @@
-import { resolveBookingPublicRoute } from '../core/account/index.js';
+import { getBookingContext, getGlobalAccountRecords, resolveBookingPublicRoute } from '../core/account/index.js';
+import { procedurePricingForWorkplace } from '../core/service/procedures/selection.js';
+import { openRecordConfirmationNotice } from '../ui/record/confirmation-notice.js';
 import { renderGlobalClient } from './booking.js';
 import { renderOnlineBookingX as renderOnlineBooking } from './booking-x.js';
 import { startAccountRuntime } from './account-runtime.js';
@@ -63,6 +65,64 @@ async function bookingRoute() {
   }
 }
 
+function recordCreatedMoment(record = {}) {
+  const value = Date.parse(record?.createdAt || record?.updatedAt || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function latestConfirmedRecord(records = [], tenantId = '') {
+  const id = String(tenantId || '');
+  const scoped = (Array.isArray(records) ? records : []).filter((record) => {
+    const recordTenantId = String(record?.tenantId || '');
+    const status = String(record?.status || '').toLowerCase();
+    return status !== 'cancelled' && (!recordTenantId || !id || recordTenantId === id);
+  });
+  return scoped.sort((a, b) => recordCreatedMoment(b) - recordCreatedMoment(a))[0] || null;
+}
+
+function numericCost(value) {
+  const number = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
+async function showOnlineBookingConfirmation(route) {
+  const records = await getGlobalAccountRecords().catch(() => []);
+  const record = latestConfirmedRecord(records, route.tenantId);
+  const workplaceId = String(record?.workplaceId || record?.workplaceKey || route.workplaceKey || '');
+  const context = route.tenantId
+    ? await getBookingContext(route.tenantId, workplaceId).catch(() => ({}))
+    : {};
+  const catalog = new Map((Array.isArray(context?.procedures) ? context.procedures : [])
+    .map((procedure) => [String(procedure?.id || ''), procedure]));
+  const recordedProcedures = Array.isArray(record?.procedures) ? record.procedures : [];
+  const fallbackIds = Array.isArray(route.procedureIds) ? route.procedureIds.map(String) : [];
+  const procedureSources = recordedProcedures.length
+    ? recordedProcedures
+    : fallbackIds.map((id) => catalog.get(id)).filter(Boolean);
+  const procedures = procedureSources.map((entry) => {
+    const source = catalog.get(String(entry?.id || '')) || entry || {};
+    const pricing = procedurePricingForWorkplace(source, workplaceId);
+    const recordedCost = entry?.cost;
+    return {
+      name: String(entry?.name || source?.name || 'Процедура'),
+      value: recordedCost !== '' && recordedCost != null ? recordedCost : pricing.value,
+      variable: pricing.variable,
+      free: pricing.free,
+    };
+  });
+  const finance = record?.finance && typeof record.finance === 'object' ? record.finance : {};
+  const calculated = procedures.reduce((sum, procedure) => sum + numericCost(procedure.value), 0);
+  const total = finance.planTotal ?? finance.serviceTotal ?? calculated;
+  openRecordConfirmationNotice({
+    headline: 'Вы записаны',
+    date: String(record?.date || ''),
+    time: String(record?.from || ''),
+    procedures,
+    total,
+    variable: procedures.some((procedure) => procedure.variable),
+  });
+}
+
 async function renderGlobalClientRoot(initial = {}) {
   disposeView();
   disposeView = () => {};
@@ -78,12 +138,22 @@ async function renderPublicBooking(route) {
   setThemeColor('#2F3338');
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
-  disposeView = await startAccountRuntime(route);
+  const disposeRuntime = await startAccountRuntime(route);
+  let recordCreationCommitted = false;
+  const onRecordCreationCommitted = () => { recordCreationCommitted = true; };
+  window.addEventListener('va-tools:record-creation-committed', onRecordCreationCommitted);
+  disposeView = () => {
+    disposeRuntime?.();
+    window.removeEventListener('va-tools:record-creation-committed', onRecordCreationCommitted);
+  };
   await renderOnlineBooking(document.querySelector('#app-content'), {
     ...route,
-    onExitToAccount: (target = {}) => {
+    onExitToAccount: async (target = {}) => {
+      const confirmed = recordCreationCommitted;
+      recordCreationCommitted = false;
       history.replaceState({}, '', '/');
-      void renderGlobalClientRoot(target);
+      await renderGlobalClientRoot(target);
+      if (confirmed) await showOnlineBookingConfirmation(route);
     },
   });
   syncViewport();
