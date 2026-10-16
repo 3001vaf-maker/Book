@@ -111,12 +111,16 @@ async function bootstrap() {
         return response.sendFile(resolve(siteRoot, userPwaAsset));
       }
 
+      if (request.path === '/' || request.path === '/user.html') {
+        return response.sendFile(resolve(siteRoot, 'user.html'));
+      }
+
       return staticSite(request, response, () => {
         const segments = request.path.split('/').filter(Boolean);
         const publicBookingPath = segments.length >= 1
           && segments.length <= 2
           && segments.every((segment) => !segment.includes('.'));
-        if (publicBookingPath) return response.sendFile(resolve(siteRoot, 'index.html'));
+        if (publicBookingPath) return response.sendFile(resolve(siteRoot, 'user.html'));
         return response.status(404).send('Not Found');
       });
     }
