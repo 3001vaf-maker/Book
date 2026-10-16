@@ -21,6 +21,11 @@ function applyAccess(value) {
 }
 
 export async function activateBookDemo() {
+  const current = await loadBookAccess();
+  if (current.commercialMode !== 'DEMO' || (current.demoActivatedAt && current.demoExpiresAt)) {
+    return current;
+  }
+
   const response = await apiRequest('/saas-access/demo/activate', {
     method: 'POST',
     body: JSON.stringify({}),
