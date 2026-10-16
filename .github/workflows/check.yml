@@ -942,7 +942,7 @@ jobs:
           expect_status "user.va-tools.ru" "/online-booking/booking.js" "200"
           expect_status "user.va-tools.ru" "/online-booking/model.js" "200"
           expect_status "user.va-tools.ru" "/core/time/zone.js" "200"
-          expect_contains "user.va-tools.ru" "/" "<title>Рабочее пространство</title>"
+          expect_contains "user.va-tools.ru" "/" "<title>Запись</title>"
           expect_contains "user.va-tools.ru" "/online-booking/booking.js" "renderOnlineBooking"
           expect_contains "user.va-tools.ru" "/online-booking/model.js" "zonedDateTimeParts"
           expect_contains "user.va-tools.ru" "/core/time/zone.js" "Intl.DateTimeFormat"
