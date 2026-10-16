@@ -1,12 +1,22 @@
 import { ensureBusinessState } from './business-state.js';
 import { ensureOperationalState } from './operational-state.js';
 import { ensureAuxiliaryState } from './auxiliary-state.js';
-import { ensureTenantDocumentArchive } from './tenant-document-archive.js';
+import { ensureRknGuide, ensureTenantDocumentArchive, refreshTenantDocumentArchive } from './tenant-document-archive.js';
 import { activateServerBookingSyncScopes } from '../../online-booking/server-sync.js';
 
 async function ensureFeature(loaders = [], scopes = []) {
   await Promise.all(loaders.map((load) => load()));
   activateServerBookingSyncScopes(scopes);
+}
+
+async function ensureSettingsDocuments() {
+  await ensureTenantDocumentArchive();
+  try {
+    const result = await ensureRknGuide();
+    if (result?.ready) await refreshTenantDocumentArchive();
+  } catch (error) {
+    console.error('RKN guide sync failed', error);
+  }
 }
 
 export function ensureProfessionalFeatureState(section = '', secondary = '') {
@@ -49,7 +59,7 @@ export function ensureProfessionalFeatureState(section = '', secondary = '') {
       return ensureFeature([ensureOperationalState], ['operational']);
     }
     if (child === 'documents') {
-      return ensureFeature([ensureTenantDocumentArchive], ['documents']);
+      return ensureFeature([ensureSettingsDocuments], ['documents']);
     }
     if (child === 'tags') {
       return ensureFeature([ensureAuxiliaryState], ['auxiliary', 'finance']);
