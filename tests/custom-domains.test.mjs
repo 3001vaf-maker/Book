@@ -47,7 +47,7 @@ assert.match(userHtml, /<base href="\/">/);
 assert.match(userHtml, /theme-color" content="#2F3338"/);
 assert.match(userHtml, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(userHtml, /rel="apple-touch-icon" sizes="192x192" href="\/icon-192\.png"/);
-assert.match(userHtml, /<title>Запись<\/title>/);
+assert.match(userHtml, /<title>Рабочее пространство<\/title>/);
 assert.match(userHtml, /src="online-booking\/user-entry\.js"/);
 assert.doesNotMatch(userHtml, /src="core\.js"/);
 
