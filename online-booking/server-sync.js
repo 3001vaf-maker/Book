@@ -22,6 +22,7 @@ const POLL_SCOPES = Object.freeze(['business', 'documents']);
 let timer = null;
 let running = false;
 let stopListeners = () => {};
+const activeScopes = new Set();
 const pendingScopes = new Set();
 const snapshots = new Map();
 
@@ -47,9 +48,18 @@ function notify(name, detail = {}) {
   window.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
+function normalizeScopes(scopes = []) {
+  const values = Array.isArray(scopes) ? scopes : [];
+  return [...new Set(values.filter((scope) => ALL_SCOPES.includes(scope)))];
+}
+
 function requestedScopes(scopes) {
-  const requested = Array.isArray(scopes) && scopes.length ? scopes : ALL_SCOPES;
-  return [...new Set(requested.filter((scope) => ALL_SCOPES.includes(scope)))];
+  const requested = Array.isArray(scopes) && scopes.length ? normalizeScopes(scopes) : [...activeScopes];
+  return requested.filter((scope) => activeScopes.has(scope));
+}
+
+export function activateServerBookingSyncScopes(scopes = []) {
+  normalizeScopes(scopes).forEach((scope) => activeScopes.add(scope));
 }
 
 async function fetchScopes(scopes) {
@@ -64,7 +74,7 @@ async function fetchScopes(scopes) {
   return new Map(entries);
 }
 
-async function pull(scopes = ALL_SCOPES) {
+async function pull(scopes = []) {
   const requested = requestedScopes(scopes);
   if (!requested.length) return;
   if (running) {
@@ -79,47 +89,45 @@ async function pull(scopes = ALL_SCOPES) {
 
     if (responses.has('business')) {
       const business = await responseJson(responses.get('business'), 'Не удалось обновить рабочие данные');
-        const peopleChanged = hasChanged('business.people', business.people || []);
-        const ueiChanged = hasChanged('business.uei', business.uei || {});
-        const recordsChanged = hasChanged('business.records', {
-          records: business.records || [],
-          recordEvents: business.recordEvents || [],
-        });
-        if (peopleChanged || ueiChanged || recordsChanged) {
-          hydratePeopleFromServer(business.people || []);
-          hydrateUEIFromServer(business.uei || {});
-          hydrateRecordStateFromServer({ records: business.records || [], recordEvents: business.recordEvents || [] });
-        }
-        if (peopleChanged || ueiChanged) notify('book:people-changed', { action: 'server-refresh' });
-        if (recordsChanged) {
-          notify('book:records-changed', { action: 'server-refresh' });
-          notify('book:time-usage-changed', { action: 'server-refresh' });
-        }
-
+      const peopleChanged = hasChanged('business.people', business.people || []);
+      const ueiChanged = hasChanged('business.uei', business.uei || {});
+      const recordsChanged = hasChanged('business.records', {
+        records: business.records || [],
+        recordEvents: business.recordEvents || [],
+      });
+      if (peopleChanged || ueiChanged || recordsChanged) {
+        hydratePeopleFromServer(business.people || []);
+        hydrateUEIFromServer(business.uei || {});
+        hydrateRecordStateFromServer({ records: business.records || [], recordEvents: business.recordEvents || [] });
+      }
+      if (peopleChanged || ueiChanged) notify('book:people-changed', { action: 'server-refresh' });
+      if (recordsChanged) {
+        notify('book:records-changed', { action: 'server-refresh' });
+        notify('book:time-usage-changed', { action: 'server-refresh' });
+      }
     }
 
     if (responses.has('operational')) {
       const operational = await responseJson(responses.get('operational'), 'Не удалось обновить График, процедуры и онлайн-запись');
-        const daysChanged = hasChanged('operational.days', operational.days || []);
-        const breaksChanged = hasChanged('operational.breaks', operational.breaks || []);
-        const proceduresChanged = hasChanged('operational.procedures', {
-          procedures: operational.procedures || [],
-          procedureHistory: operational.procedureHistory || [],
-        });
-        const bookingSettingsChanged = hasChanged('operational.bookingSettings', operational.bookingSettings || null);
-        if (daysChanged) hydrateDaysFromServer(operational.days || []);
-        if (breaksChanged) hydrateBreaksFromServer(operational.breaks || []);
-        if (proceduresChanged) hydrateProceduresFromServer({
-          procedures: operational.procedures || [],
-          procedureHistory: operational.procedureHistory || [],
-        });
-        if (bookingSettingsChanged) hydrateBookingSettingsFromServer(operational.bookingSettings || null);
-        if (daysChanged) notify('book:days-changed', { action: 'server-refresh' });
-        if (breaksChanged) notify('book:breaks-changed', { action: 'server-refresh' });
-        if (daysChanged || breaksChanged) notify('book:time-usage-changed', { action: 'server-refresh' });
-        if (proceduresChanged) notify('book:procedures-changed', { action: 'server-refresh' });
-        if (bookingSettingsChanged) notify('book:booking-settings-changed', { action: 'server-refresh' });
-
+      const daysChanged = hasChanged('operational.days', operational.days || []);
+      const breaksChanged = hasChanged('operational.breaks', operational.breaks || []);
+      const proceduresChanged = hasChanged('operational.procedures', {
+        procedures: operational.procedures || [],
+        procedureHistory: operational.procedureHistory || [],
+      });
+      const bookingSettingsChanged = hasChanged('operational.bookingSettings', operational.bookingSettings || null);
+      if (daysChanged) hydrateDaysFromServer(operational.days || []);
+      if (breaksChanged) hydrateBreaksFromServer(operational.breaks || []);
+      if (proceduresChanged) hydrateProceduresFromServer({
+        procedures: operational.procedures || [],
+        procedureHistory: operational.procedureHistory || [],
+      });
+      if (bookingSettingsChanged) hydrateBookingSettingsFromServer(operational.bookingSettings || null);
+      if (daysChanged) notify('book:days-changed', { action: 'server-refresh' });
+      if (breaksChanged) notify('book:breaks-changed', { action: 'server-refresh' });
+      if (daysChanged || breaksChanged) notify('book:time-usage-changed', { action: 'server-refresh' });
+      if (proceduresChanged) notify('book:procedures-changed', { action: 'server-refresh' });
+      if (bookingSettingsChanged) notify('book:booking-settings-changed', { action: 'server-refresh' });
     }
 
     if (responses.has('documents')) {
@@ -151,22 +159,21 @@ async function pull(scopes = ALL_SCOPES) {
 
     if (responses.has('auxiliary')) {
       const auxiliary = await responseJson(responses.get('auxiliary'), 'Не удалось обновить связанные данные');
-        const walletsChanged = hasChanged('auxiliary.wallets', auxiliary.wallets || []);
-        const tagsChanged = hasChanged('auxiliary.tags', auxiliary.tags || []);
-        const productsChanged = hasChanged('auxiliary.products', {
-          products: auxiliary.products || [],
-          productHistory: auxiliary.productHistory || [],
-        });
-        if (walletsChanged) hydrateWalletsFromServer(auxiliary.wallets || []);
-        if (tagsChanged) hydrateTagsFromServer(auxiliary.tags || []);
-        if (productsChanged) hydrateProductsFromServer({
-          products: auxiliary.products || [],
-          productHistory: auxiliary.productHistory || [],
-        });
-        if (walletsChanged) notify('book:wallets-changed', { action: 'server-refresh' });
-        if (tagsChanged) notify('book:tags-changed', { action: 'server-refresh' });
-        if (productsChanged) notify('book:products-changed', { action: 'server-refresh' });
-
+      const walletsChanged = hasChanged('auxiliary.wallets', auxiliary.wallets || []);
+      const tagsChanged = hasChanged('auxiliary.tags', auxiliary.tags || []);
+      const productsChanged = hasChanged('auxiliary.products', {
+        products: auxiliary.products || [],
+        productHistory: auxiliary.productHistory || [],
+      });
+      if (walletsChanged) hydrateWalletsFromServer(auxiliary.wallets || []);
+      if (tagsChanged) hydrateTagsFromServer(auxiliary.tags || []);
+      if (productsChanged) hydrateProductsFromServer({
+        products: auxiliary.products || [],
+        productHistory: auxiliary.productHistory || [],
+      });
+      if (walletsChanged) notify('book:wallets-changed', { action: 'server-refresh' });
+      if (tagsChanged) notify('book:tags-changed', { action: 'server-refresh' });
+      if (productsChanged) notify('book:products-changed', { action: 'server-refresh' });
     }
 
     if (responses.has('finance')) {
@@ -188,16 +195,16 @@ async function pull(scopes = ALL_SCOPES) {
   }
 }
 
-export function startServerBookingSync() {
+export function startServerBookingSync(initialScopes = ALL_SCOPES) {
+  activateServerBookingSyncScopes(initialScopes);
   if (timer) return () => stopServerBookingSync();
-  void pull(ALL_SCOPES);
   timer = window.setInterval(() => void pull(POLL_SCOPES), POLL_MS);
-  const refreshAll = () => void pull(ALL_SCOPES);
+  const refreshAll = () => void pull();
   const refreshMutation = (event) => {
     const scopes = Array.isArray(event?.detail?.scopes)
       ? event.detail.scopes.map((scope) => String(scope || '')).filter(Boolean)
       : [];
-    void pull(scopes.length ? scopes : ALL_SCOPES);
+    void pull(scopes);
   };
   document.addEventListener('visibilitychange', refreshAll);
   window.addEventListener('focus', refreshAll);
@@ -213,6 +220,7 @@ export function startServerBookingSync() {
 export function stopServerBookingSync() {
   if (timer) window.clearInterval(timer);
   timer = null;
+  activeScopes.clear();
   pendingScopes.clear();
   stopListeners();
   stopListeners = () => {};
