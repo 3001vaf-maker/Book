@@ -50,8 +50,8 @@ const ROOT_SECTIONS = [
 ];
 
 const state = {
-  activeSection: 'people',
-  lastRootSection: 'people',
+  activeSection: 'journal',
+  lastRootSection: 'journal',
   navigationOpen: false,
   navigationLevel: 'f',
   navigationEnterZ: false,
@@ -247,6 +247,7 @@ function allowedRootItems() {
 }
 
 function defaultSection() {
+  if (sectionAllowed('journal')) return 'journal';
   return allowedSections()[0] || 'settings';
 }
 
@@ -687,8 +688,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
   disposePlatformNotices();
   disposePlatformNotices = () => {};
 
-  const requested = normalizeRequestedSection(location.hash.slice(1));
-  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
+  state.activeSection = sectionAllowed('journal') ? 'journal' : defaultSection();
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
