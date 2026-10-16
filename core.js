@@ -669,15 +669,15 @@ function startRegularPlatformNotices() {
 
 async function renderAuthenticated(account = authenticatedAccount) {
   authenticatedAccount = account || authenticatedAccount;
-  await loadProfileState();
-  await loadBusinessState();
-  await loadOperationalState();
-  await loadTenantDocumentArchive();
-  await syncRknGuideIfReady().catch((error) => {
-    console.error('RKN guide initial sync failed', error);
-  });
-  await loadAuxiliaryState();
-  await activateBookDemo();
+  const profileReady = loadProfileState();
+  await Promise.all([
+    profileReady,
+    loadBusinessState(),
+    loadOperationalState(),
+    profileReady.then(() => loadTenantDocumentArchive()),
+    loadAuxiliaryState(),
+    activateBookDemo(),
+  ]);
   if (getBookAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
@@ -692,6 +692,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
+  scheduleRknGuideSync();
   startRegularPlatformNotices();
 }
 
