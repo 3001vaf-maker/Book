@@ -13,7 +13,13 @@ export function ensureProfessionalFeatureState(section = '', secondary = '') {
   const root = String(section || '').trim();
   const child = String(secondary || '').trim();
 
-  if (root === 'people' || root === 'chat') {
+  if (root === 'people') {
+    return ensureFeature(
+      [ensureBusinessState, ensureTenantDocumentArchive],
+      ['business', 'documents'],
+    );
+  }
+  if (root === 'chat') {
     return ensureFeature([ensureBusinessState], ['business']);
   }
   if (root === 'journal') {
