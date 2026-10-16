@@ -35,6 +35,7 @@ expect(alphabet.includes('В корне Messenger Z1 D меняется на я�
 expect(alphabet.includes('Для обычного диалога D — скрепка/вложения'), 'UI alphabet must reserve dialog D for attachment.');
 expect(alphabet.includes('Информационный control `I`') && alphabet.includes('всегда находится в правой зоне `Z Header`'), 'UI alphabet must keep I on the right side of the surface header.');
 expect(alphabet.includes('S — только информационное/техническое сообщение'), 'UI alphabet must keep S informational only.');
+expect(alphabet.includes('Модалы Q/X/S не владеют A/B/C/D и не меняют Header приложения под собой'), 'UI alphabet must keep application Header ownership below modals.');
 expect(alphabet.includes('Текущее выбранное значение в закрытом select всегда визуально центрировано'), 'UI alphabet must keep selector values centered.');
 
 expect(shell.includes('data-v2-app style="--v2-base:#000000"'), 'Shared H owner must keep the application background black.');
