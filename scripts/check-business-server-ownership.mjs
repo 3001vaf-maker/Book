@@ -13,8 +13,12 @@ const online = read('server/src/online-booking/online-booking.service.ts');
 const serverRecord = read('server/src/record/record.service.ts');
 const app = read('server/src/app.module.ts');
 const schema = read('server/prisma/schema.prisma');
+const authenticatedRuntime = core.slice(
+  core.indexOf('async function renderAuthenticated'),
+  core.indexOf('\nfunction renderLogin'),
+);
 
-if (!core.includes('await loadBusinessState()')) failures.push('Authenticated runtime must hydrate People/UEI/Record from server before rendering.');
+if (!/await Promise\.all\(\[[\s\S]*loadBusinessState\(\)[\s\S]*\]\);[\s\S]*renderWorkspace\(\)/.test(authenticatedRuntime)) failures.push('Authenticated runtime must hydrate People/UEI/Record from server before rendering.');
 if (!people.includes('hydratePeopleFromServer') || !people.includes('queuePersonUpsert')) failures.push('Person owner must use server-hydrated runtime state and server writes.');
 if (!uei.includes('hydrateUEIFromServer') || !uei.includes('queueUEIStore')) failures.push('UEI owner must use server-hydrated runtime state and server writes.');
 if (!records.includes('hydrateRecordStateFromServer') || !records.includes('queueRecordUpsert') || !records.includes('queueRecordEventUpsert')) failures.push('Record persistence gateway must use server-hydrated rows and server writes.');
