@@ -3,6 +3,7 @@ import { hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWallets
 import { hydrateProductsFromServer } from '../../core/service/products/data.js';
 import { hydrateTagsFromServer } from '../../settings/tags/data.js';
 import { hydrateCardAppearanceTemplates } from '../card-appearance-templates.js';
+import { PROFESSIONAL_RUNTIME_PRELOADS, takeRuntimePreload } from './preload.js';
 
 function clone(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
 
@@ -13,9 +14,11 @@ async function payload(response, fallback) {
 }
 
 export async function loadAuxiliaryState() {
+  const auxiliaryResponse = takeRuntimePreload(PROFESSIONAL_RUNTIME_PRELOADS.auxiliary) || apiRequest('/auxiliary-state');
+  const financeResponse = takeRuntimePreload(PROFESSIONAL_RUNTIME_PRELOADS.finance) || apiRequest('/finance');
   const [remote, finance] = await Promise.all([
-    apiRequest('/auxiliary-state').then((response) => payload(response, 'Не удалось загрузить связанные данные')),
-    apiRequest('/finance').then((response) => payload(response, 'Не удалось загрузить Финансы')),
+    auxiliaryResponse.then((response) => payload(response, 'Не удалось загрузить связанные данные')),
+    financeResponse.then((response) => payload(response, 'Не удалось загрузить Финансы')),
   ]);
 
   hydrateWalletsFromServer(Array.isArray(remote.wallets) ? clone(remote.wallets) : []);

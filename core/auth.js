@@ -1,6 +1,16 @@
 import { API_BASE } from './environment.js';
+import { clearRuntimePreloads, PROFESSIONAL_RUNTIME_PRELOADS, startRuntimePreload } from './runtime/preload.js';
 
 const TOKEN_KEY = 'book.auth.token';
+const PROFESSIONAL_STARTUP_PATHS = [
+  [PROFESSIONAL_RUNTIME_PRELOADS.profile, '/profile'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.business, '/business-state'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.operational, '/business-state/operational'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.auxiliary, '/auxiliary-state'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.finance, '/finance'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.access, '/saas-access/me'],
+  [PROFESSIONAL_RUNTIME_PRELOADS.documentBases, '/tenant-document-archive/platform-bases'],
+];
 
 function migrateSessionToken() {
   const persistent = localStorage.getItem(TOKEN_KEY) || '';
@@ -18,6 +28,7 @@ export function getAuthToken() {
 
 export function setAuthToken(token) {
   const value = String(token || '').trim();
+  clearRuntimePreloads();
   sessionStorage.removeItem(TOKEN_KEY);
   if (!value) {
     localStorage.removeItem(TOKEN_KEY);
@@ -27,6 +38,7 @@ export function setAuthToken(token) {
 }
 
 export function clearAuthToken() {
+  clearRuntimePreloads();
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
 }
@@ -37,6 +49,12 @@ export async function apiRequest(path, options = {}) {
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   return fetch(`${API_BASE}${path}`, { ...options, headers });
+}
+
+function preloadProfessionalRuntime() {
+  for (const [key, path] of PROFESSIONAL_STARTUP_PATHS) {
+    startRuntimePreload(key, () => apiRequest(path));
+  }
 }
 
 export async function login(email, password) {
@@ -52,6 +70,7 @@ export async function login(email, password) {
   }
 
   setAuthToken(payload.accessToken);
+  preloadProfessionalRuntime();
   return payload;
 }
 
@@ -59,7 +78,9 @@ export async function getCurrentAccount() {
   const token = getAuthToken();
   if (!token) return null;
 
-  const response = await apiRequest('/auth/me');
+  const responsePromise = apiRequest('/auth/me');
+  preloadProfessionalRuntime();
+  const response = await responsePromise;
 
   if (response.status === 401) {
     clearAuthToken();
@@ -67,6 +88,7 @@ export async function getCurrentAccount() {
   }
 
   if (!response.ok) {
+    clearRuntimePreloads();
     throw new Error('Не удалось проверить вход');
   }
 

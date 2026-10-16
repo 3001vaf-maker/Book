@@ -1,4 +1,5 @@
 import { apiRequest } from './auth.js';
+import { PROFESSIONAL_RUNTIME_PRELOADS, takeRuntimePreload } from './runtime/preload.js';
 
 let currentAccess = {
   tenantId: '',
@@ -47,7 +48,7 @@ export async function requestLiveMode() {
 }
 
 export async function loadBookAccess() {
-  const response = await apiRequest('/saas-access/me');
+  const response = await (takeRuntimePreload(PROFESSIONAL_RUNTIME_PRELOADS.access) || apiRequest('/saas-access/me'));
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || 'Не удалось загрузить доступы');
   return applyAccess(payload);
