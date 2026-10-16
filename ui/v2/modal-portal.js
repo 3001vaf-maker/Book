@@ -98,23 +98,15 @@ function retainModalHeaderTarget(target) {
   };
 }
 
-function lockModalHeader(app, { allowContextActions = false } = {}) {
+function lockModalHeader(app) {
   const header = app?.querySelector?.('[data-v2-header]');
   if (!header) return () => {};
 
-  const targets = allowContextActions
-    ? [
-        header.querySelector('.v2-header__slot--a'),
-        header.querySelector('.v2-header__title'),
-      ].filter(Boolean)
-    : [header];
-
-  // Header remains pointer-addressable on purpose: outside input must reach the
-  // Shared modal owner so the veil can dismiss the active modal. The capture
-  // handler below consumes that input before any underlying Header action runs.
-  // Using inert here would make locked Header zones dead instead of veil-dismiss zones.
-  const releases = targets.map(retainModalHeaderTarget);
-  return () => releases.forEach((release) => release());
+  // A/B/C/D always belong to the underlying screen, never to a modal.
+  // Keep the Header pointer-addressable so any tap on the veil can dismiss
+  // the active modal, while the capture handler prevents the Header action.
+  const release = retainModalHeaderTarget(header);
+  return () => release();
 }
 
 function applicationLayers() {
@@ -182,7 +174,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const releaseHeaderLock = technical
     ? () => {}
     : (qLayer
-        ? lockModalHeader(app, { allowContextActions: true })
+        ? lockModalHeader(app)
         : (locksHeader
             ? () => {
                 if (!header) return;
@@ -226,10 +218,7 @@ export function mountV2Layer(html, { root = null } = {}) {
     const foreignLayer = event.target.closest?.('[data-v2-layer]');
     if (foreignLayer && foreignLayer !== node) return true;
     const sheet = node.querySelector(':scope > .v2-layer');
-    if (sheet?.contains(event.target)) return true;
-    if (!qLayer) return false;
-    const qHeaderAction = event.target.closest?.('[data-v2-header] .v2-header__slot--c .v2-header__control, [data-v2-header] .v2-header__slot--d .v2-header__control');
-    return Boolean(qHeaderAction && app?.contains?.(qHeaderAction));
+    return Boolean(sheet?.contains(event.target));
   };
 
   const resetVeilPointer = () => {
