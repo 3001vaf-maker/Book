@@ -39,13 +39,13 @@ const END_USER_APP_HOSTS = new Set([
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
-  { id: 'finance', label: 'Финансы', capability: '' },
-  { id: 'inventory', label: 'Склад', capability: '' },
-  { id: 'loyalty', label: 'Лояльность', capability: '' },
-  { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
+  { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'service', label: 'Сервис', capability: 'services.access' },
+  { id: 'inventory', label: 'Склад', capability: '' },
+  { id: 'finance', label: 'Финансы', capability: '' },
+  { id: 'loyalty', label: 'Лояльность', capability: '' },
   { id: 'settings', label: 'Настройки', capability: '' },
 ];
 
@@ -56,6 +56,8 @@ const state = {
   navigationLevel: 'f',
   navigationEnterZ: false,
   chatPersonKey: '',
+  chatReturnSection: '',
+  chatReturnNavigationOpen: true,
   journalView: 'day',
   secondary: {
     finance: 'cash',
@@ -280,12 +282,36 @@ function setNavigationOpen(open) {
   setV2DeckOpen(app, state.navigationOpen);
 }
 
+function showMenu({ updateHistory = true } = {}) {
+  state.activeSection = '';
+  state.lastRootSection = '';
+  state.navigationOpen = true;
+  state.navigationLevel = 'f';
+  state.navigationEnterZ = false;
+  state.chatPersonKey = '';
+  renderWorkspace();
+  if (updateHistory) history.replaceState({}, '', location.pathname);
+}
+
+function returnFromChat() {
+  const origin = normalizeRequestedSection(state.chatReturnSection);
+  if (!origin) {
+    showMenu();
+    return;
+  }
+  navigate(origin, { navigationOpen: state.chatReturnNavigationOpen });
+}
+
 function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true, chatPersonKey = '' } = {}) {
   if (!workspaceReady) return;
   const next = normalizeRequestedSection(section);
   if (!sectionAllowed(next)) return;
   if (next === 'chat') {
-    if (state.activeSection !== 'chat') state.lastRootSection = activeRootSection();
+    if (state.activeSection !== 'chat') {
+      state.chatReturnSection = state.navigationOpen ? '' : normalizeRequestedSection(state.activeSection);
+      state.chatReturnNavigationOpen = Boolean(state.navigationOpen);
+      state.lastRootSection = activeRootSection();
+    }
     state.activeSection = 'chat';
     state.chatPersonKey = String(chatPersonKey || '');
     state.navigationOpen = false;
@@ -384,7 +410,7 @@ function workspaceProfileASlot({ settingsTag = false, data = '', aria = 'Про�
 }
 
 function syncWorkspaceHeader(surface) {
-  if (!surface?.isConnected) return;
+  if (!surface?.isConnected || !state.activeSection) return;
   const contextRoot = activeWorkspaceSurface(surface);
   const context = contextRoot.querySelector('[data-workspace-header-context]');
   const root = activeRootSection();
@@ -451,7 +477,7 @@ function syncWorkspaceHeader(surface) {
       dSource.click();
       return;
     }
-    if (state.activeSection === 'chat') navigate(state.lastRootSection, { navigationOpen: false });
+    if (state.activeSection === 'chat') returnFromChat();
     else navigate('chat', { navigationOpen: false });
   });
 }
@@ -490,13 +516,18 @@ function renderWorkspace() {
   disposeView();
   disposeView = () => {};
   const requested = normalizeRequestedSection(state.activeSection);
-  if (!sectionAllowed(requested)) state.activeSection = defaultSection();
-  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
+  if (requested && !sectionAllowed(requested)) state.activeSection = defaultSection();
+  if (!state.activeSection) {
+    state.navigationOpen = true;
+    state.navigationLevel = 'f';
+  } else if (state.activeSection !== 'chat') {
+    state.lastRootSection = state.activeSection;
+  }
 
   const root = activeRootSection();
   const rootItems = allowedRootItems();
-  const childItems = secondaryItems(root);
-  const childActive = ensureSecondary(root);
+  const childItems = root ? secondaryItems(root) : [];
+  const childActive = root ? ensureSecondary(root) : '';
   const rootDeck = v2CardDeck(rootItems, {
     axis: 'x',
     active: root,
@@ -514,7 +545,7 @@ function renderWorkspace() {
 
   const headerMarkup = v2Header({
     a: workspaceProfileASlot(),
-    b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
+    b: !state.activeSection ? 'Меню' : state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
   let shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
@@ -576,9 +607,13 @@ function renderWorkspace() {
     deckOpen: state.navigationOpen,
     eOpen: state.navigationOpen && state.navigationLevel === 'e',
     onDeckOpenChange: (open) => {
+      if (!state.activeSection && !open) {
+        state.navigationOpen = true;
+        setV2DeckOpen(shell, true);
+        return;
+      }
       state.navigationOpen = open;
-      if (open) state.navigationLevel = 'f';
-      else state.navigationLevel = 'f';
+      state.navigationLevel = 'f';
     },
     onEOpenChange: (open) => {
       state.navigationLevel = open ? 'e' : 'f';
@@ -613,7 +648,7 @@ function renderWorkspace() {
     attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible', 'data-v2-primary-label', 'data-v2-primary-variant'],
   });
 
-  const result = surface ? renderActiveWorkspaceSurface(surface) : null;
+  const result = surface && state.activeSection ? renderActiveWorkspaceSurface(surface) : null;
   Promise.resolve(result).then((nextDispose) => {
     if (disposed || renderVersion !== workspaceRenderVersion) {
       if (typeof nextDispose === 'function') nextDispose();
@@ -687,10 +722,13 @@ async function renderAuthenticated(account = authenticatedAccount) {
   disposePlatformNotices();
   disposePlatformNotices = () => {};
 
-  const requested = normalizeRequestedSection(location.hash.slice(1));
-  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
-  if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
-  history.replaceState({}, '', `#${state.activeSection}`);
+  state.activeSection = '';
+  state.lastRootSection = '';
+  state.navigationOpen = true;
+  state.navigationLevel = 'f';
+  state.navigationEnterZ = false;
+  state.chatPersonKey = '';
+  history.replaceState({}, '', location.pathname);
   renderWorkspace();
   startRegularPlatformNotices();
 }
@@ -769,6 +807,8 @@ window.addEventListener('hashchange', () => {
   const section = normalizeRequestedSection(location.hash.slice(1));
   if (sectionAllowed(section)) {
     navigate(section, { navigationOpen: false, updateHash: false });
+  } else if (!state.activeSection) {
+    history.replaceState({}, '', location.pathname);
   } else {
     history.replaceState({}, '', `#${state.activeSection}`);
   }
