@@ -12,6 +12,7 @@ const TECHNICAL_STORAGE_OWNERS = new Set([
   'core/workplace-context.js',
   'core/people/view-state.js',
   'onboarding/onboarding.js',
+  'service-worker.js',
 ]);
 
 function walk(dir) {
