@@ -1,3 +1,44 @@
+const STATIC_CACHE_PREFIX = 'va-static-';
+
+function versionedStaticRequest(request) {
+  if (request.method !== 'GET') return false;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || !url.searchParams.get('build')) return false;
+  return /\.(?:js|mjs|css)$/i.test(url.pathname);
+}
+
+async function cachedVersionedAsset(request) {
+  const url = new URL(request.url);
+  const build = String(url.searchParams.get('build') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'build';
+  const cacheName = `${STATIC_CACHE_PREFIX}${build}`;
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response.ok) {
+    await cache.put(request, response.clone());
+    const names = await caches.keys();
+    await Promise.all(names
+      .filter((name) => name.startsWith(STATIC_CACHE_PREFIX) && name !== cacheName)
+      .map((name) => caches.delete(name)));
+  }
+  return response;
+}
+
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  if (!versionedStaticRequest(event.request)) return;
+  event.respondWith(cachedVersionedAsset(event.request));
+});
+
 async function syncAppBadge(count) {
   const value = Math.max(0, Math.trunc(Number(count) || 0));
   try {
