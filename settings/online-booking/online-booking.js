@@ -2,7 +2,6 @@ import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { ACCOUNT_APP_ORIGIN } from '../../core/environment.js';
 import {
-  BOOKING_SLOT_STEPS,
   getBookingSettings,
   normalizeBookingSettings,
   saveBookingSettings,
@@ -17,7 +16,6 @@ import {
   mountModal,
   openSharedProfileSettingsMenu,
   select,
-  smallActionButton,
   setCopyButtonCopied,
   textareaField,
   workspaceHeaderContext,
@@ -144,15 +142,6 @@ function openOnlineBookingSettings(root) {
   });
 }
 
-function openSlotStepInfo() {
-  const content = '<div class="modal-title"><h2>Шаг записи</h2><p>Шаг определяет, как часто человеку показываются возможные начала записи. Он не ограничивает произвольное время специалиста и не меняет длительность процедуры.</p></div>';
-  return mountModal(document.body, modal(content, {
-    title: 'О шаге записи',
-    variant: 's',
-    surface: 'app',
-  }));
-}
-
 function mountScreen(root, body) {
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Онлайн-запись',
@@ -167,26 +156,10 @@ function mountScreen(root, body) {
 
 function renderReady(root) {
   const workplaces = getWorkplaces();
-  const saved = getBookingSettings();
   const options = [
     { value: '', label: 'Выбрать рабочее пространство' },
     ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
   ];
-  const stepControl = select({
-    label: '',
-    name: 'slotStep',
-    value: String(saved.slotStep),
-    options: BOOKING_SLOT_STEPS.map((value) => ({
-      value: String(value),
-      label: value === 60 ? '1 час' : `${value} минут`,
-    })),
-    data: 'data-online-booking-slot-step',
-  });
-  const stepInfo = smallActionButton({
-    icon: 'info',
-    data: 'data-online-booking-slot-info',
-    aria: 'О шаге записи',
-  });
 
   mountScreen(root, `<div class="form-grid form-grid--relaxed">
     ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
@@ -198,10 +171,6 @@ function renderReady(root) {
       aria: 'Выбрать рабочее пространство для онлайн-записи',
     })}
     <div data-workplace-booking-link></div>
-    <div class="field">
-      <div class="field-inline-label"><span>Шаг записи</span>${stepInfo}</div>
-      ${stepControl}
-    </div>
   </div>`);
 
   bindCopyButtons(root);
@@ -211,13 +180,6 @@ function renderReady(root) {
     host.innerHTML = selectedWorkplaceLink(workplaces, event.target.value);
     bindCopyButtons(host);
   });
-  root.querySelector('[data-online-booking-slot-step]')?.addEventListener('change', (event) => {
-    saveBookingSettings({
-      ...getBookingSettings(),
-      slotStep: Number(event.currentTarget.value),
-    });
-  });
-  root.querySelector('[data-online-booking-slot-info]')?.addEventListener('click', openSlotStepInfo);
 }
 
 function renderUnavailable(root, title, message) {

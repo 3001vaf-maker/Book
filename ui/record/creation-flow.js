@@ -44,23 +44,12 @@ export function recordCreationTimeRows(items = [], {
     .filter((item) => item.value);
   if (!values.length) return `<div class="muted">${String(empty || 'Времени нет.')}</div>`;
 
-  const groups = new Map();
-  values.forEach((item) => {
-    const hour = String(item.value).split(':')[0] || '';
-    if (!groups.has(hour)) groups.set(hour, []);
-    groups.get(hour).push(item);
+  return timeSlots({
+    values,
+    selected,
+    data,
+    ariaLabel: 'Выбор времени',
   });
-
-  return `<div class="record-creation-time-rows">${[...groups.entries()].map(([hour, slots]) => `
-    <section class="record-creation-time-row">
-      ${timeSlots({
-        values: slots,
-        selected,
-        data,
-        ariaLabel: `Выбор времени ${hour}:00`,
-        className: 'time-slots--hour-rows',
-      })}
-    </section>`).join('')}</div>`;
 }
 
 export function openRecordCreationOwner({ onCancel = () => {} } = {}) {

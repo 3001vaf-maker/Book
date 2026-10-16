@@ -394,9 +394,8 @@ assert.doesNotMatch(bookingSettingsUi, /label: 'Настройки уведом�
 assert.match(bookingSettingsUi, /function openWelcomeQ/);
 assert.match(bookingSettingsUi, /variant: 'q'/);
 assert.match(bookingSettingsUi, /setWelcomeSaveVisible/);
-assert.match(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map/);
-assert.match(bookingSettingsUi, /<span>Шаг записи<\/span>/);
-assert.match(bookingSettingsUi, /smallActionButton\(\{[\s\S]*icon: 'info'/);
+assert.doesNotMatch(bookingSettingsUi, /BOOKING_SLOT_STEPS\.map|<span>Шаг записи<\/span>|data-online-booking-slot-step|data-online-booking-slot-info/);
+assert.doesNotMatch(bookingSettingsUi, /smallActionButton\(\{[\s\S]*icon: 'info'/);
 assert.doesNotMatch(bookingSettingsUi, /twoColumnLayout\(|iconButton\(|v2ListEntry\(/);
 assert.doesNotMatch(bookingSettingsUi, /label: 'Порядок отправки'|label: 'Канал 1'|label: 'Канал 2'|label: 'Канал 3'|getNotificationRouting|saveNotificationRouting/);
 assert.match(notificationSettingsUi, /data-notification-delivery-settings-open/);
