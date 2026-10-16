@@ -110,6 +110,7 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
     render,
     commit() {
       committed = true;
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('va-tools:record-creation-committed'));
       layer.v2Close?.();
     },
     close() {
