@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { isStartupCallAwaitedBeforeWorkspaceRender } from './runtime-startup-contract.mjs';
 
 function text(path) { return fs.readFileSync(path, 'utf8'); }
 function assert(condition, message) { if (!condition) throw new Error(message); }
@@ -15,7 +16,7 @@ const products = text('core/service/products/data.js');
 const schema = text('server/prisma/schema.prisma');
 const moduleFile = text('server/src/auxiliary-state/auxiliary-state.module.ts');
 
-assert(core.includes('loadAuxiliaryState'), 'Core must load server-owned Finance and auxiliary state before workspace render.');
+assert(isStartupCallAwaitedBeforeWorkspaceRender(core, 'loadAuxiliaryState()'), 'Core must load server-owned Finance and auxiliary state before workspace render.');
 assert(runtime.includes("apiRequest('/auxiliary-state')"), 'Auxiliary runtime must read the canonical server owner directly.');
 assert(!/localStorage|readLegacy|\/migrate|bootstrap/.test(runtime), 'Auxiliary runtime must not contain transition paths.');
 assert(runtime.includes("apiRequest('/finance')") && runtime.includes('hydrateFinanceFromServer'), 'Finance startup must hydrate the dedicated canonical Finance owner.');
