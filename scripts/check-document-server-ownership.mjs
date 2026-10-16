@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isStartupCallAwaitedBeforeWorkspaceRender } from './runtime-startup-contract.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const failures = [];
@@ -10,7 +11,7 @@ const history = read('settings/documents/history.js');
 const moduleSource = read('server/src/tenant-document-archive/tenant-document-archive.module.ts');
 const schema = read('server/prisma/schema.prisma');
 
-if (!core.includes('loadTenantDocumentArchive')) failures.push('Core must load server-owned Documents before workspace render.');
+if (!isStartupCallAwaitedBeforeWorkspaceRender(core, 'loadTenantDocumentArchive()')) failures.push('Core must load server-owned Documents before workspace render.');
 if (!runtime.includes("apiRequest('/tenant-document-archive/initialize'")) failures.push('Documents startup must initialize the canonical server owner directly.');
 if (/localStorage|readLegacy|\/migrate|bootstrap/.test(runtime)) failures.push('Documents runtime must not depend on transition paths.');
 if (!documents.includes('hydrateDocumentsFromServer') || !documents.includes('configureDocumentPersistence')) failures.push('Document templates must be server-owned.');
