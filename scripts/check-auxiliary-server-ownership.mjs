@@ -18,6 +18,10 @@ const moduleFile = text('server/src/auxiliary-state/auxiliary-state.module.ts');
 
 assert(isStartupCallAwaitedBeforeWorkspaceRender(core, 'loadAuxiliaryState()'), 'Core must load server-owned Finance and auxiliary state before workspace render.');
 assert(runtime.includes("apiRequest('/auxiliary-state')"), 'Auxiliary runtime must read the canonical server owner directly.');
+assert(!runtime.includes("../finance/index.js"), 'Auxiliary startup must not import the heavy Finance barrel.');
+assert(runtime.includes("from '../finance/data.js'")
+  && runtime.includes("from '../finance/cash/data.js'")
+  && runtime.includes("from '../finance/cash/entities.js'"), 'Auxiliary startup must import only the canonical Finance hydration owners it needs.');
 assert(!/localStorage|readLegacy|\/migrate|bootstrap/.test(runtime), 'Auxiliary runtime must not contain transition paths.');
 assert(runtime.includes("apiRequest('/finance')") && runtime.includes('hydrateFinanceFromServer'), 'Finance startup must hydrate the dedicated canonical Finance owner.');
 assert(runtime.includes('hydrateWalletsFromServer') && runtime.includes('hydrateCashEntitiesFromServer') && runtime.includes('hydrateTagsFromServer') && runtime.includes('hydrateProductsFromServer'), 'Auxiliary startup must hydrate Wallets, cash entities, Tags and Products from the auxiliary owner.');
