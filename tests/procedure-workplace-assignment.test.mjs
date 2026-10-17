@@ -71,10 +71,13 @@ const recordRuntimeSource = readFileSync(new URL('../ui/record/runtime.js', impo
 const recordCss = readFileSync(new URL('../ui/record/record.css', import.meta.url), 'utf8');
 const buttonCss = readFileSync(new URL('../ui/buttons/buttons.css', import.meta.url), 'utf8');
 assert.match(recordSource, /assignProceduresToWorkplace/);
-assert.match(recordSource, /bindRecordSettings/);
-assert.match(recordSource, /data-record-settings-from-price/);
-assert.match(recordSource, /data-record-settings-add-procedure/);
-assert.doesNotMatch(recordSource, /button\('Из прайса'/);
+assert.match(recordSource, /button\('Добавить из прайса'/);
+assert.match(recordSource, /button\('\+ Добавить процедуру'/);
+assert.match(recordSource, /data-record-create-from-price/);
+assert.match(recordSource, /data-record-create-add-procedure/);
+assert.doesNotMatch(recordSource, /bindRecordSettings/);
+assert.doesNotMatch(recordSource, /data-record-settings-from-price/);
+assert.doesNotMatch(recordSource, /data-record-settings-add-procedure/);
 assert.doesNotMatch(recordSource, /data-record-from-price/);
 assert.doesNotMatch(recordSource, /iconButton\('\+'/);
 assert.match(recordRuntimeSource, /data-record-owner-settings/);

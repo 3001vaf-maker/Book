@@ -85,23 +85,26 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
     step = '',
     title = '',
     body = '',
+    footer = '',
     action = null,
   } = {}) => {
     if (!bodyHost || !actionHost || !titleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
     titleHost.textContent = resolveRecordCreationTitle(step, title);
     bodyHost.innerHTML = body;
-    actionHost.innerHTML = action?.label
+    const primary = action?.label
       ? button(action.label, {
           data: action.data || 'data-record-creation-primary',
           disabled: Boolean(action.disabled),
           variant: action.variant || 'primary',
         })
       : '';
+    actionHost.innerHTML = `${String(footer || '')}${primary}`;
     return {
       layer,
       body: bodyHost,
-      action: actionHost.querySelector('button'),
+      footer: actionHost,
+      action: action?.label ? actionHost.querySelector('button:last-of-type') : null,
     };
   };
 

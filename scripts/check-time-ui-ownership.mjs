@@ -5,6 +5,7 @@ const errors = [];
 const fail = (path, message) => errors.push(`${path}: ${message}`);
 
 const recordFlow = read('journal/record.js');
+const recordProcedureCorrection = read('journal/record-procedure-correction.js');
 const recordView = read('journal/record-view.js');
 const breakView = read('journal/break-view.js');
 const breakData = read('journal/break-data.js');
@@ -19,31 +20,36 @@ const dayEditor = read('timetable/day-editor.js');
 const sharedTime = read('ui/time/index.js');
 const sharedTimeCss = read('ui/time/time.css');
 
-if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
-if (!/checkTimeAvailability/.test(recordFlow) || !/listAvailableStartTimes/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
-if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Record creation must use the canonical WorkPlan date query');
-if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record creation must not rebuild occupancy or WorkPlan availability');
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record must ask Core Availability');
+if (!/checkTimeAvailability/.test(recordFlow) || !/getTimeAvailabilityAt/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
+if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Record date correction must use the canonical WorkPlan date query');
+if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record must not rebuild occupancy or WorkPlan availability');
 if (/from ['"]\.\/break-data\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must command Break through break-service.js');
 
 if (!/openRecordEditFlow/.test(recordView)
   || !/startAt,\s*date:\s*state\.date,\s*workplaceId:\s*state\.workplaceId,\s*from:\s*state\.from,\s*to:\s*state\.to/s.test(recordView)) {
-  fail('journal/record-view.js', 'Created Record editor must delegate schedule/procedure editing to the shared Record edit flow');
+  fail('journal/record-view.js', 'Created Record editor must delegate schedule editing to journal/record.js');
+}
+if (!/openRecordProcedureCorrection/.test(recordView)) {
+  fail('journal/record-view.js', 'Created Record procedure correction must delegate to the canonical procedure correction owner');
 }
 if (/openTimePickerAction|startWorkplaceEdit|startRecordDateEdit|startRecordTimeEdit|openWorkplacePicker|openDatePicker/.test(recordView)) {
   fail('journal/record-view.js', 'Created Record editor must not keep a second direct schedule-edit implementation');
 }
 if (!/export function openRecordEditFlow/.test(recordFlow)
-  || !/if \(startAt === 'workplace'\) openWorkplace\(\);\s*else if \(startAt === 'date'\) openDate\(\);\s*else if \(startAt === 'procedure'\) openProcedures\(\);\s*else openTime\(\);/s.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must own Workplace, Date, Time and Procedure entry points');
+  || !/if \(startAt === 'workplace'\) openWorkplace\(\);\s*else if \(startAt === 'date'\) openDate\(\);\s*else openTime\(\);/s.test(recordFlow)) {
+  fail('journal/record.js', 'journal/record.js must own Workplace, Date and Time correction entry points');
 }
 if (!/draft\.workplaceId\s*=\s*String\([^;]+;[\s\S]*?apply\(\);/.test(recordFlow)
   || !/draft\.date\s*=\s*nextDate;\s*apply\(\);/s.test(recordFlow)
-  || !/draft\.from\s*=\s*nextFrom;\s*draft\.to\s*=\s*nextTo;\s*apply\(\);/s.test(recordFlow)
-  || !/onDone:\s*\(\{ procedures: next, to: nextTo \}\)\s*=>\s*\{[\s\S]*?draft\.procedures\s*=\s*next;[\s\S]*?draft\.to\s*=\s*nextTo;[\s\S]*?apply\(\);/s.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must apply only the selected Workplace, Date, Time or Procedure correction and return without replaying the booking sequence');
+  || !/draft\.from\s*=\s*nextFrom;\s*draft\.to\s*=\s*nextTo;\s*apply\(\);/s.test(recordFlow)) {
+  fail('journal/record.js', 'journal/record.js must apply only the selected Workplace, Date or Time correction and return without replaying creation');
 }
-if (!/listAvailableStartTimes/.test(recordFlow) || !/excludeId/.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must ask canonical Availability and exclude the edited Record');
+if (!/excludeId/.test(recordFlow)) {
+  fail('journal/record.js', 'Record correction must exclude the edited Record from Availability checks');
+}
+if (!/checkTimeAvailability/.test(recordProcedureCorrection) || !/excludeId/.test(recordProcedureCorrection)) {
+  fail('journal/record-procedure-correction.js', 'Procedure correction must validate the resulting Record range through canonical Availability');
 }
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
