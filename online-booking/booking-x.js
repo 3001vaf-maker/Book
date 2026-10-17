@@ -32,7 +32,7 @@ import {
   v2Sticker,
 } from '../ui/ui.js';
 import { formError, formView } from '../ui/forms/index.js';
-import { openRecords } from '../records/records.js';
+import { openRecords } from '../core/records/records.js';
 import {
   bookingProcedureCost,
   getBookingProcedures,
