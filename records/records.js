@@ -25,9 +25,10 @@ import { openPersonCreate } from '../core/people/create.js';
 import { personDisplay } from '../core/people/presentation.js';
 import { getProcedures } from '../core/service/procedures/data.js';
 import { openProcedureEditor } from '../core/service/procedures/procedures.js';
-import { assignProceduresToWorkplace } from '../core/service/procedures/service.js';
+import { assignProceduresToWorkplace } from '../core/service/procedures/assignment.js';
 import { procedureCostForWorkplace, proceduresForWorkplace } from '../core/service/procedures/selection.js';
 import {
+  buildNaturalBookingTimeRows,
   checkTimeAvailability,
   getAvailabilityGrid,
   getTimeAvailabilityAt,
@@ -35,7 +36,6 @@ import {
   minutesToTime,
   timeToMinutes,
 } from '../core/time/index.js';
-import { buildPersonRecordTimeRows } from '../core/people/record-time.js';
 import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
 import { getProfile } from '../core/profile/data.js';
 import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../core/profile/card-presentation.js';
@@ -104,7 +104,7 @@ function professionalProvider() {
     workingDates: (workplaceId) => getWorkplaceWorkingDates(workplaceId),
     timeRows({ workplaceId, date, procedures }) {
       const duration = Math.max(5, procedures.reduce((sum, item) => sum + (Number(item.duration) || 0), 0));
-      return buildPersonRecordTimeRows(getAvailabilityGrid({ date, workplaceId }), duration);
+      return buildNaturalBookingTimeRows(getAvailabilityGrid({ date, workplaceId }), duration);
     },
     async create(state, actionContext = null) {
       const primary = state.people[0] || state.person;
