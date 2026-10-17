@@ -6,15 +6,12 @@ const records = fs.readFileSync('records/records.js', 'utf8');
 const owner = fs.readFileSync('ui/record/creation-flow.js', 'utf8');
 const day = fs.readFileSync('journal/день.js', 'utf8');
 const journalView = fs.readFileSync('journal/journal-view.js', 'utf8');
-const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
-const account = fs.readFileSync('online-booking/account.js', 'utf8');
-const userEntry = fs.readFileSync('online-booking/user-entry.js', 'utf8');
+const booking = fs.readFileSync('online-booking/booking-x.js', 'utf8');
 const personEntry = fs.readFileSync('core/people/record-creation.js', 'utf8');
 
 assert.equal(fs.existsSync('journal/record.js'), false);
 assert.equal(fs.existsSync('journal/record-view.js'), false);
 assert.equal(fs.existsSync('journal/record-creation-x.js'), false);
-assert.equal(fs.existsSync('online-booking/booking-x.js'), false);
 assert.match(records, /export function openRecords/);
 assert.match(owner, /variant: 'q'/);
 assert.match(day, /import\('\.\.\/records\/records\.js'\)/);
@@ -22,11 +19,6 @@ assert.match(day, /import\('\.\/journal-view\.js'\)/);
 assert.match(journalView, /export function openJournalView/);
 assert.match(personEntry, /from '\.\.\/\.\.\/records\/records\.js'/);
 assert.match(booking, /from '\.\.\/records\/records\.js'/);
-assert.doesNotMatch(account, /from '\.\.\/records\/records\.js'/);
-assert.match(account, /params\.set\('booking', id\)/);
-assert.match(userEntry, /params\.get\('booking'\)/);
-assert.match(userEntry, /from '\.\/account\.js'/);
-assert.match(userEntry, /from '\.\/booking\.js'/);
 
 const context = {
   workplaces: [{ key: 'w1', name: 'A', timeZone: 'Europe/Moscow', from: '10:00', to: '14:00' }],

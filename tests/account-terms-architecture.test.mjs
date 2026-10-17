@@ -53,15 +53,17 @@ assert.match(accountApi, /export async function getAccountTerms\(/);
 assert.match(accountApi, /export async function getAccountPlatformState\(/);
 assert.match(accountApi, /export async function acceptAccountTerms\(/);
 
-assert.match(bookingUi, /function renderLegal\(/);
+assert.match(bookingUi, /function renderLegalSticker\(/);
 assert.doesNotMatch(bookingUi, /function renderAccountTerms\(/);
 assert.doesNotMatch(bookingUi, /function renderTenantAgreements\(/);
 assert.match(bookingUi, /accountTerms: currentAccountTermsFact\(state\)/);
-assert.match(bookingUi, /async function loadLegalState\(state\)/);
-assert.match(bookingUi, /getAccountPlatformState\(state\.tenantId\)/);
-assert.match(bookingUi, /getAccountConsentState\(state\.tenantId\)/);
-assert.match(bookingUi, /if \(!platform\?\.accepted \|\| !tenant\?\.pdnActive\)/, 'Booking must gate Records on both platform terms and Tenant PDN');
-assert.match(bookingUi, /renderLegal\(root, state\)/, 'Booking must show one legal checkpoint when either legal gate is missing');
+assert.match(bookingUi, /const platformState = await getAccountPlatformState\(state\.tenantId\)/);
+assert.match(bookingUi, /const consentState = await refreshTenantConsentState\(state\)/);
+assert.ok(
+  bookingUi.indexOf('const platformState = await getAccountPlatformState(state.tenantId)')
+    < bookingUi.indexOf('const consentState = await refreshTenantConsentState(state)'),
+  'Platform terms must be checked before Tenant consent',
+);
 
 assert.match(workflow, /online-booking\/account-terms/);
 assert.match(workflow, /accountTerms:JSON\.parse/);

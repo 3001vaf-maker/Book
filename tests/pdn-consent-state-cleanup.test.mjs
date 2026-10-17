@@ -28,8 +28,7 @@ assert.doesNotMatch(service, /this\.ensurePdnConsent/);
 assert.doesNotMatch(service, /ensureRequiredConsents/);
 assert.match(controller, /acceptAccountConsents\(auth\.tenantId, auth\.accountId/);
 
-assert.match(booking, /getAccountConsentState\(state\.tenantId\)/);
-assert.match(booking, /!tenant\?\.pdnActive/);
+assert.match(booking, /consentState\.pdnActive/);
 assert.doesNotMatch(booking, /consentState\.allowed/);
 
 console.log('PDN consent state cleanup tests: OK');

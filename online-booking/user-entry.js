@@ -1,8 +1,8 @@
 import { getBookingContext, getGlobalAccountRecords, resolveBookingPublicRoute } from '../core/account/index.js';
 import { procedurePricingForWorkplace } from '../core/service/procedures/selection.js';
 import { openRecordConfirmationNotice } from '../ui/record/confirmation-notice.js';
-import { renderGlobalClient } from './account.js';
-import { renderBooking } from './booking.js';
+import { renderGlobalClient } from './booking.js';
+import { renderOnlineBookingX as renderOnlineBooking } from './booking-x.js';
 import { startAccountRuntime } from './account-runtime.js';
 
 const app = document.querySelector('#app');
@@ -21,31 +21,11 @@ function setThemeColor(value) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value);
 }
 
-function routeProcedureIds(params) {
-  return String(params.get('procedures') || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 function bookingRouteQuery(params) {
   return {
-    procedureIds: routeProcedureIds(params),
+    procedureIds: String(params.get('procedures') || '').split(',').map((value) => value.trim()).filter(Boolean),
     telegramEntry: String(params.get('tg_entry') || '').trim(),
     entry: String(params.get('entry') || '').trim(),
-  };
-}
-
-function accountBookingRoute() {
-  const params = new URLSearchParams(location.search);
-  const tenantId = String(params.get('booking') || '').trim();
-  if (!tenantId) return null;
-  return {
-    tenantId,
-    workplaceKey: String(params.get('workplace') || '').trim(),
-    procedureIds: routeProcedureIds(params),
-    entry: 'account-booking',
-    source: 'account',
   };
 }
 
@@ -65,12 +45,12 @@ function publicBookingPath() {
   };
 }
 
-async function onlineBookingRoute() {
+async function bookingRoute() {
   const params = new URLSearchParams(location.search);
   const pathRoute = publicBookingPath();
   if (!pathRoute) return null;
   if (pathRoute.invalid || !pathRoute.profileSlug) {
-    return { tenantId: '', workplaceKey: '', source: 'online', ...bookingRouteQuery(params) };
+    return { tenantId: '', workplaceKey: '', ...bookingRouteQuery(params) };
   }
 
   try {
@@ -78,11 +58,10 @@ async function onlineBookingRoute() {
     return {
       tenantId: String(resolved?.tenantId || ''),
       workplaceKey: String(resolved?.workplaceKey || ''),
-      source: 'online',
       ...bookingRouteQuery(params),
     };
   } catch {
-    return { tenantId: '', workplaceKey: '', source: 'online', ...bookingRouteQuery(params) };
+    return { tenantId: '', workplaceKey: '', ...bookingRouteQuery(params) };
   }
 }
 
@@ -106,10 +85,9 @@ function numericCost(value) {
   return Number.isFinite(number) ? Math.max(0, number) : 0;
 }
 
-async function showBookingConfirmation(route) {
+async function showOnlineBookingConfirmation(route) {
   const records = await getGlobalAccountRecords().catch(() => []);
   const record = latestConfirmedRecord(records, route.tenantId);
-  if (!record) return;
   const workplaceId = String(record?.workplaceId || record?.workplaceKey || route.workplaceKey || '');
   const context = route.tenantId
     ? await getBookingContext(route.tenantId, workplaceId).catch(() => ({}))
@@ -155,7 +133,7 @@ async function renderGlobalClientRoot(initial = {}) {
   syncViewport();
 }
 
-async function renderBookingRoute(route) {
+async function renderPublicBooking(route) {
   disposeView();
   setThemeColor('#2F3338');
   app.classList.add('app-shell--booking');
@@ -168,14 +146,14 @@ async function renderBookingRoute(route) {
     disposeRuntime?.();
     window.removeEventListener('va-tools:record-creation-committed', onRecordCreationCommitted);
   };
-  await renderBooking(document.querySelector('#app-content'), {
+  await renderOnlineBooking(document.querySelector('#app-content'), {
     ...route,
     onExitToAccount: async (target = {}) => {
       const confirmed = recordCreationCommitted;
       recordCreationCommitted = false;
       history.replaceState({}, '', '/');
       await renderGlobalClientRoot(target);
-      if (confirmed) await showBookingConfirmation(route);
+      if (confirmed) await showOnlineBookingConfirmation(route);
     },
   });
   syncViewport();
@@ -186,11 +164,6 @@ window.visualViewport?.addEventListener('resize', syncViewport, { passive: true 
 window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
 
 syncViewport();
-const accountBooking = accountBookingRoute();
-if (accountBooking) {
-  await renderBookingRoute(accountBooking);
-} else {
-  const onlineBooking = await onlineBookingRoute();
-  if (onlineBooking) await renderBookingRoute(onlineBooking);
-  else await renderGlobalClientRoot();
-}
+const publicBooking = await bookingRoute();
+if (publicBooking) await renderPublicBooking(publicBooking);
+else await renderGlobalClientRoot();
