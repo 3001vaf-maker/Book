@@ -213,14 +213,16 @@ assert.doesNotMatch(journalDaySource, /openRecordPaymentEntry/);
 assert.match(recordPaymentSource, /export function openRecordPayment/);
 assert.match(recordPaymentSource, /className: 'record-payment-q'/);
 assert.match(recordPaymentSource, /className: 'record-payment-allocation-q'/);
+assert.match(recordPaymentSource, /className: 'record-payment-correction-q'/);
 assert.match(recordPaymentSource, /variant: 'q'/);
 assert.doesNotMatch(recordPaymentSource, /mountV2ZLayer|v2ZLayer|record-payment-z|record-payment-allocation-z|record-payment-correction-z/);
 assert.match(recordPaymentSource, /title: 'Оплата'/);
-assert.match(recordPaymentSource, /settingsTag:\s*true/);
 assert.match(recordPaymentSource, /hideD:\s*false/);
 assert.match(recordPaymentSource, /showActions: false/);
-assert.match(recordPaymentSource, /label: 'Сохранить'/);
-assert.match(recordPaymentSource, /label: 'Оплатить'/);
+assert.match(recordPaymentSource, /data-record-payment-save/);
+assert.match(recordPaymentSource, /data-record-payment-pay/);
+assert.match(recordPaymentSource, /data-record-payment-allocation-submit/);
+assert.match(recordPaymentSource, /data-record-payment-correction-save/);
 assert.match(recordPaymentSource, /const canPay = state\.remaining > 0\.009 \|\| state\.fullyPaid/);
 assert.match(recordPaymentSource, /data-record-payment-chat/);
 assert.match(recordPaymentSource, /personKeys:/);
@@ -231,14 +233,19 @@ assert.match(recordPaymentSource, /paymentMethods\(\{ wallets: getWallets\(\), d
 assert.match(recordPaymentSource, /depositAllocations:\s*allocationState\.depositAllocations/);
 assert.match(recordPaymentSource, /personalAccountAmount:\s*allocationState\.personalAccountAmount/);
 assert.match(recordPaymentSource, /finalizeDebt:\s*allocationState\.remaining > 0\.009/);
+assert.doesNotMatch(recordPaymentSource, /openSharedProfileSettingsMenu|setRecordPrimaryAction|data-record-payment-settings|settingsTag:\s*true/);
 
 for (const action of [
-  "id: 'correct-payment'",
-  "id: 'refund-payment'",
-  "id: 'cancel-payment'",
-  "id: 'delete-payment'",
-]) assert.ok(recordPaymentSource.includes(action), `Missing payment A action: ${action}`);
+  'data-record-payment-correct',
+  'data-record-payment-refund',
+  'data-record-payment-cancel',
+  'data-record-payment-delete',
+]) assert.ok(recordPaymentSource.includes(action), `Missing payment Q body action: ${action}`);
 
+assert.match(recordPaymentSource, /Корректировка оплаты/);
+assert.match(recordPaymentSource, /Возврат/);
+assert.match(recordPaymentSource, /Отмена оплаты/);
+assert.match(recordPaymentSource, /Удаление оплаты/);
 assert.match(recordPaymentSource, /await\s+correctFinanceOperation/);
 assert.match(recordPaymentSource, /await\s+recordRefundExpense/);
 assert.match(recordPaymentSource, /await\s+cancelPaymentOperation/);
@@ -258,7 +265,7 @@ assert.match(recordPaymentSource, /mountPaymentQ\(current/);
 assert.match(recordPaymentSource, /mountPaymentQ\(record/);
 assert.match(recordPaymentSource, /serviceAmount:\s*allocationState\.applied/);
 assert.match(recordPaymentSource, /tips:\s*allocationState\.tips/);
-assert.match(recordPaymentSource, /setRecordPrimaryAction\(layer, \{\s*label: 'Оплатить'/s);
+assert.match(recordPaymentSource, /data-record-payment-allocation-submit[\s\S]*recordPaymentIncome/s);
 assert.match(recordPaymentSource, /occurredAtForDate/);
 assert.match(recordPaymentSource, /zonedDateTimeToDate/);
 
