@@ -4,6 +4,7 @@ const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 const read = (path) => fs.readFileSync(path, 'utf8');
 
+const core = read('core.js');
 const account = read('online-booking/account.js');
 const booking = read('online-booking/booking.js');
 const userEntry = read('online-booking/user-entry.js');
@@ -47,6 +48,13 @@ expect(userEntry.includes("resolveBookingPublicRoute(pathRoute.profileSlug, path
 expect(userEntry.includes("from './account.js'"), 'End-user entry must load Account separately.');
 expect(userEntry.includes("from './booking.js'"), 'End-user entry must load Booking separately.');
 expect(userEntry.includes('if (accountBooking)'), 'Account Booking must be handled before public online routing.');
+
+expect(!core.includes("from './online-booking/account.js'"), 'Professional entry must not own the end-user Account route.');
+expect(!core.includes("from './online-booking/booking.js'"), 'Professional entry must not own end-user Booking.');
+expect(!core.includes('function accountBookingRoute('), 'Professional entry must not duplicate Account Booking routing.');
+expect(!core.includes('function onlineBookingRoute('), 'Professional entry must not duplicate Online Booking routing.');
+expect(!core.includes('function renderBookingRoute('), 'Professional entry must not render end-user Booking.');
+expect(!core.includes('function renderGlobalClientRoot('), 'Professional entry must not render the end-user Account.');
 
 expect(accountShell.includes("data: 'data-global-contact-booking'"), 'Contact must expose Booking.');
 expect(accountShell.includes("handlers.onStartBooking?.(tenantId"), 'Contact Booking button must call the Booking route.');
