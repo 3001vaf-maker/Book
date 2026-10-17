@@ -1,4 +1,4 @@
-import { actionBlock, button, miniCard, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
+import { button, miniCard, modal, mountModal, timeSlots, mountRecordZ, recordZHost, bindRecordSettings } from '../ui/ui.js';
 import { listAvailableEndTimes, listAvailableStartTimes } from '../core/time/index.js';
 import { moveJournalBreak, removeJournalBreak } from './break-service.js';
 
@@ -72,11 +72,6 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
   if (!m) return;
   const root = recordZHost(m);
 
-  const deleteBreak = () => {
-    if (!removeJournalBreak(current.id)) return;
-    m.v2Close?.();
-  };
-
   const render = () => {
     const date = formatDate(current.date);
     const period = `${current.from} - ${current.to}`;
@@ -88,11 +83,7 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
         { value: period, align: 'right', data: 'data-break-move', aria: `Перенести перерыв ${period}` },
       ],
     });
-    const actions = actionBlock(
-      button('Удалить перерыв', { variant: 'critical', data: 'data-break-body-delete' }),
-      { className: 'record-visible-actions' },
-    );
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${actions}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
 
     root.querySelector('[data-break-move]')?.addEventListener('click', () => {
       openBreakTimeSlots(current, ({ from, to }) => {
@@ -102,7 +93,6 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
         render();
       });
     });
-    root.querySelector('[data-break-body-delete]')?.addEventListener('click', deleteBreak);
   };
 
   bindRecordSettings(m, () => {
@@ -112,7 +102,8 @@ export function openBreakView(breakItem, { onClose = () => {} } = {}) {
     ));
     layer?.querySelector('[data-break-settings-delete]')?.addEventListener('click', () => {
       layer.v2Close?.();
-      deleteBreak();
+      if (!removeJournalBreak(current.id)) return;
+      m.v2Close?.();
     });
   });
 
