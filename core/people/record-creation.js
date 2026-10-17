@@ -1,7 +1,20 @@
 import { openRecords } from '../../records/records.js';
 import { openRecordConfirmationNotice } from '../../ui/record/confirmation-notice.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
+import { getProfile } from '../profile/data.js';
 import { procedurePricingForWorkplace } from '../service/procedures/selection.js';
+
+function actionContext() {
+  const profile = getProfile();
+  return {
+    source: 'journal',
+    actor: {
+      type: 'profile',
+      profileId: String(profile?.id || ''),
+      accountId: String(profile?.platformAccountId || ''),
+    },
+  };
+}
 
 export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) {
   if (!person?.key) return null;
@@ -10,6 +23,7 @@ export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) 
     context: 'person',
     person,
     professionalActions: true,
+    actionContext: actionContext(),
     onCreated: (created, state) => {
       onCreated?.(created);
       const procedures = (state?.procedures || []).map((entry) => {
