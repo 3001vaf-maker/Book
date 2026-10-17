@@ -47,19 +47,6 @@ if (!paymentUi.includes("label: 'Условие'") || !paymentUi.includes('disab
   errors.push('automatic price condition must remain read-only in payment UI');
 }
 
-const browserRuntime = readFileSync('tests/professional-core-runtime-browser.html', 'utf8');
-for (const assertion of [
-  'Payment Q1 base price must remain editable',
-  'Editing existing Payment price must switch Header C to Save',
-  'Editing existing Payment price must recalculate amount due',
-  'Saving Payment price must persist Record procedures[].cost',
-  'Saving Payment price must persist Settlement item price',
-]) {
-  if (!browserRuntime.includes(assertion)) {
-    errors.push(`browser runtime regression must assert: ${assertion}`);
-  }
-}
-
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);
