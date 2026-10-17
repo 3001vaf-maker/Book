@@ -1,5 +1,0 @@
-/* Q is the canonical owner of primary actions. Shared Header C may mirror an action,
-   but the original action must remain available in the active Q/Z body. */
-.v2-app--workspace .v2-z .v2-workspace-source-hidden {
-  display: revert !important;
-}

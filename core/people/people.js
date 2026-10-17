@@ -1,5 +1,4 @@
 import {
-  actionBlock,
   button,
   collectLinks,
   details,
@@ -259,7 +258,7 @@ function personHistoryMarkup(person, query = '') {
 }
 
 function personQContext(person, { c = null } = {}) {
-  const context = workspaceHeaderContext({
+  return workspaceHeaderContext({
     title: name(person),
     a: {
       kind: 'avatar',
@@ -276,12 +275,6 @@ function personQContext(person, { c = null } = {}) {
       aria: `Чат с ${name(person)}`,
     },
   });
-  const actions = actionBlock([
-    button('Документы', { variant: 'secondary', data: 'data-person-body-documents' }),
-    button('История', { variant: 'secondary', data: 'data-person-body-history' }),
-    button('Записать', { data: 'data-person-body-record' }),
-  ].join(''), { className: 'people-visible-actions' });
-  return `${context}${actions}`;
 }
 
 function openPersonHistoryItemQ(root, person, item, options = {}) {
@@ -691,15 +684,6 @@ function bindPersonContext(root, person, options = {}) {
   root.querySelector('[data-person-direct-chat]')?.addEventListener('click', () => {
     options.onDirectChat?.(person.key);
   });
-  root.querySelectorAll('[data-person-body-documents]').forEach((node) => node.addEventListener('click', () => {
-    openPersonDocuments(root, person);
-  }));
-  root.querySelectorAll('[data-person-body-history]').forEach((node) => node.addEventListener('click', () => {
-    openPersonHistoryQ(root, person, options);
-  }));
-  root.querySelectorAll('[data-person-body-record]').forEach((node) => node.addEventListener('click', () => {
-    openPersonRecordCreation({ person });
-  }));
 }
 
 function overviewCard(person) {

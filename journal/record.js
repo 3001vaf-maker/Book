@@ -226,7 +226,7 @@ function renderProceduresStep(modalRoot, {
     });
   });
   let selectionController = null;
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--procedures"><div data-record-procedures></div><div data-record-procedure-actions></div></div>`);
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--procedures"><div data-record-procedure-actions></div><div data-record-procedures></div></div>`);
   if (!host) return;
 
   const currentEnd = () => {
@@ -439,7 +439,8 @@ function renderPersonStep(modalRoot, { date, workplaceId, from, to, procedures: 
   let filtered = all;
   let selectedPerson = null;
   const selectedPeople = new Map();
-  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people">${groupMode ? `<div class="muted" data-record-group-count>Участники: 0 / ${groupCapacity}</div>` : ''}<div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div><div class="record-person-list" data-record-person-list></div>${actionBlock(button('+ Добавить клиента', { data: 'data-record-body-add-person' }), { className: 'record-visible-actions' })}</div>`);
+  const addPersonAction = actionBlock(button('+ Добавить клиента', { data: 'data-record-body-add-person' }), { className: 'record-visible-actions' });
+  const host = renderRecordZ(modalRoot, `<div class="record-screen record-screen--people">${groupMode ? `<div class="muted" data-record-group-count>Участники: 0 / ${groupCapacity}</div>` : ''}<div class="ui-search-field">${field({ name: 'recordPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-record-person-search' })}</div><div class="ui-search-divider" aria-hidden="true"></div>${addPersonAction}<div class="record-person-list" data-record-person-list></div></div>`);
   if (!host) return;
 
   const proceed = () => {
@@ -694,17 +695,8 @@ function renderConfirmationStep(modalRoot, { date, workplaceId, from, to, select
         right: item.cost === '' || item.cost === null || item.cost === undefined ? '' : `${item.cost} ₽`,
       })),
     });
-    const editActions = actionBlock([
-      button('Пространство', { variant: 'secondary', data: 'data-record-body-edit="workplace"' }),
-      button('Дата', { variant: 'secondary', data: 'data-record-body-edit="date"' }),
-      button('Время', { variant: 'secondary', data: 'data-record-body-edit="time"' }),
-      button('Процедура', { variant: 'secondary', data: 'data-record-body-edit="procedure"' }),
-    ].join(''), { className: 'record-visible-actions' });
 
-    host.innerHTML = `<div class="record-screen record-screen--state-view">${card}${editActions}</div>`;
-    host.querySelectorAll('[data-record-body-edit]').forEach((node) => node.addEventListener('click', () => {
-      applyRecordEdit(String(node.dataset.recordBodyEdit || ''));
-    }));
+    host.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
 
     setRecordPrimaryAction(modalRoot, {
       label: 'Подтвердить',
