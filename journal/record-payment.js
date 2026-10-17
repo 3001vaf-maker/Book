@@ -8,11 +8,9 @@ import {
   modal,
   mountModal,
   openNotice,
-  openSharedProfileSettingsMenu,
   paymentForm,
   paymentMethods,
   select,
-  setRecordPrimaryAction,
   shortDate,
   workspaceHeaderContext,
 } from '../ui/ui.js';
@@ -176,7 +174,7 @@ function paymentDepositAllocations(payment) {
   return Array.isArray(payment?.depositAllocations) ? payment.depositAllocations.map((item) => ({ ...item })) : [];
 }
 
-function paymentOwnerA({ settings = false } = {}) {
+function paymentOwnerA() {
   const profile = getProfile();
   const initials = [profile?.name, profile?.surname]
     .filter(Boolean)
@@ -190,7 +188,8 @@ function paymentOwnerA({ settings = false } = {}) {
     image: String(profile?.photo || ''),
     imagePosition: `${Number(profile?.photoCropX ?? 50)}% ${Number(profile?.photoCropY ?? 50)}%`,
     initials,
-    ...(settings ? { settingsTag: true, data: 'data-record-payment-settings', aria: 'Настройки оплаты' } : { disabled: true, aria: 'Оплата' }),
+    disabled: true,
+    aria: 'Оплата',
   };
 }
 
@@ -208,8 +207,8 @@ function paymentChatContext(record) {
   };
 }
 
-function paymentLayerContext(record, state) {
-  return workspaceHeaderContext({ title: 'Оплата', a: paymentOwnerA({ settings: Boolean(state?.hasPayments) }), ...paymentChatContext(record) });
+function paymentLayerContext(record) {
+  return workspaceHeaderContext({ title: 'Оплата', a: paymentOwnerA(), ...paymentChatContext(record) });
 }
 
 function blankPaymentContext(record, title = 'Оплата') {
@@ -309,58 +308,59 @@ async function openPaymentAllocationLayer(parentLayer, record, settlement, onCom
     <div class="form-grid">
       ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentDate', value: '', showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: true })}
       ${paymentMethods({ wallets: getWallets(), deposits, personalAccount, total, showAction: false, showTotal: false })}
+      <div class="modal-actions">${button('Оплатить', { data: 'data-record-payment-allocation-submit' })}</div>
     </div>`;
   initDatePickers(host);
 
   let allocationState = null;
-  const syncPrimary = () => {
-    if (!allocationState?.valid) { setRecordPrimaryAction(layer); return; }
-    setRecordPrimaryAction(layer, {
-      label: 'Оплатить',
-      onClick: async () => {
-        const dateValue = String(host.querySelector('input[name="recordPaymentDate"]')?.value || '');
-        let completed = null;
-        try {
-          completed = await recordPaymentIncome({
-            source: { type: 'record', id: current.id },
-            workplace: workplaceName(current.workplaceId),
-            person: recordPerson(current),
-            settlement,
-            allocations: allocationState.allocations,
-            depositAllocations: allocationState.depositAllocations,
-            personalAccountAmount: allocationState.personalAccountAmount,
-            finalizeDebt: allocationState.remaining > 0.009,
-            maxAmount: total,
-            serviceAmount: allocationState.applied,
-            tips: allocationState.tips,
-            occurredAt: recordPaymentOccurredAt(current, dateValue),
-          });
-        } catch (error) {
-          openNotice({ message: String(error?.message || 'Не удалось провести оплату') });
-          return;
-        }
-        if (!completed) return;
-
-        layer.v2Close?.();
-        onCompleted?.();
-        setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
-        try {
-          await flushBusinessPersistence();
-          await Promise.all([refreshRecordsFromServer(), refreshFinanceState()]);
-        } catch {
-          await Promise.all([
-            refreshRecordsFromServer().catch(() => null),
-            refreshFinanceState().catch(() => null),
-          ]);
-        }
-      },
-    });
+  const submit = host.querySelector('[data-record-payment-allocation-submit]');
+  const syncAction = () => {
+    if (submit) submit.disabled = !allocationState?.valid;
   };
 
-  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
-    onChange: (next) => { allocationState = next; syncPrimary(); },
+  submit?.addEventListener('click', async () => {
+    if (!allocationState?.valid) return;
+    const dateValue = String(host.querySelector('input[name="recordPaymentDate"]')?.value || '');
+    let completed = null;
+    try {
+      completed = await recordPaymentIncome({
+        source: { type: 'record', id: current.id },
+        workplace: workplaceName(current.workplaceId),
+        person: recordPerson(current),
+        settlement,
+        allocations: allocationState.allocations,
+        depositAllocations: allocationState.depositAllocations,
+        personalAccountAmount: allocationState.personalAccountAmount,
+        finalizeDebt: allocationState.remaining > 0.009,
+        maxAmount: total,
+        serviceAmount: allocationState.applied,
+        tips: allocationState.tips,
+        occurredAt: recordPaymentOccurredAt(current, dateValue),
+      });
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось провести оплату') });
+      return;
+    }
+    if (!completed) return;
+
+    layer.v2Close?.();
+    onCompleted?.();
+    setRecordConfirmed(current.id, true, { actionContext: journalRecordActionContext() });
+    try {
+      await flushBusinessPersistence();
+      await Promise.all([refreshRecordsFromServer(), refreshFinanceState()]);
+    } catch {
+      await Promise.all([
+        refreshRecordsFromServer().catch(() => null),
+        refreshFinanceState().catch(() => null),
+      ]);
+    }
   });
-  syncPrimary();
+
+  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
+    onChange: (next) => { allocationState = next; syncAction(); },
+  });
+  syncAction();
   return layer;
 }
 
@@ -382,38 +382,38 @@ async function openPaymentCorrection(parentLayer, record, payment, onSaved) {
     <div class="form-grid">
       ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentCorrectionDate', value: paymentDateValue(payment), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
       ${paymentMethods({ wallets: getWallets(), deposits, total: serviceAmount, showAction: false, showTotal: false, initialAllocations, initialDepositAllocations })}
+      <div class="modal-actions">${button('Сохранить', { variant: 'secondary', data: 'data-record-payment-correction-save' })}</div>
     </div>`;
   initDatePickers(host);
 
   let allocationState = null;
-  const syncPrimary = () => {
-    if (!allocationState?.valid) { setRecordPrimaryAction(layer); return; }
-    setRecordPrimaryAction(layer, {
-      label: 'Сохранить',
-      variant: 'secondary',
-      onClick: async () => {
-        const dateValue = String(host.querySelector('input[name="recordPaymentCorrectionDate"]')?.value || '');
-        try {
-          await correctFinanceOperation(payment.id, {
-            allocations: allocationState.allocations,
-            depositAllocations: allocationState.depositAllocations,
-            serviceAmount: allocationState.applied,
-            tips: allocationState.tips,
-            occurredAt: occurredAtForDate(dateValue, record, payment.occurredAt || payment.paidAt || new Date()),
-          });
-          layer.v2Close?.();
-          onSaved?.();
-        } catch (error) {
-          openNotice({ message: String(error?.message || 'Не удалось скорректировать оплату') });
-        }
-      },
-    });
+  const save = host.querySelector('[data-record-payment-correction-save]');
+  const syncAction = () => {
+    if (save) save.disabled = !allocationState?.valid;
   };
 
-  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
-    onChange: (next) => { allocationState = next; syncPrimary(); },
+  save?.addEventListener('click', async () => {
+    if (!allocationState?.valid) return;
+    const dateValue = String(host.querySelector('input[name="recordPaymentCorrectionDate"]')?.value || '');
+    try {
+      await correctFinanceOperation(payment.id, {
+        allocations: allocationState.allocations,
+        depositAllocations: allocationState.depositAllocations,
+        serviceAmount: allocationState.applied,
+        tips: allocationState.tips,
+        occurredAt: occurredAtForDate(dateValue, record, payment.occurredAt || payment.paidAt || new Date()),
+      });
+      layer.v2Close?.();
+      onSaved?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось скорректировать оплату') });
+    }
   });
-  syncPrimary();
+
+  initPaymentMethods(host.querySelector('[data-payment-methods]'), {
+    onChange: (next) => { allocationState = next; syncAction(); },
+  });
+  syncAction();
   return layer;
 }
 
@@ -516,18 +516,14 @@ function openPaymentDeletion(payment, onSaved) {
   return layer;
 }
 
-function openPaymentSettings(layer, record, state, rerender) {
-  const payment = state?.latestPayment || null;
-  if (!payment) return null;
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки оплаты',
-    actions: [
-      { id: 'correct-payment', label: 'Корректировка оплаты', onSelect: () => openPaymentCorrection(layer, record, payment, rerender) },
-      { id: 'refund-payment', label: 'Возврат', variant: 'danger', onSelect: () => openPaymentRefund(record, payment, rerender) },
-      { id: 'cancel-payment', label: 'Отмена оплаты', variant: 'danger', onSelect: () => openPaymentCancellation(record, payment, rerender) },
-      { id: 'delete-payment', label: 'Удаление оплаты', variant: 'critical', onSelect: () => openPaymentDeletion(payment, rerender) },
-    ],
-  });
+function paymentOperationActions(state) {
+  if (!state?.latestPayment) return '';
+  return `<div class="modal-actions" data-record-payment-operation-actions>
+    ${button('Корректировка оплаты', { variant: 'outline', data: 'data-record-payment-correct' })}
+    ${button('Возврат', { variant: 'danger', data: 'data-record-payment-refund' })}
+    ${button('Отмена оплаты', { variant: 'danger', data: 'data-record-payment-cancel' })}
+    ${button('Удаление оплаты', { variant: 'critical', data: 'data-record-payment-delete' })}
+  </div>`;
 }
 
 function renderPaymentLayer(layer, recordId) {
@@ -538,7 +534,7 @@ function renderPaymentLayer(layer, recordId) {
   const settlement = payment.settlement;
   const host = layer.querySelector('[data-record-payment-q-host]');
   if (!host) { layer.v2Close?.(); return; }
-  host.innerHTML = paymentForm({
+  host.innerHTML = `${paymentForm({
     workplace: payment.workplace,
     date: payment.date,
     time: payment.time,
@@ -546,49 +542,61 @@ function renderPaymentLayer(layer, recordId) {
     procedures: paymentItems(settlement),
     total: state.remaining,
     showActions: false,
-  });
+  })}
+    <div class="modal-actions" data-record-payment-primary-actions>
+      ${button('Сохранить', { variant: 'secondary', data: 'data-record-payment-save' })}
+      ${button('Оплатить', { data: 'data-record-payment-pay' })}
+    </div>
+    ${paymentOperationActions(state)}`;
+
   let formState = { settlement, total: state.remaining, dirty: false };
-  const syncPrimary = () => {
-    if (formState.dirty) {
-      setRecordPrimaryAction(layer, {
-        label: 'Сохранить',
-        variant: 'secondary',
-        onClick: async () => {
-          const updated = await saveSettlementCorrection(current, formState.settlement);
-          if (updated && layer.isConnected) renderPaymentLayer(layer, current.id);
-        },
-      });
-      return;
-    }
+  const save = host.querySelector('[data-record-payment-save]');
+  const pay = host.querySelector('[data-record-payment-pay]');
+  const syncActions = () => {
     const canPay = state.remaining > 0.009 || state.fullyPaid;
-    if (!canPay) { setRecordPrimaryAction(layer); return; }
-    setRecordPrimaryAction(layer, {
-      label: 'Оплатить',
-      onClick: () => openPaymentAllocationLayer(layer, current, formState.settlement, () => {
-        layer.v2Close?.();
-      }),
-    });
+    if (save) save.hidden = !formState.dirty;
+    if (pay) pay.hidden = formState.dirty || !canPay;
   };
+
   initPaymentForm(host.querySelector('[data-payment-ui]'), {
     calculate: (items) => calculateSettlement(items),
     paidTotal: state.paidTotal,
-    onChange: (next) => { formState = next; syncPrimary(); },
+    onChange: (next) => { formState = next; syncActions(); },
   });
-  layer.querySelector('[data-record-payment-settings]')?.addEventListener('click', () => {
-    openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), () => {
-      if (layer.isConnected) renderPaymentLayer(layer, current.id);
+
+  save?.addEventListener('click', async () => {
+    if (!formState.dirty) return;
+    const updated = await saveSettlementCorrection(current, formState.settlement);
+    if (updated && layer.isConnected) renderPaymentLayer(layer, current.id);
+  });
+  pay?.addEventListener('click', () => {
+    const canPay = state.remaining > 0.009 || state.fullyPaid;
+    if (formState.dirty || !canPay) return;
+    openPaymentAllocationLayer(layer, current, formState.settlement, () => {
+      layer.v2Close?.();
     });
-  }, { once: true });
-  syncPrimary();
+  });
+
+  const latestPayment = state?.latestPayment || null;
+  const rerender = () => {
+    if (layer.isConnected) renderPaymentLayer(layer, current.id);
+  };
+  if (latestPayment) {
+    host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrection(layer, current, latestPayment, rerender));
+    host.querySelector('[data-record-payment-refund]')?.addEventListener('click', () => openPaymentRefund(current, latestPayment, rerender));
+    host.querySelector('[data-record-payment-cancel]')?.addEventListener('click', () => openPaymentCancellation(current, latestPayment, rerender));
+    host.querySelector('[data-record-payment-delete]')?.addEventListener('click', () => openPaymentDeletion(latestPayment, rerender));
+  }
+
+  syncActions();
 }
 
 export function openRecordPayment(record) {
   if (!record?.id) return null;
   const current = getRecord(record.id) || record;
-  const state = paymentStateForRecord(current);
   const layer = mountPaymentQ(current, {
     title: 'Оплата',
-    context: paymentLayerContext(current, state),
+    context: paymentLayerContext(current),
     className: 'record-payment-q',
     hostData: 'data-record-payment-q-host',
   });
