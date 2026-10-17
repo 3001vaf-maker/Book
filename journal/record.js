@@ -1,7 +1,10 @@
 import {
   button,
+  durationPicker,
   durationText,
+  escapeHtml,
   field,
+  initDurationPickers,
   initMultiSelect,
   initViewNavigation,
   miniCard,
@@ -180,6 +183,24 @@ function openPriceProcedurePicker({ workplaceId, onAssigned = () => {} } = {}) {
     controller?.destroy?.();
     layer.v2Close?.();
     onAssigned(assigned);
+  });
+}
+
+function openProcedureSettings({ procedure, current, onSave }) {
+  if (!procedure || !current) return;
+  const durationField = durationPicker({ name: 'recordDuration', label: 'Время', value: Number(current.duration) || 0 });
+  const html = `<div class="modal-title"><h2>${escapeHtml(procedure.name)}</h2><p>Скорректируйте время процедуры для этой записи.</p></div><div class="compact-form">${durationField}<div class="modal-actions">${button('Сохранить', { data: 'data-record-duration-save' })}</div></div>`;
+  const layer = mountModal(document.body, modal(html, { variant: 'x', surface: 'app', className: 'modal--form-sheet' }));
+  if (!layer) return;
+  initDurationPickers(layer);
+  layer.querySelector('[data-record-duration-save]')?.addEventListener('click', () => {
+    const durationValue = Number(layer.querySelector('[data-duration-value]')?.value);
+    onSave?.({
+      procedure,
+      cost: current.cost,
+      duration: Number.isFinite(durationValue) ? durationValue : current.duration,
+    });
+    layer.v2Close?.();
   });
 }
 
@@ -385,6 +406,36 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
       available = procedures().filter((procedure) => procedureForWorkplace(procedure, state.workplaceId));
     };
 
+    const openDurationCorrection = () => {
+      if (!selected.size) return;
+      const rows = recordProcedureList([...selected.entries()].map(([id, item]) => ({
+        id,
+        name: item?.procedure?.name || 'Процедура',
+        durationText: durationText(item?.duration),
+        costText: item?.cost === '' || item?.cost == null ? '' : `${item.cost} ₽`,
+      })), {
+        data: 'data-record-duration-edit',
+        selected: [],
+        empty: 'Процедуры не выбраны.',
+      });
+      const layer = mountModal(document.body, modal(rows, { variant: 'x', surface: 'app', className: 'modal--form-sheet' }));
+      if (!layer) return;
+      layer.querySelectorAll('[data-record-duration-edit]').forEach((node) => node.addEventListener('click', () => {
+        const id = String(node.dataset.recordDurationEdit || '');
+        const current = selected.get(id);
+        if (!current) return;
+        layer.v2Close?.();
+        openProcedureSettings({
+          procedure: current.procedure,
+          current,
+          onSave: (updated) => {
+            selected.set(id, updated);
+            render();
+          },
+        });
+      }));
+    };
+
     const openFromPrice = () => {
       openPriceProcedurePicker({
         workplaceId: state.workplaceId,
@@ -422,8 +473,10 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
       const content = recordProcedureList(available.map((procedure) => ({
         id: procedure.id,
         name: procedure.name || '',
-        durationText: durationText(procedure.duration),
-        costText: defaultCost(procedure, state.workplaceId) !== '' ? `${defaultCost(procedure, state.workplaceId)} ₽` : '',
+        durationText: durationText(selected.get(String(procedure.id || ''))?.duration ?? procedure.duration),
+        costText: selected.get(String(procedure.id || ''))?.cost ?? defaultCost(procedure, state.workplaceId) !== ''
+          ? `${selected.get(String(procedure.id || ''))?.cost ?? defaultCost(procedure, state.workplaceId)} ₽`
+          : '',
       })), {
         data: 'data-record-create-procedure',
         selected: [...selected.keys()],
@@ -432,7 +485,7 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
       const view = owner.render({
         step: 'procedures',
         body: `<div class="record-screen record-screen--procedures"><div data-record-create-procedures>${content}</div></div>`,
-        footer: `${button('Добавить из прайса', { data: 'data-record-create-from-price', variant: 'secondary' })}${button('+ Добавить процедуру', { data: 'data-record-create-add-procedure', variant: 'secondary' })}`,
+        footer: `${selected.size ? button('Время процедур', { data: 'data-record-create-duration', variant: 'secondary' }) : ''}${button('Добавить из прайса', { data: 'data-record-create-from-price', variant: 'secondary' })}${button('+ Добавить процедуру', { data: 'data-record-create-add-procedure', variant: 'secondary' })}`,
         action: { label: 'Далее', data: 'data-record-create-procedures-next', disabled: selected.size === 0 },
       });
       const listRoot = view?.body?.querySelector('[data-record-create-procedures]');
@@ -457,6 +510,7 @@ export function openRecordCreation({ date, workplaceId, from, onCreated = () => 
           render();
         },
       });
+      view?.footer?.querySelector('[data-record-create-duration]')?.addEventListener('click', openDurationCorrection);
       view?.footer?.querySelector('[data-record-create-from-price]')?.addEventListener('click', openFromPrice);
       view?.footer?.querySelector('[data-record-create-add-procedure]')?.addEventListener('click', openAddProcedure);
       view?.action?.addEventListener('click', () => {
