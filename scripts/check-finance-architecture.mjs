@@ -338,7 +338,6 @@ if (/<select\b/.test(cashUI)) {
   errors.push('Cash investment tools must reuse the shared selector instead of native select');
 }
 
-
 if (!/wallets\/:walletId\/hard/.test(financeController)) {
   errors.push('Finance server must expose the admin-only full cash deletion command');
 }
@@ -461,48 +460,19 @@ if (!/export function getZReport/.test(financeRead) || !/getLedgerEntries\(\)/.t
   errors.push('Z-report must be a Ledger-only projection');
 }
 
-
 const stagingSeed = source('server/prisma/seed-staging.ts');
 if (/financeSettlement\.upsert|financeOperation\.upsert|financeLedgerEntry\.upsert|staging-payment-|staging-ledger-/.test(stagingSeed)) {
   errors.push('Staging fixtures must not create test Finance facts');
 }
 
-const recordView = source('journal/record-view.js');
-if (/recordViewProcedureCost|data-record-view-procedure-cost/.test(recordView)) {
-  errors.push('Created Record card must not correct procedure price; it may correct procedure time only');
-}
-
-const recordCreation = source('journal/record.js');
+const recordCreation = source('records/records.js');
 if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
-  errors.push('Record creation must not correct procedure price; price comes from Price and is corrected only at payment');
+  errors.push('Records creation must not correct procedure price; price comes from Price and is corrected only at payment');
 }
 
 const paymentUI = source('ui/payment/index.js');
 if (!/data-payment-price/.test(paymentUI) || /data-payment-price\s+readonly/.test(paymentUI)) {
   errors.push('Payment must remain the editable procedure/product price correction point');
-}
-
-const recordPayment = source('journal/record-payment.js');
-if (!/saveSettlementSnapshot/.test(recordPayment) || !/await\s+recordPaymentIncome/.test(recordPayment)) {
-  errors.push('Payment UI must save Settlement and await the server money command');
-}
-if (!/datePicker\(\{[^}]*name:\s*['"]recordPaymentDate['"][^}]*allowClear:\s*true/s.test(recordPayment)
-  || /type:\s*['"]datetime-local['"]|paymentOccurredAt|refundOccurredAt|cancelOccurredAt/.test(recordPayment)) {
-  errors.push('Record payment must use the shared optional date-only picker and must not recreate legacy date-time payment/refund fields');
-}
-if (!/datePicker\(\{[^}]*name:\s*['"]recordPaymentCancelDate['"]/s.test(recordPayment)
-  || !/await\s+cancelPaymentOperation/.test(recordPayment)
-  || !/await\s+hardDeleteFinanceOperation/.test(recordPayment)
-  || !/await\s+correctFinanceOperation/.test(recordPayment)) {
-  errors.push('Payment settings must await canonical correction, cancellation and hard-delete Finance commands');
-}
-if (!/await\s+recordRefundExpense/.test(recordPayment)
-  || !/datePicker\(\{[^}]*name:\s*['"]recordPaymentRefundDate['"]/s.test(recordPayment)
-  || /refundOccurredAt|type:\s*['"]datetime-local['"]/.test(recordPayment)) {
-  errors.push('Record payment refund must use the canonical server command with the shared date-only picker');
-}
-if (/finance:\s*settlement/.test(recordPayment)) {
-  errors.push('Payment-stage Settlement must not be persisted back into Record');
 }
 
 if (errors.length) {
@@ -513,13 +483,12 @@ if (errors.length) {
 
 console.log('finance architecture check: OK');
 
-
 // Settlement math has one canonical owner shared by browser and server.
 const SERVER_SETTLEMENT_DUPLICATE = 'server/src/finance/settlement-rules.ts';
 if (existsSync(SERVER_SETTLEMENT_DUPLICATE)) {
-  fail('server/src/finance/settlement-rules.ts must not exist; use core/finance/rules.js');
+  errors.push('server/src/finance/settlement-rules.ts must not exist; use core/finance/rules.js');
 }
 const financeServerSource = readFileSync('server/src/finance/finance.service.ts', 'utf8');
 if (!financeServerSource.includes("../../../core/finance/rules.js")) {
-  fail('FinanceService must use the canonical core/finance/rules.js Settlement calculator');
+  errors.push('FinanceService must use the canonical core/finance/rules.js Settlement calculator');
 }

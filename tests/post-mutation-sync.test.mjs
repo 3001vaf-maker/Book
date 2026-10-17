@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 function source(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -7,9 +7,8 @@ function source(path) {
 
 const persistence = source('core/business-persistence.js');
 const serverSync = source('online-booking/server-sync.js');
-const payment = source('journal/record-payment.js');
 const financeService = source('core/finance/service.js');
-const recordView = source('journal/record-view.js');
+const journalView = source('journal/journal-view.js');
 const journal = source('journal/journal.js');
 const timetable = source('timetable/timetable.js');
 const profile = source('core/profile/data.js');
@@ -18,8 +17,8 @@ const workplaces = source('core/profile/workplaces/data.js');
 const frontendSources = [
   persistence,
   serverSync,
-  payment,
-  recordView,
+  financeService,
+  journalView,
   journal,
   timetable,
   profile,
@@ -62,13 +61,6 @@ assert.match(serverSync, /book:profile-changed/);
 assert.match(serverSync, /book:workplaces-changed/);
 assert.match(serverSync, /book:dds-changed/);
 
-assert.match(payment, /recordPaymentIncome/);
-assert.match(payment, /refreshRecordsFromServer/);
-assert.match(payment, /correctFinanceOperation/);
-assert.match(payment, /recordRefundExpense/);
-assert.match(payment, /cancelPaymentOperation/);
-assert.match(payment, /hardDeleteFinanceOperation/);
-assert.doesNotMatch(payment, /refreshPaidStateForPayment|event\?\.detail\?\.action === 'server-refresh'/);
 assert.match(financeService, /async function applyServerState/);
 assert.match(financeService, /hydrateFinanceFromServer\(payload\)/);
 assert.match(financeService, /recordPaymentIncome[\s\S]*applyServerState\(response/);
@@ -76,7 +68,10 @@ assert.match(financeService, /correctFinanceOperation[\s\S]*applyServerState\(re
 assert.match(financeService, /recordRefundExpense[\s\S]*applyServerState\(response/);
 assert.match(financeService, /cancelFinanceOperation[\s\S]*applyServerState\(response/);
 assert.match(financeService, /hardDeleteFinanceOperation[\s\S]*applyServerState\(response/);
-assert.match(recordView, /book:people-changed/);
+
+assert.doesNotMatch(journalView, /recordPaymentIncome|correctFinanceOperation|recordRefundExpense|cancelPaymentOperation|hardDeleteFinanceOperation/);
+assert.equal(existsSync(new URL('../journal/record-payment.js', import.meta.url)), false);
+assert.equal(existsSync(new URL('../journal/record-view.js', import.meta.url)), false);
 assert.match(journal, /book:products-changed/);
 assert.match(journal, /book:workplaces-changed/);
 assert.match(timetable, /book:time-usage-changed/);

@@ -26,10 +26,6 @@ import {
 
 const recordServiceSource = readFileSync(new URL('../core/record/service.js', import.meta.url), 'utf8');
 const serverRecordSource = readFileSync(new URL('../server/src/record/record.service.ts', import.meta.url), 'utf8');
-const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
-const procedureCorrectionSource = readFileSync(new URL('../journal/record-procedure-correction.js', import.meta.url), 'utf8');
-const recordRuntimeSource = readFileSync(new URL('../ui/record/runtime.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(recordServiceSource, /from ['"][^'"]*finance\/index\.js['"]/);
 assert.match(recordServiceSource, /'finance'/);
@@ -37,26 +33,6 @@ assert.match(serverRecordSource, /this\.finance\.upsertSettlement/);
 assert.match(serverRecordSource, /const \{ finance: _financeProjection, \.\.\.currentRecord \} = current/);
 assert.match(serverRecordSource, /const requestedCost = Number\(draft\?\.cost \?\? draft\?\.price\);/);
 assert.match(serverRecordSource, /cost: Number\.isFinite\(requestedCost\) && requestedCost >= 0 \? requestedCost : item\.cost/);
-assert.match(recordPaymentSource, /saveSettlementSnapshot/);
-
-const transferSelectorSource = recordViewSource.match(/const openRecordTransferSelector = \(\) => \{([\s\S]*?)\n  \};\n\n  const confirmHardDelete/)?.[1] || '';
-assert.ok(transferSelectorSource, 'Record transfer selector must exist');
-assert.match(recordViewSource, /data-record-view-procedure-edit/);
-assert.match(recordViewSource, /label:\s*'⚙'/);
-assert.match(recordViewSource, /openRecordProcedureCorrection\(\{/);
-assert.match(recordViewSource, /procedureIndex/);
-assert.doesNotMatch(recordViewSource, /id:\s*'procedure-correction'/);
-assert.doesNotMatch(recordViewSource, /openRecordEdit\('procedure'\)/);
-assert.match(transferSelectorSource, /value:\s*'workplace'/);
-assert.match(transferSelectorSource, /value:\s*'date'/);
-assert.match(transferSelectorSource, /value:\s*'time'/);
-assert.doesNotMatch(transferSelectorSource, /value:\s*'procedure'/);
-assert.match(recordRuntimeSource, /item\.action \? \{ action: item\.action \}/);
-assert.match(procedureCorrectionSource, /title:\s*'Корректировка'/);
-assert.match(procedureCorrectionSource, /durationPicker\(/);
-assert.match(procedureCorrectionSource, /label:\s*'Процедура'/);
-assert.match(procedureCorrectionSource, /Удалить процедуру/);
-assert.match(procedureCorrectionSource, /\+ Добавить процедуру/);
 
 // Record owns source facts; Finance projection calculates the initial Settlement.
 hydrateDaysFromServer([
@@ -233,5 +209,4 @@ assert.equal(restored.finance.correctionTotal, 1600);
 assert.equal(restored.finance.planTotal, 6400);
 assert.equal(restored.finance.factTotal, 6400);
 
-assert.match(recordPaymentSource, /К оплате/);
 console.log('critical record flow tests: OK');

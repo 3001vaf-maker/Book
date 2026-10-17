@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { hydrateDaysFromServer } from '../core/day/index.js';
 import { calculateSettlement, getSettlementItemTotals, hydrateFinanceFromServer } from '../core/finance/index.js';
 import { createRecord, getRecords, hydrateRecordStateFromServer, updateRecord } from '../core/record/index.js';
@@ -57,20 +57,10 @@ assert.equal(getSettlementItemTotals('procedure', 'procedure-products').factTota
 assert.equal(getSettlementItemTotals('product', 'product-1').factTotal, 1800);
 assert.equal(getRecords().find((item) => item.id === record.id)?.finance?.planTotal, 6800);
 
-const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
-const recordPaymentSource = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
-assert.doesNotMatch(recordViewSource, /data-record-settings-sale|data-record-sale-product|button\('Продажа'|initMultiSelect/);
-assert.match(recordViewSource, /\.\.\.state\.products\.map/);
-assert.match(recordViewSource, /name:\s*item\.name\s*\|\|\s*''/);
-assert.match(recordPaymentSource, /products:\s*sourcesFromSettlement/);
-assert.match(recordPaymentSource, /saveSettlementSnapshot/);
-// Payment is an action contour over the record: Q1/Q2 must cover Z without creating more Z layers.
-assert.match(recordPaymentSource, /mountPaymentQ\(/);
-assert.match(recordPaymentSource, /variant: 'q'/);
-assert.match(recordPaymentSource, /className: 'record-payment-q'/);
-assert.match(recordPaymentSource, /className: 'record-payment-allocation-q'/);
-assert.doesNotMatch(recordPaymentSource, /mountV2ZLayer|v2ZLayer|record-payment-z|record-payment-allocation-z/);
-assert.match(recordPaymentSource, /paymentForm\(/);
-assert.doesNotMatch(recordPaymentSource, /modal-bottom-action/);
+// Journal View is intentionally display-only while Records has one canonical owner.
+const journalViewSource = readFileSync(new URL('../journal/journal-view.js', import.meta.url), 'utf8');
+assert.doesNotMatch(journalViewSource, /data-record-settings-sale|data-record-sale-product|button\('Продажа'|initMultiSelect|paymentForm|mountPaymentQ/);
+assert.equal(existsSync(new URL('../journal/record-view.js', import.meta.url)), false);
+assert.equal(existsSync(new URL('../journal/record-payment.js', import.meta.url)), false);
 
 console.log('record product sale tests: OK');

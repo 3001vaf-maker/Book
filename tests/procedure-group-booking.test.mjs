@@ -20,14 +20,14 @@ assert.match(formSource, /name:\s*'procedureGroupCapacity'/);
 assert.match(formSource, /label:\s*'Максимум людей'/);
 assert.match(formSource, /groupBooking:\s*\{/);
 
-const recordSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
-assert.match(recordSource, /function\s+groupCapacityForSelectedProcedures/);
-assert.match(recordSource, /catalog\?\.groupBooking\?\.enabled\s*!==\s*true/);
-assert.match(recordSource, /Math\.min\(\.\.\.capacities\)/);
-assert.match(recordSource, /title:\s*groupMode\s*\?\s*'Выбор участников'/);
-assert.match(recordSource, /selectedPeople\.size\s*>=\s*groupCapacity/);
-assert.match(recordSource, /group:\s*capacity\s*>\s*1\s*\?/);
-assert.doesNotMatch(recordSource, /data-record-group-capacity-save|openGroupCapacity|label:\s*'Количество мест'/);
+const recordsSource = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
+assert.match(recordsSource, /function groupCapacity\(procedures = \[\]\)/);
+assert.match(recordsSource, /source\?\.groupBooking\?\.enabled !== true/);
+assert.match(recordsSource, /Math\.min\(\.\.\.capacities\)/);
+assert.match(recordsSource, /const groupMode = capacity > 1/);
+assert.match(recordsSource, /selected\.size < capacity/);
+assert.match(recordsSource, /group:\s*capacity > 1 \?/);
+assert.doesNotMatch(recordsSource, /data-record-group-capacity-save|openGroupCapacity|label:\s*'Количество мест'/);
 
 const procedureServerSource = readFileSync(new URL('../server/src/procedure/procedure.service.ts', import.meta.url), 'utf8');
 assert.match(procedureServerSource, /groupBooking:\s*\{/);

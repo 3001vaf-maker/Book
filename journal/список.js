@@ -3,7 +3,7 @@ import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getRecords } from '../core/record/index.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
-import { openRecordView } from './record-view.js';
+import { openJournalView } from './journal-view.js';
 
 function formatMoney(value = 0) {
   const amount = Math.max(0, Math.round(Number(value) || 0));
@@ -68,7 +68,7 @@ function bindRecordClicks(root, records) {
   const byId = new Map(records.map((record) => [recordId(record), record]).filter(([id]) => Boolean(id)));
   root.querySelectorAll('[data-journal-list-record]').forEach((node) => node.addEventListener('click', () => {
     const record = byId.get(String(node.dataset.journalListRecord || ''));
-    if (record) openRecordView(record);
+    if (record) openJournalView(record);
   }));
 }
 

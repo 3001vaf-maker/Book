@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const recordFlow = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
-const recordView = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
+const recordFlow = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
+const journalView = readFileSync(new URL('../journal/journal-view.js', import.meta.url), 'utf8');
 const breakView = readFileSync(new URL('../journal/break-view.js', import.meta.url), 'utf8');
 const journalDay = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
 const timeline = readFileSync(new URL('../ui/time/journal-day.js', import.meta.url), 'utf8');
@@ -10,28 +10,17 @@ const timeUsage = readFileSync(new URL('../core/time/usage.js', import.meta.url)
 const dayEditor = readFileSync(new URL('../timetable/day-editor.js', import.meta.url), 'utf8');
 
 assert.match(recordFlow, /checkTimeAvailability/);
-assert.match(recordFlow, /listAvailableStartTimes/);
+assert.match(recordFlow, /getTimeAvailabilityAt/);
 assert.match(recordFlow, /listAvailableEndTimes/);
-assert.match(recordFlow, /recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/);
-assert.match(recordFlow, /recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/);
-assert.doesNotMatch(recordFlow, /recordTimeRows\(\{\s*items:/);
+assert.match(recordFlow, /buildNaturalBookingTimeRows/);
+assert.match(recordFlow, /recordCreationTimeRows\(rows/);
 assert.match(recordFlow, /getWorkplaceWorkingDates/);
 assert.doesNotMatch(recordFlow, /isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/);
 assert.doesNotMatch(recordFlow, /from ['"]\.\.\/core\/day\.js['"]/);
 
-assert.match(recordView, /openRecordEditFlow/);
-assert.doesNotMatch(recordView, /openTimePickerAction|checkRecordTime|startWorkplaceEdit|startRecordDateEdit|startRecordTimeEdit|openWorkplacePicker|openDatePicker/);
-assert.doesNotMatch(recordView, /listAvailableStartTimes|timeSlots\(\{|getBookingSettings\(\)\.slotStep/);
-assert.doesNotMatch(recordView, /from ['"]\.\.\/core\/day\.js['"]/);
-
-const sharedEditFlow = recordFlow.slice(
-  recordFlow.indexOf('export function openRecordEditFlow'),
-  recordFlow.indexOf('function blockEndValues'),
-);
-assert.match(sharedEditFlow, /timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1/);
-assert.match(sharedEditFlow, /initTimePickers\(host\)/);
-assert.match(sharedEditFlow, /checkTimeAvailability\(\{[\s\S]*excludeId/);
-assert.doesNotMatch(sharedEditFlow, /getBookingSettings\(\)\.slotStep/);
+// Journal View is display-only for now and must not own a second Record time/edit flow.
+assert.doesNotMatch(journalView, /openRecordEditFlow|openTimePickerAction|checkTimeAvailability|listAvailableStartTimes|listAvailableEndTimes|getBookingSettings/);
+assert.doesNotMatch(journalView, /from ['"]\.\.\/core\/day\.js['"]/);
 
 assert.match(breakView, /listAvailableStartTimes/);
 assert.match(breakView, /listAvailableEndTimes/);

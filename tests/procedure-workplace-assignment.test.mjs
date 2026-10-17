@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { assignProceduresToWorkplace } from '../core/service/procedures/service.js';
+import { assignProceduresToWorkplace } from '../core/service/procedures/assignment.js';
 import { getProcedures, hydrateProceduresFromServer } from '../core/service/procedures/data.js';
 
 const store = new Map();
@@ -63,24 +63,14 @@ const repeated = assignProceduresToWorkplace({
 assert.equal(repeated.length, 0);
 assert.equal(localStorage.getItem('book.procedures.history'), null);
 
-const procedureServiceSource = readFileSync(new URL('../core/service/procedures/service.js', import.meta.url), 'utf8');
-assert.match(procedureServiceSource, /pushProcedureHistory\(previous, 'updated'\)/);
+const assignmentSource = readFileSync(new URL('../core/service/procedures/assignment.js', import.meta.url), 'utf8');
+assert.match(assignmentSource, /pushProcedureHistory\(previous, 'updated'\)/);
 
-const recordSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
-const recordRuntimeSource = readFileSync(new URL('../ui/record/runtime.js', import.meta.url), 'utf8');
-const recordCss = readFileSync(new URL('../ui/record/record.css', import.meta.url), 'utf8');
-const buttonCss = readFileSync(new URL('../ui/buttons/buttons.css', import.meta.url), 'utf8');
-assert.match(recordSource, /assignProceduresToWorkplace/);
-assert.match(recordSource, /bindRecordSettings/);
-assert.match(recordSource, /data-record-settings-from-price/);
-assert.match(recordSource, /data-record-settings-add-procedure/);
-assert.doesNotMatch(recordSource, /button\('Из прайса'/);
-assert.doesNotMatch(recordSource, /data-record-from-price/);
-assert.doesNotMatch(recordSource, /iconButton\('\+'/);
-assert.match(recordRuntimeSource, /data-record-owner-settings/);
-assert.match(recordRuntimeSource, /(?:data-v2-primary-action|dataset\.v2PrimaryAction)/);
-assert.doesNotMatch(buttonCss, /data-record-from-price/);
-assert.doesNotMatch(recordCss, /data-record-from-price/);
-assert.doesNotMatch(recordSource, /saveProcedure/);
+const recordsSource = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
+assert.match(recordsSource, /assignProceduresToWorkplace/);
+assert.match(recordsSource, /data-records-from-price/);
+assert.match(recordsSource, /data-records-add-procedure/);
+assert.doesNotMatch(recordsSource, /saveProcedure/);
+assert.doesNotMatch(recordsSource, /journal\/record\.js|journal\/record-view\.js/);
 
 console.log('procedure workplace assignment tests: OK');

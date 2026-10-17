@@ -15,8 +15,8 @@ function withFinancialState(usages = []) {
 }
 
 async function openExistingRecord(record) {
-  const { openRecordView } = await import('./record-view.js');
-  openRecordView(record);
+  const { openJournalView } = await import('./journal-view.js');
+  openJournalView(record);
 }
 
 async function openUsage(usage, rerender = () => {}) {
@@ -101,8 +101,8 @@ export function renderJournalDay(root, {
         return;
       }
       if (minuteState.state !== 'free') return;
-      const { openRecordCreation } = await import('./record-creation-x.js');
-      openRecordCreation({ date, workplaceId, from, onCreated: rerender });
+      const { openRecords } = await import('../records/records.js');
+      openRecords({ context: 'journal', date, workplaceId, timeHint: from, professionalActions: true, onCreated: rerender });
     },
   });
 }

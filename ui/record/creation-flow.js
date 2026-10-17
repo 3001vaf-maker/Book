@@ -85,23 +85,35 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
     step = '',
     title = '',
     body = '',
+    secondaryActions = [],
     action = null,
   } = {}) => {
     if (!bodyHost || !actionHost || !titleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
     titleHost.textContent = resolveRecordCreationTitle(step, title);
     bodyHost.innerHTML = body;
-    actionHost.innerHTML = action?.label
+    const secondary = (Array.isArray(secondaryActions) ? secondaryActions : [])
+      .filter((item) => item?.label)
+      .map((item) => button(item.label, {
+        data: item.data || '',
+        disabled: Boolean(item.disabled),
+        variant: item.variant || 'secondary',
+      }))
+      .join('');
+    const primary = action?.label
       ? button(action.label, {
           data: action.data || 'data-record-creation-primary',
           disabled: Boolean(action.disabled),
           variant: action.variant || 'primary',
         })
       : '';
+    actionHost.innerHTML = secondary || primary
+      ? `<div class="record-creation-flow__actions">${secondary}${primary}</div>`
+      : '';
     return {
       layer,
       body: bodyHost,
-      action: actionHost.querySelector('button'),
+      action: action?.label ? actionHost.querySelector(`[${action.data || 'data-record-creation-primary'}]`) : null,
     };
   };
 

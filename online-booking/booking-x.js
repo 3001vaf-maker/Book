@@ -23,24 +23,18 @@ import {
   escapeHtml,
   field,
   formValidationMessage,
-  initCalendar,
   initPasswordFields,
   initV2StickerSwipe,
   openDocumentViewer,
   openNotice,
-  openRecordCreationOwner,
   passwordField,
   phoneField,
-  recordConfirmationMiniCard,
-  recordCreationTimeRows,
-  recordProcedureList,
-  recordWorkplaceCards,
   v2Sticker,
 } from '../ui/ui.js';
 import { formError, formView } from '../ui/forms/index.js';
+import { openRecords } from '../records/records.js';
 import {
   bookingProcedureCost,
-  bookingSelection,
   getBookingProcedures,
   getBookingSlots,
   getBookingTimeRows,
@@ -50,25 +44,9 @@ import {
 } from './model.js';
 import { workplaceCardAppearance, workplaceCardFields } from '../core/profile/card-presentation.js';
 
-function formatDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
-
-function money(value) {
-  if (value === '' || value == null) return '0 ₽';
-  const number = Number(String(value).replace(',', '.'));
-  return Number.isFinite(number) ? `${number.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} ₽` : `${value} ₽`;
-}
-
 function numericCost(value) {
   const number = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(number) ? Math.max(0, number) : 0;
-}
-
-function selectedSubtotal(state) {
-  return bookingSelection(state.context, state.workplaceKey, state.procedureIds)
-    .reduce((sum, procedure) => sum + numericCost(bookingProcedureCost(procedure, state.workplaceKey)), 0);
 }
 
 function accountDiscount(account = {}) {
@@ -81,15 +59,6 @@ function accountFlowError(error, fallbackMessage) {
   if (!isAccountSystemError(error)) return message;
   openNotice({ title: 'Не удалось выполнить действие', message, variant: 'technical' });
   return '';
-}
-
-function representativeName(state) {
-  const profile = state.context?.profile || {};
-  return [profile.name, profile.surname].filter(Boolean).join(' ').trim() || 'Запись';
-}
-
-function representativePhoto(state) {
-  return String(state.context?.profile?.photo || '');
 }
 
 function exitBookingContext(state, target = {}) {
@@ -217,7 +186,11 @@ function renderAccountEntry(root, state) {
     try {
       const prepared = await prepareAccount(state.tenantId, { identifier });
       if (!prepared.exists) {
-        state.accountDraft = { identifier, ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}), ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}) };
+        state.accountDraft = {
+          identifier,
+          ...(prepared.identifierType === 'EMAIL' ? { email: identifier.toLowerCase() } : {}),
+          ...(prepared.identifierType === 'PHONE' ? { phone: identifier } : {}),
+        };
         state.error = 'Аккаунт не найден. Выберите «Зарегистрироваться».';
         renderAccountEntry(root, state);
         return;
@@ -319,7 +292,9 @@ function renderLegal(root, state, { registration = false } = {}) {
     body: `${cards}${button('Продолжить', { data: 'data-booking-x-legal-continue', disabled: !canContinue })}${formError(state.error)}`,
     closeData: 'data-booking-x-legal-close',
   })}</section>`;
-  root.querySelector('[data-booking-x-legal-close]')?.addEventListener('click', () => registration ? renderAccountDetails(root, state) : renderAccountEntry(root, state));
+  root.querySelector('[data-booking-x-legal-close]')?.addEventListener('click', () => (
+    registration ? renderAccountDetails(root, state) : renderAccountEntry(root, state)
+  ));
   root.querySelector('[data-booking-x-platform-document]')?.addEventListener('click', () => openConsentDocument(state.accountTerms));
   root.querySelector('[data-booking-x-platform-toggle]')?.addEventListener('click', () => {
     state.accountTermsAccepted = !state.accountTermsAccepted;
@@ -382,23 +357,7 @@ async function continueAfterIdentity(root, state) {
   }
 }
 
-function ensureBookingOwner(state) {
-  if (state.flowOwner?.isOpen()) return state.flowOwner;
-  state.flowOwner = openRecordCreationOwner({
-    onCancel: () => {
-      state.flowOwner = null;
-      state.procedureIds = [];
-      state.date = '';
-      state.from = '';
-      state.to = '';
-      state.confirming = false;
-      if (state.entry === 'account-booking') exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
-    },
-  });
-  return state.flowOwner;
-}
-
-function workplaceItems(state) {
+function workplaceCards(state) {
   const profile = state.context?.profile || {};
   return (Array.isArray(state.context.workplaces) ? state.context.workplaces : []).map((workplace) => ({
     ...workplace,
@@ -409,191 +368,14 @@ function workplaceItems(state) {
   }));
 }
 
-function renderWorkplaces(state) {
-  const owner = ensureBookingOwner(state);
-  const workplaces = workplaceItems(state);
-  const body = workplaces.length
-    ? recordWorkplaceCards(workplaces, { data: 'data-booking-x-workplace' })
-    : emptyState('Нет доступных пространств', 'Рабочие пространства для онлайн-записи не найдены.');
-  const view = owner?.render({ step: 'workplace', body });
-  view?.body?.querySelectorAll('[data-booking-x-workplace]').forEach((node) => node.addEventListener('click', () => {
-    state.workplaceKey = String(node.dataset.bookingXWorkplace || '');
-    state.procedureIds = [];
-    state.date = '';
-    state.from = '';
-    state.to = '';
-    renderProcedures(state);
-  }));
-}
-
-function renderProcedures(state) {
-  const owner = ensureBookingOwner(state);
-  const procedures = getBookingProcedures(state.context, state.workplaceKey);
-  const render = () => {
-    const body = recordProcedureList(procedures.map((procedure) => ({
-      id: String(procedure.id || ''),
-      name: procedure.name || '',
-      durationText: procedure.duration ? `${Number(procedure.duration)} мин` : '',
-      costText: bookingProcedureCost(procedure, state.workplaceKey) !== '' ? money(bookingProcedureCost(procedure, state.workplaceKey)) : '',
-    })), {
-      selected: state.procedureIds,
-      data: 'data-booking-x-procedure',
-      empty: 'Для этого рабочего пространства процедуры не настроены.',
-    });
-    const view = owner?.render({
-      step: 'procedures',
-      body,
-      action: { label: 'Далее', data: 'data-booking-x-procedures-next', disabled: state.procedureIds.length === 0 },
-    });
-    view?.body?.querySelectorAll('[data-booking-x-procedure]').forEach((node) => node.addEventListener('click', () => {
-      const id = String(node.dataset.bookingXProcedure || '');
-      const selected = new Set(state.procedureIds);
-      if (selected.has(id)) selected.delete(id);
-      else selected.add(id);
-      state.procedureIds = [...selected];
-      state.date = '';
-      state.from = '';
-      state.to = '';
-      render();
-    }));
-    view?.action?.addEventListener('click', () => {
-      if (!state.procedureIds.length) return;
-      renderDates(state);
-    });
+function onlineProcedureEntry(state, procedure, workplaceKey) {
+  return {
+    id: String(procedure?.id || ''),
+    name: String(procedure?.name || ''),
+    cost: bookingProcedureCost(procedure, workplaceKey),
+    duration: Math.max(0, Number(procedure?.duration) || 0),
+    raw: procedure,
   };
-  render();
-}
-
-function renderDates(state) {
-  const owner = ensureBookingOwner(state);
-  const dates = getBookingWorkingDates(state.context, state.workplaceKey);
-  const first = state.date || dates[0] || '2000-01-01';
-  const firstDate = new Date(`${first}T00:00:00`);
-  const view = owner?.render({
-    step: 'date',
-    body: dates.length ? '<div data-booking-x-calendar></div>' : emptyState('Свободных дат нет', 'В графике пока нет доступных дат.'),
-  });
-  const calendarRoot = view?.body?.querySelector('[data-booking-x-calendar]');
-  if (!calendarRoot) return;
-  initCalendar(calendarRoot, {
-    month: new Date(firstDate.getFullYear(), firstDate.getMonth(), 1),
-    selectedValue: state.date || '',
-    workingDates: dates,
-    onDateSelect: (date) => {
-      if (!dates.includes(date)) return;
-      state.date = date;
-      state.from = '';
-      state.to = '';
-      renderTimes(state);
-    },
-  });
-}
-
-function renderTimes(state) {
-  const owner = ensureBookingOwner(state);
-  const rows = getBookingTimeRows(state.context, {
-    workplaceKey: state.workplaceKey,
-    date: state.date,
-    procedureIds: state.procedureIds,
-    step: state.settings.slotStep,
-  });
-  const view = owner?.render({
-    step: 'time',
-    body: rows.length
-      ? recordCreationTimeRows(rows, { data: 'data-booking-x-time', selected: state.from })
-      : emptyState('Свободного времени нет', 'На эту дату нет интервала для выбранных процедур.'),
-  });
-  view?.body?.querySelectorAll('[data-booking-x-time]:not(:disabled)').forEach((node) => node.addEventListener('click', () => {
-    const slot = rows.find((item) => item.available && String(item.from) === String(node.dataset.bookingXTime));
-    if (!slot) return;
-    state.from = slot.from;
-    state.to = slot.to;
-    renderConfirmation(state);
-  }));
-}
-
-function confirmationCard(state) {
-  const workplace = getBookingWorkplace(state.context, state.workplaceKey) || {};
-  const procedures = bookingSelection(state.context, state.workplaceKey, state.procedureIds);
-  const discount = accountDiscount(state.account);
-  const total = Math.max(0, selectedSubtotal(state) * (1 - discount / 100));
-  const duration = procedures.reduce((sum, procedure) => sum + Math.max(0, Number(procedure.duration || 0)), 0);
-  const accountName = [state.account?.name, state.account?.surname].filter(Boolean).join(' ').trim();
-  const accountPhone = String(state.account?.phone || state.account?.phones?.[0] || '');
-  const uei = String(state.account?.uei || state.account?.person?.uei || '');
-  return recordConfirmationMiniCard({
-    workplace: workplace.name || representativeName(state),
-    date: formatDate(state.date),
-    period: `${state.from || ''} - ${state.to || ''}`,
-    uei,
-    name: accountName || 'Запись',
-    phone: accountPhone,
-    duration: duration ? `${duration} мин` : '—',
-    discount: `${discount}%`,
-    total: money(total),
-    procedures: procedures.map((procedure) => ({
-      name: procedure.name || '',
-      durationText: procedure.duration ? `${Number(procedure.duration)} мин` : '',
-      right: money(bookingProcedureCost(procedure, state.workplaceKey)),
-    })),
-  });
-}
-
-function renderConfirmation(state) {
-  const owner = ensureBookingOwner(state);
-  const view = owner?.render({
-    step: 'confirmation',
-    body: `${confirmationCard(state)}${formError(state.error)}`,
-    action: {
-      label: state.confirming ? 'Записываем…' : 'Подтвердить',
-      data: 'data-booking-x-confirm',
-      disabled: state.confirming,
-    },
-  });
-  view?.action?.addEventListener('click', () => { void finalizeBookingRequest(state); });
-}
-
-async function finalizeBookingRequest(state) {
-  if (state.confirming) return;
-  state.confirming = true;
-  const action = state.flowOwner?.layer?.querySelector('[data-booking-x-confirm]');
-  if (action) {
-    action.disabled = true;
-    action.textContent = 'Записываем…';
-  }
-  const stillAvailable = () => getBookingSlots(state.context, {
-    workplaceKey: state.workplaceKey,
-    date: state.date,
-    procedureIds: state.procedureIds,
-    step: state.settings.slotStep,
-  }).some((slot) => String(slot.from || '') === String(state.from || ''));
-  try {
-    await createBookingRequest(state.tenantId, {
-      workplaceKey: state.workplaceKey,
-      date: state.date,
-      from: state.from,
-      procedureIds: state.procedureIds,
-    });
-    state.flowOwner?.commit();
-    state.flowOwner = null;
-    state.confirming = false;
-    if (!exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId })) {
-      document.querySelector('#app')?.replaceChildren();
-      openNotice({ title: 'Запись создана', message: 'Запись отправлена специалисту.' });
-    }
-  } catch (error) {
-    await refreshContext(state).catch(() => {});
-    state.confirming = false;
-    if (state.from && !stillAvailable()) {
-      state.error = 'Выбранное время уже занято или стало недоступно. Выберите другое.';
-      state.from = '';
-      state.to = '';
-      renderTimes(state);
-      return;
-    }
-    state.error = accountFlowError(error, 'Не удалось подтвердить запись');
-    renderConfirmation(state);
-  }
 }
 
 function startBookingFlow(root, state) {
@@ -602,21 +384,97 @@ function startBookingFlow(root, state) {
     openNotice({ title: 'Запись недоступна', message: 'Рабочие пространства не настроены.' });
     return;
   }
-  if (state.lockedWorkplaceKey) {
-    state.workplaceKey = state.lockedWorkplaceKey;
-  } else if (workplaces.length === 1) {
-    state.workplaceKey = String(workplaces[0]?.key || '');
+
+  const initialWorkplace = state.lockedWorkplaceKey
+    || (workplaces.length === 1 ? String(workplaces[0]?.key || '') : '');
+  let initialProcedures = [];
+  if (initialWorkplace && state.repeatProcedureIds.length) {
+    const byId = new Map(getBookingProcedures(state.context, initialWorkplace)
+      .map((procedure) => [String(procedure.id || ''), procedure]));
+    initialProcedures = state.repeatProcedureIds
+      .map((id) => byId.get(String(id)))
+      .filter(Boolean)
+      .map((procedure) => onlineProcedureEntry(state, procedure, initialWorkplace));
   }
-  if (!state.workplaceKey) {
-    renderWorkplaces(state);
-    return;
-  }
-  if (state.repeatProcedureIds.length) {
-    const allowed = new Set(getBookingProcedures(state.context, state.workplaceKey).map((procedure) => String(procedure.id || '')));
-    state.procedureIds = state.repeatProcedureIds.filter((id) => allowed.has(String(id)));
-  }
-  if (state.procedureIds.length) renderDates(state);
-  else renderProcedures(state);
+
+  const provider = {
+    kind: 'online',
+    workplaces: () => workplaces,
+    workplaceId: (workplace) => String(workplace?.key || ''),
+    workplaceName: (workplaceKey) => (
+      getBookingWorkplace(state.context, workplaceKey)?.name
+      || [state.context?.profile?.name, state.context?.profile?.surname].filter(Boolean).join(' ').trim()
+      || 'Рабочее пространство'
+    ),
+    workplaceCards: () => workplaceCards(state),
+    procedures: (workplaceKey) => getBookingProcedures(state.context, workplaceKey),
+    procedureId: (procedure) => String(procedure?.id || ''),
+    procedureName: (procedure) => String(procedure?.name || ''),
+    procedureCost: (procedure, workplaceKey) => bookingProcedureCost(procedure, workplaceKey),
+    procedureDuration: (procedure) => Math.max(0, Number(procedure?.duration) || 0),
+    workingDates: (workplaceKey) => getBookingWorkingDates(state.context, workplaceKey),
+    timeRows: ({ workplaceId, date, procedures }) => getBookingTimeRows(state.context, {
+      workplaceKey: workplaceId,
+      date,
+      procedureIds: procedures.map((entry) => String(entry.id || '')),
+      step: state.settings.slotStep,
+    }),
+    personDisplay: (account = {}) => ({
+      uei: String(account?.uei || account?.person?.uei || ''),
+      name: [account?.name, account?.surname].filter(Boolean).join(' ').trim() || 'Запись',
+      phone: String(account?.phone || account?.phones?.[0] || ''),
+    }),
+    discount: () => accountDiscount(state.account),
+    total: (recordsState) => {
+      const subtotal = recordsState.procedures.reduce((sum, entry) => sum + numericCost(entry.cost), 0);
+      return Math.max(0, subtotal * (1 - accountDiscount(state.account) / 100));
+    },
+    async create(recordsState) {
+      return createBookingRequest(state.tenantId, {
+        workplaceKey: recordsState.workplaceId,
+        date: recordsState.date,
+        from: recordsState.from,
+        procedureIds: recordsState.procedures.map((entry) => String(entry.id || '')),
+      });
+    },
+    async onCreateError(error, recordsState, { renderTimes, renderConfirmation }) {
+      await refreshContext(state).catch(() => {});
+      const stillAvailable = getBookingSlots(state.context, {
+        workplaceKey: recordsState.workplaceId,
+        date: recordsState.date,
+        procedureIds: recordsState.procedures.map((entry) => String(entry.id || '')),
+        step: state.settings.slotStep,
+      }).some((slot) => String(slot.from || '') === String(recordsState.from || ''));
+      if (!stillAvailable) {
+        openNotice({ title: 'Запись недоступна', message: 'Выбранное время уже занято или стало недоступно. Выберите другое.' });
+        renderTimes();
+        return;
+      }
+      const message = accountFlowError(error, 'Не удалось подтвердить запись');
+      if (message) openNotice({ title: 'Не удалось подтвердить запись', message });
+      renderConfirmation();
+    },
+  };
+
+  openRecords({
+    context: 'online',
+    person: state.account,
+    workplaceId: initialWorkplace,
+    procedures: initialProcedures,
+    professionalActions: false,
+    provider,
+    onCancel: () => {
+      if (state.entry === 'account-booking') {
+        exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId });
+      }
+    },
+    onCreated: () => {
+      if (!exitBookingContext(state, { tab: 'contact-detail', tenantId: state.tenantId })) {
+        document.querySelector('#app')?.replaceChildren();
+        openNotice({ title: 'Запись создана', message: 'Запись отправлена специалисту.' });
+      }
+    },
+  });
 }
 
 export async function renderOnlineBookingX(root, {
@@ -629,12 +487,7 @@ export async function renderOnlineBookingX(root, {
   const state = {
     tenantId: String(tenantId || ''),
     lockedWorkplaceKey: String(workplaceKey || ''),
-    workplaceKey: String(workplaceKey || ''),
     repeatProcedureIds: [...new Set((Array.isArray(procedureIds) ? procedureIds : []).map((value) => String(value || '').trim()).filter(Boolean))],
-    procedureIds: [],
-    date: '',
-    from: '',
-    to: '',
     context: {},
     settings: normalizeBookingSettings(),
     accountDraft: {},
@@ -643,10 +496,8 @@ export async function renderOnlineBookingX(root, {
     accountTermsAccepted: false,
     consents: {},
     error: '',
-    confirming: false,
     entry: String(entry || ''),
     onExitToAccount,
-    flowOwner: null,
   };
 
   if (!state.tenantId) {
