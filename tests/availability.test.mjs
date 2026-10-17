@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { hydrateDaysFromServer } from '../core/day/index.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
-import { checkTimeAvailability, createTimeGrid, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
-import { buildPersonRecordTimeRows } from '../core/people/record-time.js';
+import { buildNaturalBookingTimeRows, checkTimeAvailability, createTimeGrid, getTimeAvailabilityAt, listAvailableStartTimes } from '../core/time/index.js';
 
 globalThis.window = { dispatchEvent() {} };
 
@@ -44,7 +43,7 @@ const occupiedHourGrid = createTimeGrid({
     { type: 'record', rigidity: 'hard', sourceId: 'record-12', from: '12:00', to: '13:00' },
   ],
 });
-const occupiedHourRows = new Map(buildPersonRecordTimeRows(occupiedHourGrid, 60).map((row) => [row.value, row]));
+const occupiedHourRows = new Map(buildNaturalBookingTimeRows(occupiedHourGrid, 60).map((row) => [row.value, row]));
 assert.equal(occupiedHourRows.get('11:00')?.available, true, '11:00 must stay selectable when a one-hour procedure ends at 12:00');
 assert.equal(occupiedHourRows.has('11:05'), false, 'five-minute synthetic booking steps must not exist');
 assert.equal(occupiedHourRows.get('12:00')?.occupied, true, '12:00 must stay visible as occupied');
@@ -59,7 +58,7 @@ const naturalBoundaryGrid = createTimeGrid({
     { type: 'record', rigidity: 'hard', sourceId: 'record-half', from: '12:00', to: '12:30' },
   ],
 });
-const naturalBoundaryRows = buildPersonRecordTimeRows(naturalBoundaryGrid, 60);
+const naturalBoundaryRows = buildNaturalBookingTimeRows(naturalBoundaryGrid, 60);
 assert.deepEqual(
   naturalBoundaryRows.map((row) => row.value),
   ['12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'],
