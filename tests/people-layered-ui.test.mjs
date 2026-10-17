@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
 const personRecord = readFileSync(new URL('../core/people/record-creation.js', import.meta.url), 'utf8');
+const records = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
 const procedureSelection = readFileSync(new URL('../core/service/procedures/selection.js', import.meta.url), 'utf8');
 const programs = readFileSync(new URL('../core/people/programs.js', import.meta.url), 'utf8');
 const viewState = readFileSync(new URL('../core/people/view-state.js', import.meta.url), 'utf8');
@@ -100,24 +101,27 @@ assert.match(people, /personHistoryMarkup\(person, query\)/);
 assert.doesNotMatch(people, /data-person-history-filter/);
 assert.match(people, /people-history-q/);
 
-// Record action uses the canonical RecordCreation Q owner with a known person: no person-selection step.
+// Record action calls the one canonical Records Q with the known person; People owns no parallel steps.
 assert.match(people, /openPersonRecordCreation\(\{ person \}\)/);
-assert.match(personRecord, /openRecordCreationOwner\(\)/);
-assert.match(personRecord, /workplaces\.length === 1/);
-assert.match(personRecord, /step: 'workplace'/);
-assert.match(personRecord, /step: 'procedures'/);
-assert.match(personRecord, /step: 'date'/);
-assert.match(personRecord, /step: 'time'/);
-assert.match(personRecord, /step: 'confirmation'/);
-assert.match(personRecord, /getWorkplaceWorkingDates\(state\.workplaceId\)/);
-assert.match(personRecord, /initCalendar\(calendarRoot/);
-assert.match(personRecord, /recordCreationTimeRows\(rows/);
-assert.match(personRecord, /checkTimeAvailability\(/);
-assert.match(personRecord, /createRecord\(\{/);
-assert.match(personRecord, /person:\s*personSnapshot\(person\)/);
-assert.match(personRecord, /owner\.commit\(\)/);
-assert.doesNotMatch(personRecord, /step: 'person'|recordPersonList|data-person-record-person/);
-assert.doesNotMatch(personRecord, /mountV2ZLayer|v2ZLayer\(|variant:\s*'x'/);
+assert.match(personRecord, /openRecords\(\{/);
+assert.match(personRecord, /context: 'person'/);
+assert.match(personRecord, /person,/);
+assert.doesNotMatch(personRecord, /openRecordCreationOwner|step: 'workplace'|step: 'procedures'|step: 'date'|step: 'time'|step: 'person'|step: 'confirmation'/);
+assert.match(records, /openRecordCreationOwner\(\{/);
+assert.match(records, /workplaces\.length === 1/);
+assert.match(records, /step: 'workplace'/);
+assert.match(records, /step: 'procedures'/);
+assert.match(records, /step: 'date'/);
+assert.match(records, /step: 'time'/);
+assert.match(records, /step: 'person'/);
+assert.match(records, /step: 'confirmation'/);
+assert.match(records, /getWorkplaceWorkingDates/);
+assert.match(records, /initCalendar\(calendar/);
+assert.match(records, /recordCreationTimeRows\(rows/);
+assert.match(records, /checkTimeAvailability\(/);
+assert.match(records, /createRecord\(\{/);
+assert.match(records, /owner\.commit\(\)/);
+assert.doesNotMatch(records, /mountV2ZLayer|v2ZLayer\(/);
 assert.match(procedureSelection, /procedureCostForWorkplace/);
 assert.match(procedureSelection, /procedureWorkplaceAssignment/);
 
