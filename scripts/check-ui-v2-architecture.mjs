@@ -18,6 +18,8 @@ const facade = fs.readFileSync('ui/ui.js', 'utf8');
 const documentUi = fs.readFileSync('ui/documents/index.js', 'utf8');
 const documentCss = fs.readFileSync('ui/documents/document.css', 'utf8');
 const booking = fs.readFileSync('online-booking/booking.js', 'utf8');
+const records = fs.readFileSync('records/records.js', 'utf8');
+const recordCreation = fs.readFileSync('ui/record/creation-flow.js', 'utf8');
 const account = fs.readFileSync('online-booking/account-shell.js', 'utf8');
 const chatRuntime = fs.readFileSync('core/chat/runtime.js', 'utf8');
 const calendar = fs.readFileSync('ui/calendar/calendar.css', 'utf8');
@@ -153,7 +155,6 @@ for (const file of workspaceCssFiles) {
   expect(!/touch-action\s*:/.test(source), `Workspace feature CSS must not re-own touch gesture policy inside Shared Z: ${file}.`);
 }
 
-
 for (const name of [
   'v2Header',
   'v2CardDeck',
@@ -247,19 +248,26 @@ const stickerSwipe = ui.slice(ui.indexOf('export function initV2StickerSwipe'));
 expect(stickerSwipe.includes('surface.setPointerCapture?.(event.pointerId)') && !stickerSwipe.includes('gestureHost.setPointerCapture?.(event.pointerId)'), 'Sticker swipe must capture on its own surface and may not reference the Z-only gestureHost.');
 expect(!css.includes('scroll-snap-stop:always'), 'CardDeck native inertia must not be forced to stop at every card.');
 
-
 expect(documentUi.includes('export function documentTile') && documentUi.includes('export function documentTiles') && documentUi.includes('export function openDocumentViewer'), 'Document UI must be owned only by ui/documents.');
 expect(documentCss.includes('width:238px') && documentCss.includes('.document-tiles--rail') && documentCss.includes('.document-tile__toggle'), 'Document UI must keep one 238px geometry, horizontal rail and optional on-document toggle.');
 expect(recordRuntime.includes('export function recordTimeRows') && timeCss.includes('.time-slots--hour-rows') && timeCss.includes('overflow-x:auto'), 'Booking time must use the Shared Time owner with hourly horizontal rows.');
 expect(!/\.booking-account--account \.v2-app \.calendar__date\{[^}]*border-radius/.test(css), 'V2 must not redesign Calendar geometry.');
 expect(calendar.includes('.calendar__grid') && calendar.includes('.calendar__month-button'), 'Canonical Calendar owner must remain intact.');
 
-expect(booking.includes('recordWorkplaceCards(') && booking.includes('recordProcedureList(') && booking.includes('recordTimeRows(') && booking.includes('recordConfirmationMiniCard('), 'Online booking must consume the canonical Shared Record step owners.');
-expect(!/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/.test(booking), 'Online booking must not restore parallel local visual owners for canonical booking steps.');
+expect(
+  booking.includes("from '../records/records.js'")
+    && booking.includes('openRecords({')
+    && records.includes('recordWorkplaceCards(')
+    && records.includes('recordProcedureList(')
+    && records.includes('recordCreationTimeRows(')
+    && records.includes('recordConfirmationMiniCard('),
+  'Booking must delegate the canonical Record steps to the single Records owner.'
+);
+expect(!/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/.test(booking), 'Booking must not restore parallel local visual owners for canonical Record steps.');
 expect(inputs.includes('export function passwordField') && inputs.includes('export function initPasswordFields'), 'Password reveal control must belong to shared UI inputs.');
 expect(booking.includes('passwordField({') && booking.includes('initPasswordFields(root)'), 'Auth and Registration must use the shared password reveal control.');
-expect(booking.includes("step: 'workplaces'") && booking.includes("step: 'confirmation'"), 'Booking must remain a V2 Z-stack flow.');
-expect(booking.includes('initV2Swipe(root'), 'Online booking must preserve the proven swipe controller while consuming Shared booking UI owners.');
+expect(records.includes("step: 'workplace'") && records.includes("step: 'confirmation'") && recordCreation.includes("variant: 'q'"), 'Records must remain the single canonical Q flow for Record steps.');
+expect(booking.includes('initV2StickerSwipe(root') && recordCreation.includes("variant: 'q'"), 'Online entry must preserve Shared U swipe behavior while Records owns the Record Q.');
 expect(ui.includes("const horizontal = Math.abs(nextX) >= Math.abs(nextY) * .72") && ui.includes("const allowedDirection = (nextX > 0 && onRight) || (nextX < 0 && onLeft)"), 'Shared Z edge swipe must accept a natural rightward thumb diagonal after the edge start has established ownership.');
 expect(ui.includes("app?.classList.add('is-revealing-deck')") && ui.includes("app?.classList.remove('is-revealing-deck')"), 'Z swipe must reveal and reset the F stack physically.');
 expect(sharedSwipe.includes("const dragSurface = isBaseZ && front ? front : surface") && sharedSwipe.includes("const dragProperty = isBaseZ && front ? '--v2-front-drag-x' : '--v2-drag-x'") && sharedSwipe.includes("dragSurface.style.setProperty(dragProperty"), 'Shared edge swipe must move the whole front for Z1 and only the sheet for Z2/Z3.');
@@ -279,11 +287,11 @@ expect(accountMobileCss.includes('background:var(--v2-base)'), 'Public booking s
 expect(core.includes("setThemeColor('#2F3338')") && core.includes("setThemeColor('#F5F5F3')"), 'Public booking must tint browser chrome to H and restore the workspace theme afterwards.');
 expect(booking.includes('documentTile(') && booking.includes('documentTiles(') && booking.includes('openDocumentViewer(') && booking.includes('v2Sticker({') && !booking.includes('v2LegalCards(') && !booking.includes('v2Document('), 'Legal checkpoint may use the Shared U container but every document inside it must use the canonical Document UI and viewer.');
 expect(
-  booking.includes("closeData: 'data-booking-welcome-u-close'")
-    && booking.includes("closeData: 'data-booking-u-close'")
-    && booking.includes("closeData: 'data-booking-legal-u-close'")
+  booking.includes("closeData: 'data-booking-welcome-close'")
+    && booking.includes("closeData: 'data-booking-auth-close'")
+    && booking.includes("closeData: 'data-booking-legal-close'")
     && core.includes("closeData: 'data-specialist-u-close'"),
-  'Every U entry/information surface must expose the explicit Shared U close control.'
+  'Every U entry/information surface must expose an explicit Shared U close control.'
 );
 expect(
   !/auth-view|auth-card/.test(core)
@@ -424,8 +432,6 @@ expect(endUserProfileCard.includes('entityVisualCard({') && endUserProfileCard.i
 expect(passwordSettings.includes('openSharedPasswordAction') && !passwordSettings.includes('modal(') && !passwordSettings.includes('mountModal('), 'End-user password settings must consume the Shared Profile password owner instead of owning a modal.');
 expect(!inputs.includes('modal(') && !inputs.includes('mountModal('), 'Shared photo/input owner must keep crop inline and must not open a modal.');
 expect(!inputs.includes('mountV2Layer(') && !inputs.includes('v2Layer('), 'Shared inputs must not bypass canonical owners with local V2 layers.');
-
-
 
 expect(account.includes('v2CardDeck(GLOBAL_ACCOUNT_ROOTS') && account.includes("axis: 'x'") && account.includes("level: 'f'"), 'End-user root must use the shared horizontal CardDeck.');
 expect(account.includes("id: 'profile', label: 'Профиль'")

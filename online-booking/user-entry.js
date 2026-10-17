@@ -2,7 +2,7 @@ import { getBookingContext, getGlobalAccountRecords, resolveBookingPublicRoute }
 import { procedurePricingForWorkplace } from '../core/service/procedures/selection.js';
 import { openRecordConfirmationNotice } from '../ui/record/confirmation-notice.js';
 import { renderGlobalClient } from './account.js';
-import { renderOnlineBookingX as renderBooking } from './booking.js';
+import { renderBooking } from './booking.js';
 import { startAccountRuntime } from './account-runtime.js';
 
 const app = document.querySelector('#app');
