@@ -3,20 +3,21 @@ import { readFileSync } from 'node:fs';
 import { buildBookingLink } from '../core/booking-link/index.js';
 
 assert.equal(
-  buildBookingLink({ origin: 'https://client.va-tools.ru', profileSlug: 'aleksandr' }),
-  'https://client.va-tools.ru/aleksandr',
+  buildBookingLink({ origin: 'https://user.va-tools.ru', profileSlug: 'aleksandr' }),
+  'https://user.va-tools.ru/aleksandr',
 );
 assert.equal(
-  buildBookingLink({ origin: 'https://client.va-tools.ru', profileSlug: 'aleksandr', workplaceSlug: 'arbat' }),
-  'https://client.va-tools.ru/aleksandr/arbat',
+  buildBookingLink({ origin: 'https://user.va-tools.ru', profileSlug: 'aleksandr', workplaceSlug: 'arbat' }),
+  'https://user.va-tools.ru/aleksandr/arbat',
 );
-assert.equal(buildBookingLink({ origin: 'https://client.va-tools.ru' }), '');
+assert.equal(buildBookingLink({ origin: 'https://user.va-tools.ru' }), '');
 
 const settingsSource = readFileSync(new URL('../settings/settings.js', import.meta.url), 'utf8');
 const bookingSource = readFileSync(new URL('../settings/online-booking/online-booking.js', import.meta.url), 'utf8');
 const notificationSource = readFileSync(new URL('../settings/notifications/notifications.js', import.meta.url), 'utf8');
 const buttonsSource = readFileSync(new URL('../ui/buttons/index.js', import.meta.url), 'utf8');
 const accountSource = readFileSync(new URL('../core/account/index.js', import.meta.url), 'utf8');
+const userEntrySource = readFileSync(new URL('../online-booking/user-entry.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../core.js', import.meta.url), 'utf8');
 const controllerSource = readFileSync(new URL('../server/src/online-booking/online-booking.controller.ts', import.meta.url), 'utf8');
 const serviceSource = readFileSync(new URL('../server/src/online-booking/online-booking.service.ts', import.meta.url), 'utf8');
@@ -39,12 +40,14 @@ assert.doesNotMatch(bookingSource, /workplaces\.map\(\s*\(item\)\s*=>\s*copyLink
 
 assert.match(accountSource, /export async function resolveBookingPublicRoute/);
 assert.match(accountSource, /\/online-booking\/route\//);
-assert.match(coreSource, /await onlineBookingRoute\(\)/);
-assert.match(coreSource, /function accountBookingRoute\(\)/);
-assert.match(coreSource, /params\.get\('booking'\)/, 'Internal Account Booking must carry the professional identity explicitly');
-assert.match(coreSource, /renderBookingRoute\(accountBooking\)/);
-assert.match(coreSource, /renderBookingRoute\(onlineBooking\)/);
-assert.match(coreSource, /resolveBookingPublicRoute/);
+assert.match(userEntrySource, /await onlineBookingRoute\(\)/);
+assert.match(userEntrySource, /function accountBookingRoute\(\)/);
+assert.match(userEntrySource, /params\.get\('booking'\)/, 'Internal Account Booking must carry the professional identity explicitly');
+assert.match(userEntrySource, /renderBookingRoute\(accountBooking\)/);
+assert.match(userEntrySource, /renderBookingRoute\(onlineBooking\)/);
+assert.match(userEntrySource, /resolveBookingPublicRoute/);
+assert.doesNotMatch(coreSource, /accountBookingRoute|onlineBookingRoute|renderBookingRoute|renderGlobalClientRoot/);
+assert.doesNotMatch(coreSource, /online-booking\/account\.js|online-booking\/booking\.js|online-booking\/account-runtime\.js/);
 assert.match(controllerSource, /@Get\('owner\/route'\)/);
 assert.match(controllerSource, /@Get\('route\/:profileSlug'\)/);
 assert.match(serviceSource, /BookingPublicRouteType/);
