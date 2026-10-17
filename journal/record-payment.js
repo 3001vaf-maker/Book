@@ -1,4 +1,5 @@
 import {
+  actionBlock,
   button,
   datePicker,
   field,
@@ -530,6 +531,25 @@ function openPaymentSettings(layer, record, state, rerender) {
   });
 }
 
+function paymentActionsBody(state) {
+  if (!state?.latestPayment) return '';
+  return actionBlock([
+    button('Корректировка оплаты', { variant: 'secondary', data: 'data-record-payment-correct' }),
+    button('Возврат', { variant: 'danger', data: 'data-record-payment-refund' }),
+    button('Отмена оплаты', { variant: 'danger', data: 'data-record-payment-cancel' }),
+    button('Удаление оплаты', { variant: 'critical', data: 'data-record-payment-delete' }),
+  ].join(''), { className: 'record-payment-actions' });
+}
+
+function bindPaymentBodyActions(host, layer, record, state, rerender) {
+  const payment = state?.latestPayment || null;
+  if (!payment) return;
+  host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrection(layer, record, payment, rerender));
+  host.querySelector('[data-record-payment-refund]')?.addEventListener('click', () => openPaymentRefund(record, payment, rerender));
+  host.querySelector('[data-record-payment-cancel]')?.addEventListener('click', () => openPaymentCancellation(record, payment, rerender));
+  host.querySelector('[data-record-payment-delete]')?.addEventListener('click', () => openPaymentDeletion(payment, rerender));
+}
+
 function renderPaymentLayer(layer, recordId) {
   const current = getRecord(recordId);
   if (!current) { layer.v2Close?.(); return; }
@@ -538,7 +558,7 @@ function renderPaymentLayer(layer, recordId) {
   const settlement = payment.settlement;
   const host = layer.querySelector('[data-record-payment-q-host]');
   if (!host) { layer.v2Close?.(); return; }
-  host.innerHTML = paymentForm({
+  host.innerHTML = `${paymentForm({
     workplace: payment.workplace,
     date: payment.date,
     time: payment.time,
@@ -546,7 +566,11 @@ function renderPaymentLayer(layer, recordId) {
     procedures: paymentItems(settlement),
     total: state.remaining,
     showActions: false,
-  });
+  })}${paymentActionsBody(state)}`;
+  const rerender = () => {
+    if (layer.isConnected) renderPaymentLayer(layer, current.id);
+  };
+  bindPaymentBodyActions(host, layer, current, state, rerender);
   let formState = { settlement, total: state.remaining, dirty: false };
   const syncPrimary = () => {
     if (formState.dirty) {
@@ -575,9 +599,7 @@ function renderPaymentLayer(layer, recordId) {
     onChange: (next) => { formState = next; syncPrimary(); },
   });
   layer.querySelector('[data-record-payment-settings]')?.addEventListener('click', () => {
-    openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), () => {
-      if (layer.isConnected) renderPaymentLayer(layer, current.id);
-    });
+    openPaymentSettings(layer, current, paymentStateForRecord(getRecord(current.id) || current), rerender);
   }, { once: true });
   syncPrimary();
 }
