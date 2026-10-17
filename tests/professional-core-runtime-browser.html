@@ -1082,159 +1082,22 @@ mark('journal-day-record-open');
 const journalRecord = shell()?.querySelector('[data-journal-usage="runtime-journal-record"]');
 ok(Boolean(journalRecord), 'Journal Day record plaque missing');
 journalRecord?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-mark('journal-record-dispatched');
 await wait(60);
-mark('journal-record-z-ready');
-let recordZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(Boolean(recordZ?.classList.contains('record-view-z')), 'Journal record did not open Record Z2');
-ok(Boolean(recordZ?.querySelector('.record-confirmation-mini-card')), 'Record Z2 must use canonical mini-card');
-ok(!recordZ?.querySelector('.entity-card--top-dark'), 'Record Z2 must not keep legacy dark entity card');
-const recordReceipt = recordZ?.querySelector('[data-read-only-sheet]');
-ok(Boolean(recordReceipt), 'Record Z2 procedures must use shared read-only receipt');
-ok(recordReceipt?.textContent.includes('Очень длинное название процедуры без сокращения'),
-  'Record Z2 must show full procedure name');
-ok(!document.querySelector('[data-record-payment-entry]'),
-  'Opening Record must not create legacy automatic payment sheet');
-ok(/^\s*1\s*500\s*₽\s*$/.test(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent || ''),
-  'Record Z2 C must expose only the amount due');
 
-mark('journal-record-settings');
-shell()?.querySelector('[data-v2-workspace-a]')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(35);
-const recordSettings = document.querySelector('[data-shared-profile-settings-menu]');
-const recordActionIds = [...(recordSettings?.querySelectorAll('[data-shared-profile-action]') || [])]
-  .map((node) => node.dataset.sharedProfileAction);
-ok(recordActionIds.join('|') === 'move|cancel|delete',
-  'Record A must contain exactly Move, Cancel and Delete');
-recordSettings?.closest('[data-modal]')?.v2Close?.();
-await wait(20);
+mark('journal-view-ready');
+const journalViewZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
+ok(Boolean(journalViewZ?.classList.contains('journal-view-z')),
+  'Journal plaque must open Journal View Z2');
+ok(Boolean(journalViewZ?.querySelector('.record-confirmation-mini-card')),
+  'Journal View must show the plaque through the shared mini-card');
+ok(journalViewZ?.textContent.includes('Очень длинное название процедуры без сокращения'),
+  'Journal View must show the full procedure name');
+ok(!journalViewZ?.querySelector('[data-payment-ui],[data-record-payment-entry]'),
+  'Journal View must not own the retired Record payment flow');
+ok(!shell()?.querySelector('[data-v2-workspace-primary]'),
+  'Journal View must not expose Record/Payment Header C while View is display-only');
 
-mark('journal-record-payment');
-shell()?.querySelector('[data-v2-workspace-primary]')
-  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(50);
-let paymentQ = [...document.querySelectorAll('[data-v2-q="true"]')].at(-1);
-ok(paymentQ?.querySelector('[data-workspace-header-context]')?.dataset.workspaceTitle === 'Оплата',
-  'Record C must open Payment Q1 over the existing Record Z2');
-ok(Boolean(paymentQ?.querySelector('[data-payment-ui]')), 'Payment Q1 shared form missing');
-ok([...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1) === recordZ,
-  'Payment Q1 must cover Record Z2 without creating another Z');
-let paymentPrice = paymentQ?.querySelector('[data-payment-price]');
-ok(Boolean(paymentPrice), 'Payment Q1 procedure price missing');
-ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'), 'Payment Q1 base price must remain editable');
-ok(Boolean(paymentQ?.querySelector('input[data-payment-correction-percent]')), 'Payment Q1 manual percent price correction selector missing');
-ok(Boolean(paymentQ?.querySelector('[data-payment-correction-money]')), 'Payment Q1 manual money price correction field missing');
-ok(!paymentQ?.querySelector('[data-payment-discount-percent],[data-payment-discount-money]'), 'Payment Q1 must not expose retired discount controls');
-ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить',
-  'Payment Q1 C must be Pay when data is unchanged');
-
-const originalPaymentFetch = window.fetch;
-let persistedPaymentRecord = null;
-let persistedPaymentSettlement = null;
-const paymentJsonResponse = (body) => new Response(JSON.stringify(body), {
-  status:200,
-  headers:{'Content-Type':'application/json'},
-});
-window.fetch = async (input, init = {}) => {
-  const path = (() => {
-    try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname; }
-    catch { return String(input || ''); }
-  })();
-  const method = String(init.method || (typeof input === 'string' ? '' : input?.method) || 'GET').toUpperCase();
-  if (method === 'PUT' && path.endsWith('/finance/settlements/record/runtime-journal-record')) {
-    persistedPaymentSettlement = JSON.parse(String(init.body || '{}'))?.settlement || null;
-    const base = await originalPaymentFetch('/finance');
-    const state = await base.json();
-    return paymentJsonResponse({
-      ...state,
-      settlements: persistedPaymentSettlement ? [{
-        source:{type:'record',id:'runtime-journal-record'},
-        settlement:persistedPaymentSettlement,
-      }] : [],
-    });
-  }
-  if (method === 'PUT' && path.endsWith('/business-state/records/runtime-journal-record')) {
-    persistedPaymentRecord = JSON.parse(String(init.body || '{}'))?.record || null;
-    return originalPaymentFetch(input, init);
-  }
-  if (method === 'GET' && path.endsWith('/business-state') && persistedPaymentRecord) {
-    const base = await originalPaymentFetch(input, init);
-    const state = await base.json();
-    return paymentJsonResponse({ ...state, records:[persistedPaymentRecord] });
-  }
-  if (method === 'GET' && path.endsWith('/finance') && persistedPaymentSettlement) {
-    const base = await originalPaymentFetch(input, init);
-    const state = await base.json();
-    return paymentJsonResponse({
-      ...state,
-      settlements:[{
-        source:{type:'record',id:'runtime-journal-record'},
-        settlement:persistedPaymentSettlement,
-      }],
-    });
-  }
-  return originalPaymentFetch(input, init);
-};
-
-paymentPrice.value = '2000';
-paymentPrice.dispatchEvent(new Event('input',{bubbles:true}));
-await wait(60);
-ok(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Сохранить',
-  'Editing existing Payment price must switch Header C to Save');
-ok(paymentQ?.querySelector('[data-payment-summary]')?.textContent.includes('2 000'),
-  'Editing existing Payment price must recalculate amount due');
-
-shell()?.querySelector('[data-v2-workspace-primary]')
-  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await waitFor(() => {
-  const savedPrice = paymentQ?.querySelector('[data-payment-price]');
-  return Number(savedPrice?.value) === 2000
-    && shell()?.querySelector('[data-v2-workspace-primary]')?.textContent.trim() === 'Оплатить';
-}, 'saved editable payment price');
-ok(Number(persistedPaymentRecord?.procedures?.[0]?.cost) === 2000,
-  'Saving Payment price must persist Record procedures[].cost');
-ok(Number(persistedPaymentSettlement?.items?.[0]?.price) === 2000,
-  'Saving Payment price must persist Settlement item price');
-
-mark('journal-record-payment-close');
-paymentQ?.v2Close?.();
-await wait(25);
-recordZ?.v2Close?.();
-await wait(35);
-
-mark('journal-record-payment-reopen');
-const reopenedJournalRecord = shell()?.querySelector('[data-journal-usage="runtime-journal-record"]');
-reopenedJournalRecord?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(60);
-recordZ = [...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1);
-ok(/^\s*2\s*000\s*₽\s*$/.test(shell()?.querySelector('[data-v2-workspace-primary]')?.textContent || ''),
-  'Reopened Record must use saved price in amount due');
-shell()?.querySelector('[data-v2-workspace-primary]')
-  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(50);
-paymentQ = [...document.querySelectorAll('[data-v2-q="true"]')].at(-1);
-paymentPrice = paymentQ?.querySelector('[data-payment-price]');
-ok(Number(paymentPrice?.value) === 2000, 'Reopened Payment must show saved price');
-ok(paymentPrice?.readOnly === false && !paymentPrice?.hasAttribute('readonly'),
-  'Reopened Payment price field must stay editable');
-
-mark('journal-record-payment-q2');
-shell()?.querySelector('[data-v2-workspace-primary]')
-  ?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-await wait(80);
-const paymentQs = [...document.querySelectorAll('[data-v2-q="true"]')];
-const paymentQ2 = paymentQs.at(-1);
-ok(paymentQs.length === 2, 'Pay must open Q2 over Q1');
-ok(paymentQ2 !== paymentQ && Boolean(paymentQ2?.querySelector('[data-record-payment-allocation-host]')),
-  'Q2 payment allocation form missing');
-ok([...(shell()?.querySelectorAll('[data-v2-z-layer]') || [])].at(-1) === recordZ,
-  'Q2 must cover the same Record Z2 without creating Z3/Z4');
-paymentQ2?.v2Close?.();
-await wait(25);
-window.fetch = originalPaymentFetch;
-paymentQ?.v2Close?.();
-await wait(25);
-recordZ?.v2Close?.();
+journalViewZ?.v2Close?.();
 await wait(35);
 
 mark('journal-list-switch');
@@ -1249,7 +1112,6 @@ ok(Boolean(shell()?.querySelector('[data-journal-view]')), 'Journal List view co
 await openF(5,'journal-list');
 await tapAndOpen(fDeck(), fCard('profile'), 19, 'profile');
 ok(!shell()?.classList.contains('is-deck-open'), 'Profile F without E did not enter Z directly');
-
 
 mark('service-z2-procedure');
 await openF(6,'service');
@@ -1457,14 +1319,12 @@ for (const [index,id] of ['people','finance','journal','profile','settings','peo
   await tapAndOpen(fDeck(), fCard(id), 40 + index, 'repeat-' + id);
   if (id === 'finance' || id === 'settings') {
     ok(shell()?.classList.contains('is-e-open'), id + ' repeat did not enter E');
-    // Collapse E by its own geometry before continuing to avoid choosing an arbitrary child.
     const deck = eDeck();
     pointer(deck,'pointerdown',190,390,70 + index);
     pointer(deck,'pointermove',232,392,70 + index);
     pointer(deck,'pointerup',232,392,70 + index);
     await wait(140);
     ok(!shell()?.classList.contains('is-e-open'), id + ' E did not collapse by right gesture');
-    // F is still open; choose a root without E to return to Z deterministically.
     await tapAndOpen(fDeck(), fCard('people'), 90 + index, id + '-to-people');
   } else if (id === 'journal') {
     ok(!shell()?.classList.contains('is-deck-open'), 'journal repeat must enter Z directly without E');
