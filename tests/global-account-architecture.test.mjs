@@ -10,8 +10,10 @@ const booking = fs.readFileSync('server/src/online-booking/online-booking.servic
 const auxiliaryState = fs.readFileSync('server/src/auxiliary-state/auxiliary-state.service.ts', 'utf8');
 const communication = fs.readFileSync('server/src/communication/communication.service.ts', 'utf8');
 const runtime = fs.readFileSync('online-booking/account-runtime.js', 'utf8');
+const accountUi = fs.readFileSync('online-booking/account.js', 'utf8');
 const bookingUi = fs.readFileSync('online-booking/booking.js', 'utf8');
 const accountShell = fs.readFileSync('online-booking/account-shell.js', 'utf8');
+const userEntry = fs.readFileSync('online-booking/user-entry.js', 'utf8');
 const consentController = fs.readFileSync('server/src/online-booking/booking-consent.controller.ts', 'utf8');
 const controller = fs.readFileSync('server/src/online-booking/online-booking.controller.ts', 'utf8');
 const core = fs.readFileSync('core.js', 'utf8');
@@ -50,8 +52,6 @@ assert.match(booking, /AccountContactType\.EMAIL/);
 assert.match(booking, /AccountContactType\.PHONE/);
 assert.match(booking, /AccountContactType\.TELEGRAM/);
 assert.match(booking, /function accountLoginContact/);
-assert.match(booking, /AccountContactType\.EMAIL/);
-assert.match(booking, /AccountContactType\.PHONE/);
 assert.match(booking, /async loginAccount\(tenantId: string, identifierValue: unknown/);
 assert.doesNotMatch(booking, /tenantId_email/, 'Account lookup must never return to tenant-scoped email uniqueness');
 const issueTokenBlock = booking.slice(
@@ -100,23 +100,47 @@ assert.doesNotMatch(deleteRelationshipBlock, /bookingRequest\.delete|records\.de
 
 assert.match(consentController, /accountTenantLink\.upsert/, 'A tenant relationship must be persisted only after tenant consent becomes active');
 assert.match(consentController, /consentState\?\.pdnActive/, 'Tenant relationship must be gated by active tenant PDN');
-assert.match(bookingUi, /export async function renderGlobalClient\(/, 'Client host must have a global Account entry flow');
-assert.match(bookingUi, /state\.platformOnlyLegal = state\.identityDestination === 'profile'/, 'Profile entry must keep platform terms separate from tenant legal documents');
+
+assert.match(accountUi, /export async function renderGlobalClient\(/, 'Account must own the global end-user entry flow');
+assert.match(accountUi, /getGlobalAccountPlatformState\(\)/, 'Account must own global platform-term gating');
+assert.doesNotMatch(accountUi, /getAccountConsentState\(/, 'Account must not own tenant Booking consent state');
+assert.doesNotMatch(accountUi, /createBookingRequest\(/, 'Account must not create Records');
+assert.match(accountUi, /params\.set\('booking', id\)/, 'Account Booking action must route by tenant identity');
+assert.match(accountUi, /params\.set\('workplace', workplaceKey\)/, 'Workplace Booking action must preserve the selected workplace');
+assert.match(accountUi, /params\.set\('procedures', procedureIds\.join\(','\)\)/, 'Repeat Booking must preserve procedures');
+
+assert.match(bookingUi, /getAccountPlatformState\(state\.tenantId\)/, 'Booking must preserve platform legal state for the selected professional');
+assert.match(bookingUi, /getAccountConsentState\(state\.tenantId\)/, 'Booking must own tenant legal state');
 assert.match(bookingUi, /onExitToAccount/, 'Booking context must be escapable back to the global client profile');
+assert.match(bookingUi, /from '\.\.\/records\/records\.js'/, 'Booking must delegate to canonical Records');
+assert.match(bookingUi, /openRecords\(\{/, 'Booking must open canonical Records');
+assert.doesNotMatch(bookingUi, /data-booking-flow-chat|kind:\s*'chat'/, 'Booking must not restore a parallel Chat control');
+
 assert.match(accountShell, /export async function renderGlobalAccount\(/, 'Global Account must reuse the shared client shell');
 assert.match(accountShell, /async function renderGlobalMessages\(/, 'Global Account must expose the shared chat list');
 assert.match(accountShell, /data-account-open-chat-root/, 'Global Account header must expose chat directly');
 assert.match(accountShell, /state\.accountSelectedChatTenantId/, 'Global Account must own selected chat contact state directly');
 assert.doesNotMatch(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global Account chat must not bridge into a second tenant account UI');
-assert.doesNotMatch(bookingUi, /params\.set\('entry', 'chat'\)/, 'Global chat must not navigate through a tenant chat route');
-const bookingHeaderStart = bookingUi.indexOf('function bookingHeaderMarkup');
-const bookingHeaderEnd = bookingUi.indexOf('function bookingActionForStep', bookingHeaderStart);
-const bookingHeader = bookingUi.slice(bookingHeaderStart, bookingHeaderEnd);
-assert.match(bookingHeader, /d:\s*null/, 'Online booking itself must keep Header D absent on booking steps.');
-assert.match(accountShell, /async function renderGlobalMessages\(/, 'Chat remains owned by the single global Account chat surface.');
-assert.doesNotMatch(bookingHeader, /data-booking-flow-chat|kind:\s*'chat'/, 'Online booking must not restore a parallel Chat control inside booking Header.');
+assert.match(accountShell, /data-global-contact-booking/, 'Contact must expose Booking');
+assert.match(accountShell, /handlers\.onStartBooking\?\.\(tenantId/, 'Contact Booking button must use the shared Booking route');
+
+assert.match(userEntry, /params\.get\('booking'\)/, 'Dedicated end-user entry must understand internal Booking routes');
+assert.match(userEntry, /resolveBookingPublicRoute\(pathRoute\.profileSlug, pathRoute\.workplaceSlug\)/, 'Dedicated end-user entry must resolve Online professional/workplace links');
+assert.match(userEntry, /from '\.\/account\.js'/, 'Dedicated end-user entry must load Account separately');
+assert.match(userEntry, /from '\.\/booking\.js'/, 'Dedicated end-user entry must load Booking separately');
+
 assert.match(core, /isEndUserAppHost\(\)/);
 assert.match(core, /renderGlobalClientRoot\(\)/);
-assert.match(core, /params\.get\('entry'\)/, 'Global profile must distinguish account entry from an external booking link');
+assert.match(core, /function accountBookingRoute\(\)/, 'Main browser entry must understand Booking started from Account');
+assert.match(core, /params\.get\('booking'\)/, 'Main browser entry must read the Booking tenant identity');
+assert.match(core, /async function onlineBookingRoute\(\)/, 'Main browser entry must keep Online routing separate from Booking');
+assert.match(core, /renderBookingRoute\(accountBooking\)/, 'Account Booking must enter the shared Booking route');
+assert.match(core, /renderBookingRoute\(onlineBooking\)/, 'Online link must enter the same Booking route');
+assert.match(core, /from '\.\/online-booking\/account\.js'/, 'Main browser entry must load Account separately');
+assert.match(core, /from '\.\/online-booking\/booking\.js'/, 'Main browser entry must load Booking separately');
+assert.doesNotMatch(core, /booking-x\.js|renderOnlineBookingX/, 'Main browser entry must not retain the removed X Booking path');
+
+assert.match(dockerfile, /reset-test-account-before-global-migration/, 'Deployment must keep the guarded test-account reset before global Account migration');
+assert.match(reset, /ALLOW_TEST_ACCOUNT_RESET/, 'Test Account reset must stay explicitly guarded');
 
 console.log('global account architecture tests passed');

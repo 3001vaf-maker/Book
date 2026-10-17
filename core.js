@@ -22,8 +22,8 @@ import { getCurrentAccount, login } from './core/auth.js';
 import { resolveBookingPublicRoute } from './core/account/index.js';
 import { activateBookDemo, canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
-import { renderGlobalClient } from './online-booking/booking.js';
-import { renderOnlineBookingX as renderOnlineBooking } from './online-booking/booking-x.js';
+import { renderGlobalClient } from './online-booking/account.js';
+import { renderBooking } from './online-booking/booking.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
@@ -133,6 +133,19 @@ function bookingRouteQuery(params) {
   };
 }
 
+function accountBookingRoute() {
+  if (!isEndUserAppHost()) return null;
+  const params = new URLSearchParams(location.search);
+  const tenantId = String(params.get('booking') || '').trim();
+  if (!tenantId) return null;
+  return {
+    tenantId,
+    workplaceKey: String(params.get('workplace') || '').trim(),
+    procedureIds: String(params.get('procedures') || '').split(',').map((value) => value.trim()).filter(Boolean),
+    entry: 'account-booking',
+  };
+}
+
 function publicBookingPath() {
   if (!isEndUserAppHost()) return null;
   const segments = String(location.pathname || '/')
@@ -150,7 +163,7 @@ function publicBookingPath() {
   };
 }
 
-async function bookingRoute() {
+async function onlineBookingRoute() {
   const params = new URLSearchParams(location.search);
   const pathRoute = publicBookingPath();
   if (!pathRoute) return null;
@@ -170,14 +183,14 @@ async function bookingRoute() {
   }
 }
 
-async function renderPublicBooking(route) {
+async function renderBookingRoute(route) {
   workspaceReady = false;
   disposeView();
   setThemeColor('#2F3338');
   app.classList.add('app-shell--booking');
   app.innerHTML = '<main class="booking-content" id="app-content"></main>';
   disposeView = await startAccountRuntime(route);
-  await renderOnlineBooking(document.querySelector('#app-content'), {
+  await renderBooking(document.querySelector('#app-content'), {
     ...route,
     onExitToAccount: (target = {}) => {
       history.replaceState({}, '', isEndUserAppHost() ? '/' : location.pathname);
@@ -792,21 +805,26 @@ document.addEventListener('focusin', (event) => {
 
 syncViewport();
 
-const publicBooking = await bookingRoute();
-if (publicBooking) {
-  await renderPublicBooking(publicBooking);
-} else if (isEndUserAppHost()) {
-  await renderGlobalClientRoot();
+const accountBooking = accountBookingRoute();
+if (accountBooking) {
+  await renderBookingRoute(accountBooking);
 } else {
-  try {
-    const currentAccount = await getCurrentAccount();
-    if (currentAccount) {
-      authenticatedAccount = currentAccount;
-      await renderAuthenticated(currentAccount);
-    } else {
-      renderLogin();
+  const onlineBooking = await onlineBookingRoute();
+  if (onlineBooking) {
+    await renderBookingRoute(onlineBooking);
+  } else if (isEndUserAppHost()) {
+    await renderGlobalClientRoot();
+  } else {
+    try {
+      const currentAccount = await getCurrentAccount();
+      if (currentAccount) {
+        authenticatedAccount = currentAccount;
+        await renderAuthenticated(currentAccount);
+      } else {
+        renderLogin();
+      }
+    } catch {
+      renderLogin('Сервер временно недоступен');
     }
-  } catch {
-    renderLogin('Сервер временно недоступен');
   }
 }
