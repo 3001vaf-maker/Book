@@ -27,7 +27,9 @@ assert.match(recordSource, /Math\.min\(\.\.\.capacities\)/);
 assert.match(recordSource, /const\s+groupMode\s*=\s*capacity\s*>\s*1/);
 assert.match(recordSource, /selected\.size\s*<\s*capacity/);
 assert.match(recordSource, /Участники:\s*\$\{selected\.size\}\s*\/\s*\$\{capacity\}/);
-assert.match(recordSource, /group:\s*capacity\s*>\s*1\s*\?/);
+assert.match(recordSource, /const\s+group\s*=\s*capacity\s*>\s*1\s*\?/);
+assert.match(recordSource, /participants:\s*state\.people\.map\(recordPersonSnapshot\)/);
+assert.match(recordSource, /person:\s*recordPersonSnapshot\(primaryPerson\),\s*group,/s);
 assert.doesNotMatch(recordSource, /data-record-group-capacity-save|openGroupCapacity|label:\s*'Количество мест'/);
 
 const procedureServerSource = readFileSync(new URL('../server/src/procedure/procedure.service.ts', import.meta.url), 'utf8');
