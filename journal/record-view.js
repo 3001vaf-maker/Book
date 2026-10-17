@@ -1,4 +1,5 @@
 import {
+  actionBlock,
   button,
   durationText,
   select,
@@ -398,6 +399,13 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
         })),
       ],
     });
+    const bodyActions = actionBlock([
+      !cancelled ? button('Пространство', { variant: 'secondary', data: 'data-record-view-edit="workplace"' }) : '',
+      !cancelled ? button('Дата', { variant: 'secondary', data: 'data-record-view-edit="date"' }) : '',
+      !cancelled ? button('Время', { variant: 'secondary', data: 'data-record-view-edit="time"' }) : '',
+      !cancelled ? button('Отмена записи', { variant: 'danger', data: 'data-record-view-cancel' }) : '',
+      button('Удалить запись', { variant: 'critical', data: 'data-record-view-delete' }),
+    ].filter(Boolean).join(''), { className: 'record-visible-actions' });
 
     const started = hasAppointmentStarted(state);
     const effectiveAttendance = normalizedAttendance(state.attendance) || (started ? 'arrived' : '');
@@ -410,7 +418,7 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
     </div>`;
     setV2ZHeaderRows(m, [confirmedControl, attendanceControl]);
     const dirty = stateSnapshot(state) !== baseline;
-    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}</div>`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view">${card}${bodyActions}</div>`;
     if (dirty) {
       setRecordPrimaryAction(m, {
         label: 'Сохранить',
@@ -435,6 +443,13 @@ export function openRecordView(record, { onClose = () => {} } = {}) {
       if (!Number.isInteger(index) || !state.procedures[index]) return;
       openProcedureCorrection(index);
     }));
+    root.querySelectorAll('[data-record-view-edit]').forEach((node) => node.addEventListener('click', () => {
+      openRecordEdit(String(node.dataset.recordViewEdit || ''));
+    }));
+    root.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
+      confirmCancel(currentRecord, () => m.v2Close?.());
+    });
+    root.querySelector('[data-record-view-delete]')?.addEventListener('click', confirmHardDelete);
     m.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
       if (isPaid()) return;
       applyPatch({ confirmed: !state.confirmed });
