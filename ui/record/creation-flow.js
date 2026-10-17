@@ -77,6 +77,7 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
     if (cancelled) onCancel?.();
   };
 
+  const headerHost = layer.querySelector('[data-v2-q-header-content]');
   const titleHost = layer.querySelector('[data-record-creation-title]');
   const bodyHost = layer.querySelector('[data-record-creation-body]');
   const actionHost = layer.querySelector('[data-record-creation-action]');
@@ -84,12 +85,14 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
   const render = ({
     step = '',
     title = '',
+    header = '',
     body = '',
     secondaryActions = [],
     action = null,
   } = {}) => {
     if (!bodyHost || !actionHost || !titleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
+    if (headerHost) headerHost.innerHTML = String(header || '');
     titleHost.textContent = resolveRecordCreationTitle(step, title);
     bodyHost.innerHTML = body;
     const secondary = (Array.isArray(secondaryActions) ? secondaryActions : [])
@@ -112,6 +115,7 @@ export function openRecordCreationOwner({ onCancel = () => {} } = {}) {
       : '';
     return {
       layer,
+      header: headerHost,
       body: bodyHost,
       action: action?.label ? actionHost.querySelector(`[${action.data || 'data-record-creation-primary'}]`) : null,
     };
