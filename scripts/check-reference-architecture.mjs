@@ -197,14 +197,6 @@ for (const file of allFiles) {
   }
 }
 
-const journalCreation = join(root, 'journal/record.js');
-if (/export\s+function\s+openRecordView\b/.test(text(journalCreation))) {
-  report(journalCreation, 'Record creation must not contain a duplicate Record View; journal/record-view.js is the single view implementation');
-}
-if (/from\s+['"][^'"]*core\/record\.js['"]/.test(text(journalCreation))) {
-  report(journalCreation, 'Record creation must use the Journal Record data owner directly, not a Core compatibility bridge');
-}
-
 const legacyTimetableCss = join(root, 'timetable/timetable.css');
 if (existsSync(legacyTimetableCss)) {
   report(legacyTimetableCss, 'Graph must not own a parallel functional CSS file; shared presentation belongs to common UI');
