@@ -5,13 +5,13 @@ function read(path) {
 }
 
 const failures = [];
-const journal = read('journal/record.js');
+const records = read('records/records.js');
 const metadata = read('core/people/metadata.js');
 const business = read('server/src/business-state/business-state.service.ts');
 const server = read('server/src/online-booking/online-booking.service.ts');
 
-if (!journal.includes("import { getPeople } from '../core/people/data.js';") || journal.includes('getAllPeople')) {
-  failures.push('Journal must select the canonical visible People projection, not raw UEI members.');
+if (!records.includes("import { getPeople } from '../core/people/data.js';") || records.includes('getAllPeople')) {
+  failures.push('Records must select the canonical visible People projection, not raw UEI members.');
 }
 if (!metadata.includes('getIdentityMemberKeys') || !metadata.includes('identityKeys.has')) {
   failures.push('Person metadata must aggregate Record history across current UEI members.');
