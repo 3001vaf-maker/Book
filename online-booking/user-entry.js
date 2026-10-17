@@ -29,6 +29,17 @@ function bookingRouteQuery(params) {
   };
 }
 
+function accountBookingRoute() {
+  const params = new URLSearchParams(location.search);
+  const tenantId = String(params.get('booking') || '').trim();
+  if (!tenantId) return null;
+  return {
+    tenantId,
+    workplaceKey: String(params.get('workplace') || '').trim(),
+    ...bookingRouteQuery(params),
+  };
+}
+
 function publicBookingPath() {
   const segments = String(location.pathname || '/')
     .split('/')
@@ -164,6 +175,10 @@ window.visualViewport?.addEventListener('resize', syncViewport, { passive: true 
 window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
 
 syncViewport();
-const publicBooking = await bookingRoute();
-if (publicBooking) await renderPublicBooking(publicBooking);
-else await renderGlobalClientRoot();
+const accountBooking = accountBookingRoute();
+if (accountBooking) await renderPublicBooking(accountBooking);
+else {
+  const publicBooking = await bookingRoute();
+  if (publicBooking) await renderPublicBooking(publicBooking);
+  else await renderGlobalClientRoot();
+}
