@@ -48,7 +48,8 @@ import { getPersonMetadata } from './metadata.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
-import { openPersonRecordCreation } from './record-creation.js';
+import { openRecords } from '../records/records.js';
+import { openRecordConfirmationNotice } from '../../ui/record/confirmation.js';
 import { canUseRealPersonalData } from '../access.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
@@ -350,7 +351,22 @@ function openPersonSettings(root, person, options = {}) {
   });
   layer.querySelector('[data-person-settings-record]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    openPersonRecordCreation({ person });
+    let flashAnchor = null;
+    openRecords({
+      context: 'person',
+      person,
+      professionalActions: true,
+      actionContext: { anchor: () => flashAnchor },
+      onCreated: () => {
+        setTimeout(() => {
+          openRecordConfirmationNotice({
+            root: document.querySelector('[data-v2-app]') || document.body,
+            surface: 'app',
+            onFlashAnchor: (anchor) => { flashAnchor = anchor; },
+          });
+        }, 0);
+      },
+    });
   });
   return layer;
 }
