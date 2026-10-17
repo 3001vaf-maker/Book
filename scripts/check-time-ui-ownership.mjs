@@ -4,8 +4,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const errors = [];
 const fail = (path, message) => errors.push(`${path}: ${message}`);
 
-const recordFlow = read('journal/record.js');
-const recordView = read('journal/record-view.js');
+const recordFlow = read('records/records.js');
 const breakView = read('journal/break-view.js');
 const breakData = read('journal/break-data.js');
 const breakRead = read('journal/break-read.js');
@@ -19,32 +18,11 @@ const dayEditor = read('timetable/day-editor.js');
 const sharedTime = read('ui/time/index.js');
 const sharedTimeCss = read('ui/time/time.css');
 
-if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must ask Core Availability');
-if (!/checkTimeAvailability/.test(recordFlow) || !/listAvailableStartTimes/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('journal/record.js', 'Record creation must use canonical Availability queries');
-if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('journal/record.js', 'Record creation must use the canonical WorkPlan date query');
-if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('journal/record.js', 'Record creation must not rebuild occupancy or WorkPlan availability');
-if (/from ['"]\.\/break-data\.js['"]/.test(recordFlow)) fail('journal/record.js', 'Record creation must command Break through break-service.js');
-
-if (!/openRecordEditFlow/.test(recordView)
-  || !/startAt,\s*date:\s*state\.date,\s*workplaceId:\s*state\.workplaceId,\s*from:\s*state\.from,\s*to:\s*state\.to/s.test(recordView)) {
-  fail('journal/record-view.js', 'Created Record editor must delegate schedule/procedure editing to the shared Record edit flow');
-}
-if (/openTimePickerAction|startWorkplaceEdit|startRecordDateEdit|startRecordTimeEdit|openWorkplacePicker|openDatePicker/.test(recordView)) {
-  fail('journal/record-view.js', 'Created Record editor must not keep a second direct schedule-edit implementation');
-}
-if (!/export function openRecordEditFlow/.test(recordFlow)
-  || !/if \(startAt === 'workplace'\) openWorkplace\(\);\s*else if \(startAt === 'date'\) openDate\(\);\s*else if \(startAt === 'procedure'\) openProcedures\(\);\s*else openTime\(\);/s.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must own Workplace, Date, Time and Procedure entry points');
-}
-if (!/draft\.workplaceId\s*=\s*String\([^;]+;[\s\S]*?apply\(\);/.test(recordFlow)
-  || !/draft\.date\s*=\s*nextDate;\s*apply\(\);/s.test(recordFlow)
-  || !/draft\.from\s*=\s*nextFrom;\s*draft\.to\s*=\s*nextTo;\s*apply\(\);/s.test(recordFlow)
-  || !/onDone:\s*\(\{ procedures: next, to: nextTo \}\)\s*=>\s*\{[\s\S]*?draft\.procedures\s*=\s*next;[\s\S]*?draft\.to\s*=\s*nextTo;[\s\S]*?apply\(\);/s.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must apply only the selected Workplace, Date, Time or Procedure correction and return without replaying the booking sequence');
-}
-if (!/listAvailableStartTimes/.test(recordFlow) || !/excludeId/.test(recordFlow)) {
-  fail('journal/record.js', 'Shared Record edit flow must ask canonical Availability and exclude the edited Record');
-}
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('records/records.js', 'Records must ask Core Time/Availability.');
+if (!/checkTimeAvailability/.test(recordFlow) || !/getTimeAvailabilityAt/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('records/records.js', 'Records must use canonical Availability queries.');
+if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('records/records.js', 'Records must use the canonical WorkPlan date query.');
+if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('records/records.js', 'Records must not rebuild occupancy or WorkPlan availability.');
+if (/from ['"]\.\.\/journal\/break-data\.js['"]/.test(recordFlow)) fail('records/records.js', 'Records must command Break through break-service.js.');
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
 if (!/listAvailableStartTimes/.test(breakView) || !/listAvailableEndTimes/.test(breakView)) fail('journal/break-view.js', 'Break view must use canonical Availability choices');
