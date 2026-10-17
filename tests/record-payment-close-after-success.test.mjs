@@ -13,6 +13,19 @@ assert.match(source, /className: 'record-payment-allocation-q'/,
   'payment allocation surface must be Q2');
 assert.match(source, /modalTitle: 'Проведение оплаты'/,
   'Q2 must have a distinct application-modal key from Q1 so the shared Q owner does not reject it as a duplicate');
+assert.doesNotMatch(source, /setRecordPrimaryAction|openSharedProfileSettingsMenu/,
+  'payment Q must not hide actions in Header C or Header A settings');
+assert.match(source, /data-record-payment-allocation-submit/,
+  'Q2 payment confirmation must be visible in the Q body');
+assert.match(source, /data-record-payment-correction-save/,
+  'payment correction Save must be visible in the Q body');
+
+for (const action of [
+  'data-record-payment-correct',
+  'data-record-payment-refund',
+  'data-record-payment-cancel',
+  'data-record-payment-delete',
+]) assert.ok(source.includes(action), `payment operation action must stay visible in Q body: ${action}`);
 
 const allocationStart = source.indexOf('async function openPaymentAllocationLayer');
 const correctionStart = source.indexOf('async function openPaymentCorrection');
