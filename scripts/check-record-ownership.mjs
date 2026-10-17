@@ -29,7 +29,6 @@ const onlineBookingUi = read('online-booking/booking.js');
 const peopleUi = read('core/people/people.js');
 const prismaSchema = read('server/prisma/schema.prisma');
 const journalRecordUi = read('journal/record.js');
-const journalRecordEditUi = read('journal/record-edit.js');
 const journalRecordProcedureUi = read('journal/record-procedure-correction.js');
 const journalRecordViewUi = read('journal/record-view.js');
 const journalBreakViewUi = read('journal/break-view.js');
@@ -40,6 +39,9 @@ const sharedRecordCss = read('ui/record/record.css');
 const sharedInputsCss = read('ui/inputs/inputs.css');
 const sharedListEntryUi = read('ui/lists/list-entry.js');
 const sharedListEntryCss = read('ui/lists/list-entry.css');
+const creationStart = journalRecordUi.indexOf('export function openRecordCreation');
+const editStart = journalRecordUi.indexOf('function selectedRecordProcedures');
+const journalRecordCreationUi = journalRecordUi.slice(creationStart, editStart > creationStart ? editStart : journalRecordUi.length);
 
 if (/availability|financial-model|getAllPeople|record-events|record-state|status\s*=|attendance|confirmed|cancelRecord|createRecord|updateRecord|moveRecord/.test(recordData)) {
   errors.push('core/record/data.js: Record data must remain persistence-only');
@@ -132,15 +134,15 @@ if (/recordEvent\.upsert/.test(serverBusinessState)
   errors.push('RecordEvent persistence must be append-only and idempotent');
 }
 
-// Journal creation has one owner and one active module. It is Q, not a second Z/X flow.
-if (existsSync(join(root, 'journal/record-creation-x.js'))) {
-  errors.push('Journal Record creation must not keep a second record-creation-x.js flow');
+// Journal Record has one owner file. RecordCreation is Q; correction stays in the same journal/record.js file.
+if (existsSync(join(root, 'journal/record-creation-x.js')) || existsSync(join(root, 'journal/record-edit.js'))) {
+  errors.push('Journal Record must not keep split record-creation-x.js or record-edit.js flows');
 }
 if (!/import\('\.\/record\.js'\)/.test(journalDayUi)) {
   errors.push('Journal Day must launch the single journal/record.js creation flow');
 }
-if (!/openRecordCreationOwner\(/.test(journalRecordUi)
-  || /mountRecordZ|bindRecordSettings|setRecordPrimaryAction/.test(journalRecordUi)) {
+if (!/openRecordCreationOwner\(/.test(journalRecordCreationUi)
+  || /mountRecordZ|bindRecordSettings|setRecordPrimaryAction/.test(journalRecordCreationUi)) {
   errors.push('Journal Record creation must use the canonical Q owner and must not restore Z/A/C ownership');
 }
 if (!/variant:\s*'q'/.test(creationOwnerUi)
@@ -153,8 +155,8 @@ if (!/record-creation-flow__body\{[^}]*overflow:auto/.test(sharedRecordCss)
   || !/record-creation-flow__action\{[^}]*display:grid/.test(sharedRecordCss)) {
   errors.push('RecordCreation list/body must scroll independently above fixed actions');
 }
-if (!/recordCreationTimeRows\(/.test(journalRecordUi)
-  || /class=["'`](?:record-time-option|record-time-chip)/.test(journalRecordUi)) {
+if (!/recordCreationTimeRows\(/.test(journalRecordCreationUi)
+  || /class=["'`](?:record-time-option|record-time-chip)/.test(journalRecordCreationUi)) {
   errors.push('Journal Record creation must consume Shared RecordCreation time rows instead of local time buttons');
 }
 
@@ -175,9 +177,9 @@ if (!/v2ListEntry\(\{/.test(sharedProcedureListSource)
   errors.push('Shared Record procedure selection must consume canonical V2 List Entry presentation');
 }
 
-const procedureStepSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('const renderProcedures ='),
-  journalRecordUi.indexOf('const renderBreakConfirmation ='),
+const procedureStepSource = journalRecordCreationUi.slice(
+  journalRecordCreationUi.indexOf('const renderProcedures ='),
+  journalRecordCreationUi.indexOf('const renderBreakConfirmation ='),
 );
 if (!/recordProcedureList\(/.test(procedureStepSource)
   || !/button\('Добавить из прайса',[\s\S]*data:\s*'data-record-create-from-price'/.test(procedureStepSource)
@@ -211,9 +213,9 @@ if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
   errors.push('Shared Record person selection must keep UEI / name / phone on a plain white card');
 }
 
-const personStepSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('const renderPerson ='),
-  journalRecordUi.indexOf('const renderProcedures ='),
+const personStepSource = journalRecordCreationUi.slice(
+  journalRecordCreationUi.indexOf('const renderPerson ='),
+  journalRecordCreationUi.indexOf('const renderProcedures ='),
 );
 if (!/recordPersonList\(/.test(personStepSource)
   || !/button\('\+ Добавить клиента',[\s\S]*data:\s*'data-record-create-add-person'/.test(personStepSource)
@@ -230,34 +232,34 @@ if (!/ui-search-field/.test(peopleUi)
 }
 
 // Confirmation stays confirmation only; creation does not expose correction navigation.
-const confirmationSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('const renderConfirmation ='),
-  journalRecordUi.indexOf('const renderPerson ='),
+const confirmationSource = journalRecordCreationUi.slice(
+  journalRecordCreationUi.indexOf('const renderConfirmation ='),
+  journalRecordCreationUi.indexOf('const renderPerson ='),
 );
 if (!/label:\s*'Подтвердить'/.test(confirmationSource)
   || /recordConfirmationEditStep|openRecordEditFlow|Пространство[\s\S]*Дата[\s\S]*Время[\s\S]*Процедура/.test(confirmationSource)) {
   errors.push('Creation confirmation must contain only confirmation, not correction navigation');
 }
 
-// Existing Record and Break remain Z surfaces; their correction logic is not a second creation flow.
+// Existing Record and Break remain Z surfaces; correction lives in journal/record.js, not a second Record flow file.
 if (!/mountRecordZ/.test(journalRecordViewUi) || !/mountRecordZ/.test(journalBreakViewUi)) {
   errors.push('Existing Record and Break surfaces must keep the canonical Shared Record Z owner');
 }
 if (!/openRecordEditFlow\(/.test(journalRecordViewUi)
   || !/openRecordProcedureCorrection\(/.test(journalRecordViewUi)) {
-  errors.push('Existing Record must delegate schedule and procedure correction to their shared correction owners');
+  errors.push('Existing Record must delegate schedule and procedure correction to their canonical owners');
 }
-if (!/export function openRecordEditFlow/.test(journalRecordEditUi)
-  || !/timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1\b/.test(journalRecordEditUi)
-  || !/initTimePickers\(host\)/.test(journalRecordEditUi)
-  || !/checkTimeAvailability\(\{[\s\S]*excludeId/.test(journalRecordEditUi)
-  || !/workplaceCardAppearance\(workplace\)/.test(journalRecordEditUi)
-  || !/workplaceCardFields\(workplace,\s*profile\)/.test(journalRecordEditUi)
-  || !/workplaceCardPhoto\(workplace\)/.test(journalRecordEditUi)) {
-  errors.push('Shared specialist Record edit flow must preserve canonical workplace/date/exact-time correction');
+if (!/export function openRecordEditFlow/.test(journalRecordUi)
+  || !/timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1\b/.test(journalRecordUi)
+  || !/initTimePickers\(host\)/.test(journalRecordUi)
+  || !/checkTimeAvailability\(\{[\s\S]*excludeId/.test(journalRecordUi)
+  || !/workplaceCardAppearance\(workplace\)/.test(journalRecordUi)
+  || !/workplaceCardFields\(workplace,\s*profile\)/.test(journalRecordUi)
+  || !/workplaceCardPhoto\(workplace\)/.test(journalRecordUi)) {
+  errors.push('journal/record.js must preserve canonical workplace/date/exact-time correction');
 }
-if (!/chatPersonKey/.test(journalRecordEditUi)
-  || !/chatPersonKeys/.test(journalRecordEditUi)
+if (!/chatPersonKey/.test(journalRecordUi)
+  || !/chatPersonKeys/.test(journalRecordUi)
   || !/chatKeysForState/.test(journalRecordViewUi)) {
   errors.push('Record correction must preserve current person/group chat context');
 }
