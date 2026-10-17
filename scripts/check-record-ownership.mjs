@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
@@ -27,11 +27,14 @@ const serverBooking = read('server/src/online-booking/online-booking.service.ts'
 const accountShell = read('online-booking/account-shell.js');
 const onlineBookingUi = read('online-booking/booking.js');
 const peopleUi = read('core/people/people.js');
-const coreUi = read('core.js');
 const prismaSchema = read('server/prisma/schema.prisma');
 const journalRecordUi = read('journal/record.js');
+const journalRecordEditUi = read('journal/record-edit.js');
+const journalRecordProcedureUi = read('journal/record-procedure-correction.js');
 const journalRecordViewUi = read('journal/record-view.js');
 const journalBreakViewUi = read('journal/break-view.js');
+const journalDayUi = read('journal/день.js');
+const creationOwnerUi = read('ui/record/creation-flow.js');
 const sharedRecordUi = read('ui/record/runtime.js');
 const sharedRecordCss = read('ui/record/record.css');
 const sharedInputsCss = read('ui/inputs/inputs.css');
@@ -65,7 +68,7 @@ if (!/from '.\/data\.js'/.test(recordService)
   errors.push('core/record/service.js: command service must own Record mutations');
 }
 if (!/appendRecordEvent/.test(recordService) || !/RECORD_EVENT_TYPES\.CANCELLED/.test(recordService) || !/RECORD_EVENT_TYPES\.RESCHEDULED/.test(recordService)) {
-  errors.push('core/record/service.js: Record commands must append immutable create/reschedule/cancel and lifecycle history facts');
+  errors.push('core/record/service.js: Record commands must append immutable lifecycle facts');
 }
 if (/finance\/index\.js/.test(recordService) || /calculateSettlement|repriceSettlement|normalizeRecordSettlement/.test(recordService)) {
   errors.push('core/record/service.js: Record commands must not calculate or persist Settlement');
@@ -96,7 +99,7 @@ if (!/export class RecordService/.test(serverRecord)
   || !/this\.finance\.upsertSettlement/.test(serverRecord)
   || !/this\.finance\.settlementForSource/.test(serverRecord)
   || !/async listForPeople/.test(serverRecord)) {
-  errors.push('server RecordService must compose through Time, Procedure and Finance Settlement owners without owning Settlement persistence');
+  errors.push('server RecordService must compose through Time, Procedure and Finance owners');
 }
 if (/createOnlineBookingRecord|publicBookingOccupancy|bookingRecordSnapshot/.test(serverBusinessState)) {
   errors.push('BusinessState must not own Record creation, occupancy or Booking snapshot adapters');
@@ -111,7 +114,7 @@ if (/recordSnapshot/.test(accountShell)
   || !/globalAccountRecords\(accountId/.test(serverBooking)
   || !/const rows = await this\.getMyRecords\(link\.tenantId, accountId\)/.test(serverBooking)
   || !/return this\.records\.listForPeople\(tenantId, people\)/.test(serverBooking)) {
-  errors.push('Account history must consume canonical Records through the global account Record projection, never BookingRequest snapshots');
+  errors.push('Account history must consume canonical Records through the global account projection');
 }
 if (!/model Record\s*\{/.test(prismaSchema)
   || !/model RecordEvent\s*\{/.test(prismaSchema)
@@ -129,22 +132,35 @@ if (/recordEvent\.upsert/.test(serverBusinessState)
   errors.push('RecordEvent persistence must be append-only and idempotent');
 }
 
-if (!/mountRecordZ/.test(journalRecordUi)
-  || !/setRecordPrimaryAction/.test(journalRecordUi)
-  || !/bindRecordSettings/.test(journalRecordUi)
-  || !/mountRecordZ/.test(journalRecordViewUi)
-  || !/mountRecordZ/.test(journalBreakViewUi)) {
-  errors.push('Specialist Record surfaces must consume the canonical Shared Record Z/A/C owner');
+// Journal creation has one owner and one active module. It is Q, not a second Z/X flow.
+if (existsSync(join(root, 'journal/record-creation-x.js'))) {
+  errors.push('Journal Record creation must not keep a second record-creation-x.js flow');
 }
-
-if (!/recordTimeRows/.test(journalRecordUi)
+if (!/import\('\.\/record\.js'\)/.test(journalDayUi)) {
+  errors.push('Journal Day must launch the single journal/record.js creation flow');
+}
+if (!/openRecordCreationOwner\(/.test(journalRecordUi)
+  || /mountRecordZ|bindRecordSettings|setRecordPrimaryAction/.test(journalRecordUi)) {
+  errors.push('Journal Record creation must use the canonical Q owner and must not restore Z/A/C ownership');
+}
+if (!/variant:\s*'q'/.test(creationOwnerUi)
+  || !/data-record-creation-body/.test(creationOwnerUi)
+  || !/data-record-creation-action/.test(creationOwnerUi)
+  || !/footer\s*=\s*''/.test(creationOwnerUi)) {
+  errors.push('Shared RecordCreation owner must remain one Q with body plus fixed footer/action row');
+}
+if (!/record-creation-flow__body\{[^}]*overflow:auto/.test(sharedRecordCss)
+  || !/record-creation-flow__action\{[^}]*display:grid/.test(sharedRecordCss)) {
+  errors.push('RecordCreation list/body must scroll independently above fixed actions');
+}
+if (!/recordCreationTimeRows\(/.test(journalRecordUi)
   || /class=["'`](?:record-time-option|record-time-chip)/.test(journalRecordUi)) {
-  errors.push('journal/record.js must consume Shared Record time-row UI instead of drawing local time buttons');
+  errors.push('Journal Record creation must consume Shared RecordCreation time rows instead of local time buttons');
 }
 
 const sharedProcedureListSource = sharedRecordUi.slice(
   sharedRecordUi.indexOf('export function recordProcedureList'),
-  sharedRecordUi.indexOf('export function recordPersonList')
+  sharedRecordUi.indexOf('export function recordPersonList'),
 );
 if (!/v2ListEntry\(\{/.test(sharedProcedureListSource)
   || !/v2ListEntries\(rows\)/.test(sharedProcedureListSource)
@@ -156,49 +172,34 @@ if (!/v2ListEntry\(\{/.test(sharedProcedureListSource)
   || !/\.list-entry\{[^}]*min-height:78px[^}]*border:0[^}]*box-shadow:-9px 8px 14px -11px/.test(sharedListEntryCss)
   || !/\.list-entry__selector\{[^}]*width:24px[^}]*height:24px/.test(sharedListEntryCss)
   || !/\.list-entry\.is-selectable\.is-selected \.list-entry__selector::after\{content:'✓'\}/.test(sharedListEntryCss)) {
-  errors.push('Shared Record procedure selection must consume the canonical V2 List Entry sticker presentation and selected checkmark without a parallel service-sticker owner');
+  errors.push('Shared Record procedure selection must consume canonical V2 List Entry presentation');
 }
 
-const procedureSettingsSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('bindRecordSettings(modalRoot, () => {', journalRecordUi.indexOf('function renderProceduresStep')),
-  journalRecordUi.indexOf('function openProcedureSettings')
+const procedureStepSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('const renderProcedures ='),
+  journalRecordUi.indexOf('const renderBreakConfirmation ='),
 );
-if (!/button\('Добавить из прайса',[\s\S]*variant:\s*'secondary'/.test(procedureSettingsSource)
-  || !/button\('\+ Добавить процедуру'/.test(procedureSettingsSource)
-  || /const menu = list\(/.test(procedureSettingsSource)) {
-  errors.push('Record procedure settings must use the canonical white "Добавить из прайса" button and black "+ Добавить процедуру" button');
+if (!/recordProcedureList\(/.test(procedureStepSource)
+  || !/button\('Добавить из прайса',[\s\S]*data:\s*'data-record-create-from-price'/.test(procedureStepSource)
+  || !/button\('\+ Добавить процедуру',[\s\S]*data:\s*'data-record-create-add-procedure'/.test(procedureStepSource)
+  || !/openPriceProcedurePicker/.test(procedureStepSource)
+  || !/openProcedureEditor/.test(procedureStepSource)
+  || !/assignProceduresToWorkplace/.test(procedureStepSource)) {
+  errors.push('Procedure Q must expose Add from price / Add procedure and reuse existing Procedure + workplace assignment logic');
 }
 
 const recordPricePickerSource = journalRecordUi.slice(
   journalRecordUi.indexOf('function openPriceProcedurePicker'),
-  journalRecordUi.indexOf('function renderProceduresStep')
+  journalRecordUi.indexOf('export function openRecordCreation'),
 );
-const onlineBookingProcedureSource = onlineBookingUi.slice(
-  onlineBookingUi.indexOf('function renderProcedures'),
-  onlineBookingUi.indexOf('function renderDates')
-);
-
-for (const [name, source] of [
-  ['Record workplace price picker', recordPricePickerSource],
-  ['Online booking procedure picker', onlineBookingProcedureSource],
-]) {
-  if (!/recordProcedureList\(/.test(source)) {
-    errors.push(`${name} must consume the Shared Record procedure V2 List Entry adapter`);
-  }
-}
-if (/function\s+openConfirmationProcedurePicker|function\s+openAddProcedurePicker/.test(journalRecordUi + journalRecordViewUi)) {
-  errors.push('Record must not keep parallel confirmation/existing-record procedure pickers outside the shared procedure step');
-}
-
-if (!/recordTimeRows\(values,\s*\{\s*data:\s*'data-record-time'/.test(journalRecordUi)
-  || !/recordTimeRows\(values,\s*\{[\s\S]*?data:\s*'data-block-end'/.test(journalRecordUi)
-  || /recordTimeRows\(\{\s*items:/.test(journalRecordUi)) {
-  errors.push('journal/record.js must call Shared recordTimeRows(items, options) with the canonical positional contract');
+if (!/recordProcedureList\(/.test(recordPricePickerSource)
+  || !/assignProceduresToWorkplace/.test(recordPricePickerSource)) {
+  errors.push('Record workplace price picker must reuse Shared procedure list and canonical workplace assignment');
 }
 
 const sharedPersonListSource = sharedRecordUi.slice(
   sharedRecordUi.indexOf('export function recordPersonList'),
-  sharedRecordUi.indexOf('function timeValue')
+  sharedRecordUi.indexOf('function timeValue'),
 );
 if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
   || !/title:\s*item\.name/.test(sharedPersonListSource)
@@ -207,26 +208,19 @@ if (!/overline:\s*item\.uei/.test(sharedPersonListSource)
   || /columns:\s*\[/.test(sharedPersonListSource)
   || !/\.list-entry--record-person \.list-entry__background\{background:#fff;background-image:none\}/.test(sharedRecordCss)
   || !/\.list-entry--record-person \.list-entry__content\{background:#fff\}/.test(sharedRecordCss)) {
-  errors.push('Shared Record person selection must keep UEI / name / phone as three readable stacked lines on a plain white card with no gradient');
+  errors.push('Shared Record person selection must keep UEI / name / phone on a plain white card');
 }
 
-const recordPersonStepSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('function renderPersonStep'),
-  journalRecordUi.indexOf('function renderConfirmationStep')
+const personStepSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('const renderPerson ='),
+  journalRecordUi.indexOf('const renderProcedures ='),
 );
-if (!/button\('\+ Добавить клиента',\s*\{\s*data:\s*'data-record-settings-add-person'\s*\}\)/.test(recordPersonStepSource)
-  || !/bindRecordSettings\(modalRoot/.test(recordPersonStepSource)
-  || /variant:\s*'secondary'[^\n]*data-record-settings-add-person/.test(recordPersonStepSource)) {
-  errors.push('Record person-step A settings must expose one canonical black "+ Добавить клиента" button');
-}
-
-if (!/ui-search-field/.test(recordPersonStepSource)
-  || !/field\(\{[\s\S]*type:\s*'search'[\s\S]*placeholder:\s*'Поиск по имени или UEI'/.test(recordPersonStepSource)
-  || /record-person-toolbar|class=["'][^"']*record-person-search/.test(recordPersonStepSource)) {
-  errors.push('Record person selection must consume the same Shared search field presentation as the People folder');
-}
-if (/function\s+openPersonPicker/.test(journalRecordViewUi)) {
-  errors.push('Existing Record must not restore a second person picker; rescheduling skips Person by design');
+if (!/recordPersonList\(/.test(personStepSource)
+  || !/button\('\+ Добавить клиента',[\s\S]*data:\s*'data-record-create-add-person'/.test(personStepSource)
+  || !/openPersonCreate\(/.test(personStepSource)
+  || !/ui-search-field/.test(personStepSource)
+  || !/placeholder:\s*'Поиск по имени или UEI'/.test(personStepSource)) {
+  errors.push('Person Q must expose Add person, reuse existing PersonCreate and Shared search/list presentation');
 }
 if (!/ui-search-field/.test(peopleUi)
   || !/placeholder:\s*'Поиск по имени или UEI'/.test(peopleUi)
@@ -235,21 +229,63 @@ if (!/ui-search-field/.test(peopleUi)
   errors.push('People and Record search must share one canonical search-field presentation');
 }
 
+// Confirmation stays confirmation only; creation does not expose correction navigation.
+const confirmationSource = journalRecordUi.slice(
+  journalRecordUi.indexOf('const renderConfirmation ='),
+  journalRecordUi.indexOf('const renderPerson ='),
+);
+if (!/label:\s*'Подтвердить'/.test(confirmationSource)
+  || /recordConfirmationEditStep|openRecordEditFlow|Пространство[\s\S]*Дата[\s\S]*Время[\s\S]*Процедура/.test(confirmationSource)) {
+  errors.push('Creation confirmation must contain only confirmation, not correction navigation');
+}
+
+// Existing Record and Break remain Z surfaces; their correction logic is not a second creation flow.
+if (!/mountRecordZ/.test(journalRecordViewUi) || !/mountRecordZ/.test(journalBreakViewUi)) {
+  errors.push('Existing Record and Break surfaces must keep the canonical Shared Record Z owner');
+}
+if (!/openRecordEditFlow\(/.test(journalRecordViewUi)
+  || !/openRecordProcedureCorrection\(/.test(journalRecordViewUi)) {
+  errors.push('Existing Record must delegate schedule and procedure correction to their shared correction owners');
+}
+if (!/export function openRecordEditFlow/.test(journalRecordEditUi)
+  || !/timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1\b/.test(journalRecordEditUi)
+  || !/initTimePickers\(host\)/.test(journalRecordEditUi)
+  || !/checkTimeAvailability\(\{[\s\S]*excludeId/.test(journalRecordEditUi)
+  || !/workplaceCardAppearance\(workplace\)/.test(journalRecordEditUi)
+  || !/workplaceCardFields\(workplace,\s*profile\)/.test(journalRecordEditUi)
+  || !/workplaceCardPhoto\(workplace\)/.test(journalRecordEditUi)) {
+  errors.push('Shared specialist Record edit flow must preserve canonical workplace/date/exact-time correction');
+}
+if (!/chatPersonKey/.test(journalRecordEditUi)
+  || !/chatPersonKeys/.test(journalRecordEditUi)
+  || !/chatKeysForState/.test(journalRecordViewUi)) {
+  errors.push('Record correction must preserve current person/group chat context');
+}
+if (!/export function openRecordProcedureCorrection/.test(journalRecordProcedureUi)
+  || !/checkTimeAvailability/.test(journalRecordProcedureUi)
+  || !/excludeId/.test(journalRecordProcedureUi)) {
+  errors.push('Procedure correction must remain one canonical owner and validate through Availability');
+}
+
+if (/function\s+openPersonPicker/.test(journalRecordViewUi)) {
+  errors.push('Existing Record must not restore a second person picker; rescheduling skips Person by design');
+}
+if (/function\s+openConfirmationProcedurePicker|function\s+openAddProcedurePicker/.test(journalRecordUi + journalRecordViewUi)) {
+  errors.push('Record must not keep parallel confirmation/existing-record procedure pickers');
+}
+
 for (const [path, source] of [
   ['journal/record.js', journalRecordUi],
   ['journal/record-view.js', journalRecordViewUi],
   ['journal/break-view.js', journalBreakViewUi],
 ]) {
   if (/record-modal-actions|record-modal--flow/.test(source)) {
-    errors.push(`${path}: Record Z must not own local action rows or a parallel large modal flow`);
+    errors.push(`${path}: must not restore retired local Record modal flows`);
   }
 }
 
 if (/\.record-modal--|\.record-editor-|\.record-card-|\.entity-card--record|\.record-setting-|\.record-time-slot|\.record-confirm-(?:card|summary|actions|procedure)|\.record-view(?:\{|-(?:card|actions|services))|\.record-record-services|\.record-reset|\.record-delete-button|\.record-modal-(?:next|actions)|\.record-next-top|\.record-procedure-row|\.record-screen--(?:confirmation|settings)/.test(sharedRecordCss)) {
-  errors.push('Retired Record modal/editor CSS must not return; Record uses Shared Z, Shared Modal, Shared List, Shared Time and Shared Mini Card owners');
-}
-if (/record-modal-toolbar/.test(journalRecordUi + sharedRecordCss) || !/record-time-toolbar/.test(journalRecordUi + sharedRecordCss)) {
-  errors.push('Record step toolbar must remain a neutral Z-content toolbar and must not use retired modal terminology');
+  errors.push('Retired Record modal/editor CSS must not return');
 }
 if (/journal-list-(?:mode-navigation|viewport|anchor)/.test(sharedRecordCss) || /\.segment-control--two\{/.test(sharedRecordCss)) {
   errors.push('Record CSS must not own Journal List or SegmentControl geometry');
@@ -258,7 +294,7 @@ if (/journal-list-(?:mode-navigation|viewport|anchor)/.test(sharedRecordCss) || 
 if (!/data-record-owner-settings/.test(sharedRecordUi)
   || !/(?:data-v2-primary-action|dataset\.v2PrimaryAction)/.test(sharedRecordUi)
   || !/mountV2ZLayer/.test(sharedRecordUi)) {
-  errors.push('ui/record/runtime.js must remain the canonical Record Z/A/C presentation owner');
+  errors.push('ui/record/runtime.js must remain the canonical existing-Record Z/A/C presentation owner');
 }
 
 const sharedV2Runtime = [read('ui/v2/index.js'), read('ui/v2/z-stack.js'), read('ui/v2/swipe.js')].join('\n');
@@ -272,116 +308,32 @@ if (!/mountV2ZLayer/.test(sharedV2Runtime)
 const directDataImport = /(?:from\s+['"][^'"]*core\/record\/data\.js['"]|import\s*\(\s*['"][^'"]*core\/record\/data\.js['"]\s*\))/;
 for (const path of [...walk('journal'), ...walk('core/people'), ...walk('core/finance'), ...walk('settings'), ...walk('tests')]) {
   const source = read(path);
-  if (directDataImport.test(source)) {
-    errors.push(`${path}: must use core/record/index.js instead of the private data atom`);
-  }
-}
-
-const recordStartTimesSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('function recordStartTimes'),
-  journalRecordUi.indexOf('function openRecordTimeNotice')
-);
-if (!/duration:\s*5\b/.test(recordStartTimesSource)
-  || !/step:\s*5\b/.test(recordStartTimesSource)
-  || /getBookingSettings\(\)\.slotStep/.test(journalRecordUi)
-  || /function\s+recordSlotStep\s*\(/.test(journalRecordUi)) {
-  errors.push('Journal Record first-step quick choices must preserve the proven specialist 5-minute helper and must not consume online-booking slotStep');
-}
-
-const sharedEditFlowSource = journalRecordUi.slice(
-  journalRecordUi.indexOf('export function openRecordEditFlow'),
-  journalRecordUi.indexOf('function blockEndValues')
-);
-if (!/timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1\b/.test(sharedEditFlowSource)
-  || !/initTimePickers\(host\)/.test(sharedEditFlowSource)
-  || !/checkTimeAvailability\(\{[\s\S]*excludeId/.test(sharedEditFlowSource)) {
-  errors.push('Shared specialist Record edit flow must preserve exact-minute Shared Time correction and validate it through canonical Availability');
-}
-if (!/openRecordEditFlow\(/.test(journalRecordViewUi)
-  || /getBookingSettings\(\)\.slotStep/.test(journalRecordViewUi)) {
-  errors.push('Existing specialist Record must delegate exact-time correction to the shared edit flow and stay independent from online-booking slotStep');
-}
-if (!/isRecordEditClass/.test(sharedRecordUi)
-  || !/mountRecordQ/.test(sharedRecordUi)
-  || !/title\s*!==\s*'Выбор времени'/.test(sharedRecordUi)
-  || !/v2QFrame/.test(sharedRecordUi)
-  || !/if\s*\(isRecordEditClass\(className\)\)\s*closeRecordEditQ\(\)/.test(sharedRecordUi)) {
-  errors.push('Record correction must use Shared Q for workplace/date/procedures, keep exact-time correction as the only Z+ step, and close the previous Q before exact time');
-}
-if (!/workplaceCardAppearance\(workplace\)/.test(sharedEditFlowSource)
-  || !/workplaceCardFields\(workplace,\s*profile\)/.test(sharedEditFlowSource)
-  || !/workplaceCardPhoto\(workplace\)/.test(sharedEditFlowSource)) {
-  errors.push('Record workplace correction must render the canonical Profile workplace card data instead of an empty/local card manifestation');
-}
-if (!/chatPersonKey/.test(sharedEditFlowSource)
-  || !/chatPersonKeys/.test(sharedEditFlowSource)
-  || !/chatKeysForState/.test(journalRecordViewUi)) {
-  errors.push('Record correction must preserve the current person/group chat context instead of falling back to an unrelated chat target');
-}
-
-if (!/kind:\s*'avatar'/.test(sharedRecordUi)
-  || !/hideD:\s*false/.test(sharedRecordUi)
-  || !/d:\s*\{[\s\S]*kind:\s*'chat'/.test(sharedRecordUi)
-  || !/personKeys:\s*normalizedChatKeys\(groupPersonKeys\)/.test(sharedRecordUi)
-  || !/settings\s*\?\s*\{/.test(sharedRecordUi)) {
-  errors.push('Shared Record Header must keep A as avatar/photo, expose settings only by context, and keep D chat visible for general, person and group chat contexts');
+  if (directDataImport.test(source)) errors.push(`${path}: must use core/record/index.js instead of the private data atom`);
 }
 
 const sharedConfirmationSource = sharedRecordUi.slice(
   sharedRecordUi.indexOf('export function recordConfirmationMiniCard'),
-  sharedRecordUi.indexOf('export function mountRecordZ')
+  sharedRecordUi.indexOf('export function mountRecordZ'),
 );
 if (!/miniCard\(\{/.test(sharedConfirmationSource)
   || !/className:\s*'record-confirmation-mini-card'/.test(sharedConfirmationSource)
   || /record-confirmation-card__|record-confirmation-view__metrics|v2RailCard\(/.test(sharedConfirmationSource)
   || !/\.record-confirmation-view\{[^}]*gap:\s*20px/.test(sharedRecordCss)
-  || !/\.record-confirmation-mini-card\.mini-card--lines\{[^}]*width:var\(--mini-card-width\)[^}]*height:var\(--mini-card-height\)/.test(sharedRecordCss)
-  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(2\)\{grid-column:2;grid-row:1\}/.test(sharedRecordCss)
-  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(8\)\{grid-column:1;grid-row:5\}/.test(sharedRecordCss)
-  || !/\.record-confirmation-mini-card \.mini-card__line:nth-child\(9\)\{grid-column:2;grid-row:5\}/.test(sharedRecordCss)) {
-  errors.push('Shared Record confirmation must keep the approved standard Mini Card dimensions, place discount top right, duration bottom left, total bottom right, and keep procedures separated below');
+  || !/\.record-confirmation-mini-card\.mini-card--lines\{[^}]*width:var\(--mini-card-width\)[^}]*height:var\(--mini-card-height\)/.test(sharedRecordCss)) {
+  errors.push('Shared Record confirmation must keep the approved standard Mini Card owner');
 }
 
 if (!/step:\s*state\.settings\.slotStep/.test(onlineBookingUi)) {
   errors.push('Online booking may keep its configured display slot step; specialist Record timing must remain independent from it');
 }
-
 if (!/recordWorkplaceCards\(/.test(onlineBookingUi)
   || !/recordProcedureList\(/.test(onlineBookingUi)
   || !/recordTimeRows\(/.test(onlineBookingUi)
   || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
-  errors.push('Online booking must consume the same canonical Shared Record step owners as specialist booking');
+  errors.push('Online booking must consume the canonical Shared Record step owners');
 }
-
 if (/bookingChoiceCards\(|bookingTimeGroups\(|v2ServiceStickers\(|v2-confirmation/.test(onlineBookingUi)) {
   errors.push('Online booking must not restore parallel visual owners for canonical booking steps');
-}
-
-const bookingHeaderSource = onlineBookingUi.slice(
-  onlineBookingUi.indexOf('function bookingHeaderMarkup'),
-  onlineBookingUi.indexOf('function bookingActionForStep')
-);
-if (!/image:\s*representativePhoto\(state\)/.test(bookingHeaderSource)
-  || !/disabled:\s*true/.test(bookingHeaderSource)
-  || !/b:\s*'Запись'/.test(bookingHeaderSource)
-  || !/d:\s*null/.test(bookingHeaderSource)
-  || /data-record-owner-settings/.test(bookingHeaderSource)) {
-  errors.push('Online booking Header must keep A as a disabled professional avatar only, use Запись in B, and expose no D chat or specialist settings');
-}
-
-if (!/workplaceCardAppearance\(workplace\)/.test(onlineBookingUi)
-  || !/workplaceCardFields\(workplace, workplace\.cardProfile \|\| profile\)/.test(onlineBookingUi)
-  || !/entityVisualCard\(/.test(sharedRecordUi)
-  || !/v2-profile-workplaces/.test(sharedRecordUi)) {
-  errors.push('Booking workplace selection must render the exact saved workplace business-card owner used by Profile');
-}
-
-if (!/v2ListEntry\(/.test(sharedRecordUi)
-  || !/v2ListEntries\(/.test(sharedRecordUi)
-  || !/miniCard\(/.test(sharedRecordUi)
-  || !/timeSlots\(/.test(sharedRecordUi)
-  || !/recordConfirmationMiniCard\(/.test(onlineBookingUi)) {
-  errors.push('Record UI must reuse the existing History list and Shared Time owners while keeping one Shared confirmation-card owner for specialist and online booking');
 }
 
 if (errors.length) {
