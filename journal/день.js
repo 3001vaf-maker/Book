@@ -101,7 +101,7 @@ export function renderJournalDay(root, {
         return;
       }
       if (minuteState.state !== 'free') return;
-      const { openRecordCreation } = await import('./record-creation-x.js');
+      const { openRecordCreation } = await import('./record.js');
       openRecordCreation({ date, workplaceId, from, onCreated: rerender });
     },
   });
