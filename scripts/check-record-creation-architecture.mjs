@@ -3,6 +3,9 @@ import fs from 'node:fs';
 const core = fs.readFileSync('core.js', 'utf8');
 const owner = fs.readFileSync('ui/record/creation-flow.js', 'utf8');
 const journal = fs.readFileSync('journal/record.js', 'utf8');
+const creationStart = journal.indexOf('export function openRecordCreation');
+const editStart = journal.indexOf('function selectedRecordProcedures');
+const journalCreation = journal.slice(creationStart, editStart > creationStart ? editStart : journal.length);
 const day = fs.readFileSync('journal/день.js', 'utf8');
 const booking = fs.readFileSync('online-booking/booking-x.js', 'utf8');
 const model = fs.readFileSync('online-booking/model.js', 'utf8');
@@ -22,11 +25,12 @@ expect(/record-creation-flow__body\{[^}]*overflow:auto/.test(recordCss), 'Record
 expect(/record-creation-flow__action\{[^}]*display:grid/.test(recordCss), 'RecordCreation actions must remain fixed in the footer row.');
 expect(day.includes("import('./record.js')"), 'Journal Day must launch the single journal record flow.');
 expect(!fs.existsSync('journal/record-creation-x.js'), 'Duplicate journal record-creation-x.js must not exist.');
-expect(journal.includes('openRecordCreationOwner('), 'Journal creation must use Shared RecordCreation owner.');
-expect(!journal.includes('mountRecordZ') && !journal.includes('mountV2ZLayer') && !journal.includes('bindRecordSettings'), 'Journal creation must not restore the old Z/settings flow.');
-expect(journal.includes("button('Добавить из прайса'"), 'Procedure selection must expose Add from price.');
-expect(journal.includes("button('+ Добавить процедуру'"), 'Procedure selection must expose Add procedure.');
-expect(journal.includes("button('+ Добавить клиента'"), 'Person selection must expose Add person.');
+expect(!fs.existsSync('journal/record-edit.js'), 'Split journal record-edit.js must not exist.');
+expect(journalCreation.includes('openRecordCreationOwner('), 'Journal creation must use Shared RecordCreation owner.');
+expect(!journalCreation.includes('mountRecordZ') && !journalCreation.includes('mountV2ZLayer') && !journalCreation.includes('bindRecordSettings'), 'Journal creation must not restore the old Z/settings flow.');
+expect(journalCreation.includes("button('Добавить из прайса'"), 'Procedure selection must expose Add from price.');
+expect(journalCreation.includes("button('+ Добавить процедуру'"), 'Procedure selection must expose Add procedure.');
+expect(journalCreation.includes("button('+ Добавить клиента'"), 'Person selection must expose Add person.');
 expect(journal.includes('openPersonCreate') && journal.includes('openProcedureEditor') && journal.includes('assignProceduresToWorkplace'), 'Visible creation actions must use the existing shared entities and assignment mechanism.');
 expect(booking.includes('openRecordCreationOwner('), 'End-user creation must use Shared RecordCreation owner.');
 expect(!booking.includes('mountV2ZLayer') && !booking.includes('v2ZLayer(') && !booking.includes('v2Header(') && !booking.includes('v2Shell('), 'End-user creation must not own Z stack or A/B/C/D shell.');
@@ -34,7 +38,7 @@ expect(booking.includes('workplaces.length === 1'), 'One end-user workplace must
 expect(booking.includes("step: 'workplace'") && booking.includes("step: 'procedures'") && booking.includes("step: 'date'") && booking.includes("step: 'time'") && booking.includes("step: 'confirmation'"), 'End-user creation must keep canonical steps in one Q.');
 expect(booking.includes('recordCreationTimeRows(rows') && booking.includes('getBookingTimeRows('), 'End-user time must keep blocked time visible through shared rows.');
 expect(model.includes('export function getBookingTimeRows'), 'Booking model must expose full time-row state, not only free slots.');
-expect(!booking.includes('recordConfirmationEditStep') && !journal.includes('recordConfirmationEditStep'), 'Creation confirmation must not contain correction navigation.');
+expect(!booking.includes('recordConfirmationEditStep') && !journalCreation.includes('recordConfirmationEditStep'), 'Creation confirmation must not contain correction navigation.');
 
 if (failures.length) {
   console.error('RecordCreation architecture check failed:\n- ' + failures.join('\n- '));
