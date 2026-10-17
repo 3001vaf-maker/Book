@@ -77,7 +77,7 @@ function groupCapacity(procedures = []) {
   return capacities.every((value) => value >= 2) ? Math.min(...capacities) : 1;
 }
 
-function professionalProvider() {
+function professionalProvider(recordSource = 'manual') {
   return {
     kind: 'professional',
     workplaces: () => getWorkplaces(),
@@ -110,7 +110,7 @@ function professionalProvider() {
       const primary = state.people[0] || state.person;
       const capacity = groupCapacity(state.procedures);
       return createRecord({
-        source: 'journal',
+        source: recordSource,
         actionContext,
         date: state.date,
         workplaceId: state.workplaceId,
@@ -133,8 +133,8 @@ function professionalProvider() {
   };
 }
 
-function normalizeProvider(provider = {}) {
-  return { ...professionalProvider(), ...provider };
+function normalizeProvider(provider = {}, context = 'professional') {
+  return { ...professionalProvider(context === 'journal' ? 'journal' : 'manual'), ...provider };
 }
 
 function defaultJournalTimeRows({ date, workplaceId, hint }) {
@@ -185,7 +185,7 @@ export function openRecords({
   onCreated = () => {},
   onCancel = () => {},
 } = {}) {
-  const source = normalizeProvider(provider);
+  const source = normalizeProvider(provider, context);
   const state = {
     workplaceId: String(workplaceId || ''),
     date: date ? dateKey(date) : '',
