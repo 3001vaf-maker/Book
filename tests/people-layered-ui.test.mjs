@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const people = readFileSync(new URL('../core/people/people.js', import.meta.url), 'utf8');
 const personRecord = readFileSync(new URL('../core/people/record-creation.js', import.meta.url), 'utf8');
-const records = readFileSync(new URL('../core/records.js', import.meta.url), 'utf8');
+const records = readFileSync(new URL('../core/records/records.js', import.meta.url), 'utf8');
 const procedureSelection = readFileSync(new URL('../core/service/procedures/selection.js', import.meta.url), 'utf8');
 const programs = readFileSync(new URL('../core/people/programs.js', import.meta.url), 'utf8');
 const viewState = readFileSync(new URL('../core/people/view-state.js', import.meta.url), 'utf8');

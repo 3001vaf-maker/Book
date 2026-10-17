@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const recordFlow = readFileSync(new URL('../core/records.js', import.meta.url), 'utf8');
+const recordFlow = readFileSync(new URL('../core/records/records.js', import.meta.url), 'utf8');
 const journalView = readFileSync(new URL('../journal/journal-view.js', import.meta.url), 'utf8');
 const breakView = readFileSync(new URL('../journal/break-view.js', import.meta.url), 'utf8');
 const journalDay = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
@@ -16,7 +16,7 @@ assert.match(recordFlow, /buildNaturalBookingTimeRows/);
 assert.match(recordFlow, /recordCreationTimeRows\(rows/);
 assert.match(recordFlow, /getWorkplaceWorkingDates/);
 assert.doesNotMatch(recordFlow, /isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/);
-assert.doesNotMatch(recordFlow, /from ['"]\.\.\/core\/day\.js['"]/);
+assert.doesNotMatch(recordFlow, /from ['"]\.\.\/day\.js['"]/);
 
 // Journal View is display-only for now and must not own a second Record time/edit flow.
 assert.doesNotMatch(journalView, /openRecordEditFlow|openTimePickerAction|checkTimeAvailability|listAvailableStartTimes|listAvailableEndTimes|getBookingSettings/);

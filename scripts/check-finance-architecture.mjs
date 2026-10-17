@@ -465,7 +465,7 @@ if (/financeSettlement\.upsert|financeOperation\.upsert|financeLedgerEntry\.upse
   errors.push('Staging fixtures must not create test Finance facts');
 }
 
-const recordCreation = source('core/records.js');
+const recordCreation = source('core/records/records.js');
 if (/data-record-cost|name=['"]recordCost['"]/.test(recordCreation)) {
   errors.push('Records creation must not correct procedure price; price comes from Price and is corrected only at payment');
 }

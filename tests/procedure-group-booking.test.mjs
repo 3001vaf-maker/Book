@@ -20,7 +20,7 @@ assert.match(formSource, /name:\s*'procedureGroupCapacity'/);
 assert.match(formSource, /label:\s*'Максимум людей'/);
 assert.match(formSource, /groupBooking:\s*\{/);
 
-const recordsSource = readFileSync(new URL('../core/records.js', import.meta.url), 'utf8');
+const recordsSource = readFileSync(new URL('../core/records/records.js', import.meta.url), 'utf8');
 assert.match(recordsSource, /function groupCapacity\(procedures = \[\]\)/);
 assert.match(recordsSource, /source\?\.groupBooking\?\.enabled !== true/);
 assert.match(recordsSource, /Math\.min\(\.\.\.capacities\)/);

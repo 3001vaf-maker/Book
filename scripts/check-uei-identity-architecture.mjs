@@ -5,12 +5,12 @@ function read(path) {
 }
 
 const failures = [];
-const records = read('core/records.js');
+const records = read('core/records/records.js');
 const metadata = read('core/people/metadata.js');
 const business = read('server/src/business-state/business-state.service.ts');
 const server = read('server/src/online-booking/online-booking.service.ts');
 
-if (!records.includes("import { getPeople } from '../core/people/data.js';") || records.includes('getAllPeople')) {
+if (!records.includes("import { getPeople } from '../people/data.js';") || records.includes('getAllPeople')) {
   failures.push('Records must select the canonical visible People projection, not raw UEI members.');
 }
 if (!metadata.includes('getIdentityMemberKeys') || !metadata.includes('identityKeys.has')) {

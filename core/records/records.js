@@ -17,16 +17,16 @@ import {
   recordProcedureList,
   recordWorkplaceCards,
   viewNavigation,
-} from '../ui/ui.js';
-import { createRecord } from '../core/record/index.js';
-import { createJournalBreak } from '../journal/break-service.js';
-import { getPeople } from '../core/people/data.js';
-import { openPersonCreate } from '../core/people/create.js';
-import { personDisplay } from '../core/people/presentation.js';
-import { getProcedures } from '../core/service/procedures/data.js';
-import { openProcedureEditor } from '../core/service/procedures/procedures.js';
-import { assignProceduresToWorkplace } from '../core/service/procedures/assignment.js';
-import { procedureCostForWorkplace, proceduresForWorkplace } from '../core/service/procedures/selection.js';
+} from '../../ui/ui.js';
+import { createRecord } from '../record/index.js';
+import { createJournalBreak } from '../../journal/break-service.js';
+import { getPeople } from '../people/data.js';
+import { openPersonCreate } from '../people/create.js';
+import { personDisplay } from '../people/presentation.js';
+import { getProcedures } from '../service/procedures/data.js';
+import { openProcedureEditor } from '../service/procedures/procedures.js';
+import { assignProceduresToWorkplace } from '../service/procedures/assignment.js';
+import { procedureCostForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
 import {
   buildNaturalBookingTimeRows,
   checkTimeAvailability,
@@ -35,11 +35,11 @@ import {
   listAvailableEndTimes,
   minutesToTime,
   timeToMinutes,
-} from '../core/time/index.js';
-import { getWorkplaces, getWorkplaceWorkingDates } from '../core/workplace-time.js';
-import { getProfile } from '../core/profile/data.js';
-import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../core/profile/card-presentation.js';
-import { calculateSettlement, recordSettlementPricePercent } from '../core/finance/index.js';
+} from '../time/index.js';
+import { getWorkplaces, getWorkplaceWorkingDates } from '../workplace-time.js';
+import { getProfile } from '../profile/data.js';
+import { workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from '../profile/card-presentation.js';
+import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
 
 const JOURNAL_MODES = [
   { id: 'record', label: 'Создать запись' },
