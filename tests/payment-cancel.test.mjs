@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   calculateSettlement,
   getDDSExpenses,
@@ -24,13 +24,13 @@ function recordFor(id) {
 }
 
 const serverFinance = readFileSync(new URL('../server/src/finance/finance.service.ts', import.meta.url), 'utf8');
-const paymentUi = readFileSync(new URL('../journal/record-payment.js', import.meta.url), 'utf8');
+const financeService = readFileSync(new URL('../core/finance/service.js', import.meta.url), 'utf8');
 assert.match(serverFinance, /createReversalFor/);
 assert.match(serverFinance, /kind:\s*'cancel'/);
 assert.match(serverFinance, /direction:\s*entry\.direction === 'IN' \? 'OUT' : 'IN'/);
-assert.match(paymentUi, /await\s+cancelPaymentOperation\(payment\.id/);
+assert.match(financeService, /export async function cancelPaymentOperation/);
+assert.equal(existsSync(new URL('../journal/record-payment.js', import.meta.url)), false);
 
-// Cancelling a wrong payment keeps the original Ledger fact and appends a reversal.
 const settlement = calculateSettlement([{ sourceId: 'procedure-cancel', name: 'Стрижка', price: 5000 }]);
 const payment = paymentFixture({
   id: 'payment-cancel',
@@ -60,7 +60,6 @@ assert.equal(state.hasPayments, false);
 assert.equal(state.paidTotal, 0);
 assert.equal(state.remaining, 5000);
 
-// Cancelling a payment that already had a refund reverses both parts, preserving the whole audit chain.
 const chainSettlement = calculateSettlement([{ sourceId: 'procedure-chain', name: 'Окрашивание', price: 5000 }]);
 const chainPayment = paymentFixture({
   id: 'payment-chain',
