@@ -141,6 +141,9 @@ assert.match(core, /from '\.\/online-booking\/booking\.js'/, 'Main browser entry
 assert.doesNotMatch(core, /booking-x\.js|renderOnlineBookingX/, 'Main browser entry must not retain the removed X Booking path');
 
 assert.match(dockerfile, /reset-test-account-before-global-migration/, 'Deployment must keep the guarded test-account reset before global Account migration');
-assert.match(reset, /ALLOW_TEST_ACCOUNT_RESET/, 'Test Account reset must stay explicitly guarded');
+assert.match(reset, /const migration = '20260921130000_global_account_identity'/, 'Test Account reset must target only the failed global Account migration');
+assert.match(reset, /const failed = rows\.find\([\s\S]*if \(!failed\)[\s\S]*return 0;/, 'Test Account reset must do nothing unless that migration is actively failed');
+assert.match(reset, /const fullyRolledBack =[\s\S]*oldTenantColumn[\s\S]*!newTenantColumn[\s\S]*!accountContactExists[\s\S]*!accountContactTypeExists/, 'Test Account reset must verify the exact rolled-back schema state before cleanup');
+assert.match(reset, /refusing automatic cleanup/, 'Test Account reset must refuse cleanup outside the guarded recovery state');
 
 console.log('global account architecture tests passed');
