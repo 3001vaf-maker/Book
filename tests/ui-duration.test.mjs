@@ -9,12 +9,11 @@ assert.equal(durationText(90), '1 ч 30 мин');
 assert.equal(durationText('135'), '2 ч 15 мин');
 
 const procedureFormSource = readFileSync(new URL('../core/service/procedures/form.js', import.meta.url), 'utf8');
-const recordCreationSource = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
-const recordViewSource = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
+const recordsSource = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
+const journalViewSource = readFileSync(new URL('../journal/journal-view.js', import.meta.url), 'utf8');
 
 assert.match(procedureFormSource, /durationPicker\(\{ label: 'Длительность'/);
-assert.match(recordCreationSource, /durationPicker\(\{ name: 'recordDuration'/);
-assert.match(recordViewSource, /openRecordEditFlow/);
-assert.doesNotMatch(recordViewSource, /durationPicker\(\{ name: 'recordViewProcedureDuration'|timePicker\(\{ name: 'recordViewProcedureDuration'/);
+assert.match(recordsSource, /durationText\(/);
+assert.doesNotMatch(journalViewSource, /durationPicker\(|timePicker\(|openRecordEditFlow/);
 
 console.log('ui-duration tests: OK');
