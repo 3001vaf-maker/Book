@@ -124,21 +124,18 @@ assert.doesNotMatch(accountShell, /onOpenChat: callbacks\.onOpenChat/, 'Global A
 assert.match(accountShell, /data-global-contact-booking/, 'Contact must expose Booking');
 assert.match(accountShell, /handlers\.onStartBooking\?\.\(tenantId/, 'Contact Booking button must use the shared Booking route');
 
+assert.match(userEntry, /function accountBookingRoute\(\)/, 'Dedicated end-user entry must own internal Account Booking routing');
 assert.match(userEntry, /params\.get\('booking'\)/, 'Dedicated end-user entry must understand internal Booking routes');
+assert.match(userEntry, /async function onlineBookingRoute\(\)/, 'Dedicated end-user entry must keep Online routing separate from Account Booking');
 assert.match(userEntry, /resolveBookingPublicRoute\(pathRoute\.profileSlug, pathRoute\.workplaceSlug\)/, 'Dedicated end-user entry must resolve Online professional/workplace links');
+assert.match(userEntry, /renderBookingRoute\(accountBooking\)/, 'Account Booking must enter the shared Booking route');
+assert.match(userEntry, /renderBookingRoute\(onlineBooking\)/, 'Online link must enter the same Booking route');
 assert.match(userEntry, /from '\.\/account\.js'/, 'Dedicated end-user entry must load Account separately');
 assert.match(userEntry, /from '\.\/booking\.js'/, 'Dedicated end-user entry must load Booking separately');
 
-assert.match(core, /isEndUserAppHost\(\)/);
-assert.match(core, /renderGlobalClientRoot\(\)/);
-assert.match(core, /function accountBookingRoute\(\)/, 'Main browser entry must understand Booking started from Account');
-assert.match(core, /params\.get\('booking'\)/, 'Main browser entry must read the Booking tenant identity');
-assert.match(core, /async function onlineBookingRoute\(\)/, 'Main browser entry must keep Online routing separate from Booking');
-assert.match(core, /renderBookingRoute\(accountBooking\)/, 'Account Booking must enter the shared Booking route');
-assert.match(core, /renderBookingRoute\(onlineBooking\)/, 'Online link must enter the same Booking route');
-assert.match(core, /from '\.\/online-booking\/account\.js'/, 'Main browser entry must load Account separately');
-assert.match(core, /from '\.\/online-booking\/booking\.js'/, 'Main browser entry must load Booking separately');
-assert.doesNotMatch(core, /booking-x\.js|renderOnlineBookingX/, 'Main browser entry must not retain the removed X Booking path');
+assert.doesNotMatch(core, /function accountBookingRoute\(|async function onlineBookingRoute\(|function renderBookingRoute\(|function renderGlobalClientRoot\(/, 'Professional entry must not duplicate end-user routing');
+assert.doesNotMatch(core, /from '\.\/online-booking\/account\.js'|from '\.\/online-booking\/booking\.js'|from '\.\/online-booking\/account-runtime\.js'/, 'Professional entry must not load end-user Account or Booking');
+assert.doesNotMatch(core, /booking-x\.js|renderOnlineBookingX/, 'Professional entry must not retain the removed X Booking path');
 
 assert.match(dockerfile, /reset-test-account-before-global-migration/, 'Deployment must keep the guarded test-account reset before global Account migration');
 assert.match(reset, /const migration = '20260921130000_global_account_identity'/, 'Test Account reset must target only the failed global Account migration');
