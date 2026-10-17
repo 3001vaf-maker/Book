@@ -39,9 +39,12 @@ assert.doesNotMatch(bookingSource, /workplaces\.map\(\s*\(item\)\s*=>\s*copyLink
 
 assert.match(accountSource, /export async function resolveBookingPublicRoute/);
 assert.match(accountSource, /\/online-booking\/route\//);
-assert.match(coreSource, /await bookingRoute\(\)/);
+assert.match(coreSource, /await onlineBookingRoute\(\)/);
+assert.match(coreSource, /function accountBookingRoute\(\)/);
+assert.match(coreSource, /params\.get\('booking'\)/, 'Internal Account Booking must carry the professional identity explicitly');
+assert.match(coreSource, /renderBookingRoute\(accountBooking\)/);
+assert.match(coreSource, /renderBookingRoute\(onlineBooking\)/);
 assert.match(coreSource, /resolveBookingPublicRoute/);
-assert.doesNotMatch(coreSource, /params\.get\('booking'\)/, 'Retired query-string booking route must not return');
 assert.match(controllerSource, /@Get\('owner\/route'\)/);
 assert.match(controllerSource, /@Get\('route\/:profileSlug'\)/);
 assert.match(serviceSource, /BookingPublicRouteType/);
