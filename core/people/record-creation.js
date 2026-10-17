@@ -1,4 +1,4 @@
-import { openRecords } from '../../records/records.js';
+import { openRecords } from '../records.js';
 import { openRecordConfirmationNotice } from '../../ui/record/confirmation-notice.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
 import { getProfile } from '../profile/data.js';
