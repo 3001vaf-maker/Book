@@ -39,8 +39,8 @@ assert.doesNotMatch(recordCss, /modal--bottom[^\n{]*record-creation|record-creat
 assert.match(day, /import\('\.\/record\.js'\)/);
 assert.equal(fs.existsSync('journal/record-creation-x.js'), false);
 assert.equal(fs.existsSync('journal/record-edit.js'), false);
-assert.match(journalCreation, /label: 'Запись'/);
-assert.match(journalCreation, /label: 'Занять время'/);
+assert.match(journal, /label: 'Запись'/);
+assert.match(journal, /label: 'Занять время'/);
 assert.match(journalCreation, /initViewNavigation/);
 assert.match(journalCreation, /state\.mode === 'block'[\s\S]*renderBlockEnd/);
 assert.match(journalCreation, /title: 'Выбор времени до скольки'/);
