@@ -5,7 +5,7 @@ function read(path) {
 }
 
 const failures = [];
-const records = read('records/records.js');
+const records = read('core/records.js');
 const metadata = read('core/people/metadata.js');
 const business = read('server/src/business-state/business-state.service.ts');
 const server = read('server/src/online-booking/online-booking.service.ts');
