@@ -4,8 +4,6 @@ import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } fro
 import { getTimeUsagesForScope } from '../core/time/index.js';
 import { getTimeAvailabilityAt } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { openRecords } from '../records/records.js';
-import { journalRecordActionContext } from './record-action-context.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function withFinancialState(usages = []) {
@@ -17,8 +15,8 @@ function withFinancialState(usages = []) {
 }
 
 async function openExistingRecord(record) {
-  const { openRecordView } = await import('./record-view.js');
-  openRecordView(record);
+  const { openJournalView } = await import('./journal-view.js');
+  openJournalView(record);
 }
 
 async function openUsage(usage, rerender = () => {}) {
@@ -103,16 +101,8 @@ export function renderJournalDay(root, {
         return;
       }
       if (minuteState.state !== 'free') return;
-      openRecords({
-        context: 'journal',
-        date,
-        workplaceId,
-        timeHint: from,
-        allowBreak: true,
-        professionalActions: true,
-        actionContext: journalRecordActionContext(),
-        onCreated: rerender,
-      });
+      const { openRecords } = await import('../records/records.js');
+      openRecords({ context: 'journal', date, workplaceId, timeHint: from, professionalActions: true, onCreated: rerender });
     },
   });
 }
