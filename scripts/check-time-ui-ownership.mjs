@@ -4,7 +4,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const errors = [];
 const fail = (path, message) => errors.push(`${path}: ${message}`);
 
-const recordFlow = read('records/records.js');
+const recordFlow = read('core/records.js');
 const breakView = read('journal/break-view.js');
 const breakData = read('journal/break-data.js');
 const breakRead = read('journal/break-read.js');
@@ -18,11 +18,11 @@ const dayEditor = read('timetable/day-editor.js');
 const sharedTime = read('ui/time/index.js');
 const sharedTimeCss = read('ui/time/time.css');
 
-if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('records/records.js', 'Records must ask Core Time/Availability.');
-if (!/checkTimeAvailability/.test(recordFlow) || !/getTimeAvailabilityAt/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('records/records.js', 'Records must use canonical Availability queries.');
-if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('records/records.js', 'Records must use the canonical WorkPlan date query.');
-if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('records/records.js', 'Records must not rebuild occupancy or WorkPlan availability.');
-if (/from ['"]\.\.\/journal\/break-data\.js['"]/.test(recordFlow)) fail('records/records.js', 'Records must command Break through break-service.js.');
+if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(recordFlow)) fail('core/records.js', 'Records must ask Core Time/Availability.');
+if (!/checkTimeAvailability/.test(recordFlow) || !/getTimeAvailabilityAt/.test(recordFlow) || !/listAvailableEndTimes/.test(recordFlow)) fail('core/records.js', 'Records must use canonical Availability queries.');
+if (!/getWorkplaceWorkingDates/.test(recordFlow)) fail('core/records.js', 'Records must use the canonical WorkPlan date query.');
+if (/from ['"]\.\.\/core\/day\.js['"]|isTimeRangeAvailable|getTimeUsages|getJournalBreaks|getRecords\(|getDayTime|getDay\(/.test(recordFlow)) fail('core/records.js', 'Records must not rebuild occupancy or WorkPlan availability.');
+if (/from ['"]\.\.\/journal\/break-data\.js['"]/.test(recordFlow)) fail('core/records.js', 'Records must command Break through break-service.js.');
 
 if (!/from ['"]\.\.\/core\/time\/index\.js['"]/.test(breakView)) fail('journal/break-view.js', 'Break view must ask Core Availability');
 if (!/listAvailableStartTimes/.test(breakView) || !/listAvailableEndTimes/.test(breakView)) fail('journal/break-view.js', 'Break view must use canonical Availability choices');

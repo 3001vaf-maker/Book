@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const recordFlow = readFileSync(new URL('../records/records.js', import.meta.url), 'utf8');
+const recordFlow = readFileSync(new URL('../core/records.js', import.meta.url), 'utf8');
 const journalView = readFileSync(new URL('../journal/journal-view.js', import.meta.url), 'utf8');
 const breakView = readFileSync(new URL('../journal/break-view.js', import.meta.url), 'utf8');
 const journalDay = readFileSync(new URL('../journal/день.js', import.meta.url), 'utf8');
