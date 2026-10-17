@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root=process.cwd();
-const runtimeRoots=['core','settings','journal','timetable','online-booking','chat','ui','admin','invite'];
+const runtimeRoots=['core','records','settings','journal','timetable','online-booking','chat','ui','admin','invite'];
 const ignoredDirs=new Set(['.git','node_modules','_site','tests','scripts','server']);
 const failures=[];
 
@@ -32,7 +32,7 @@ for(const file of walk(root).filter((file)=>file.endsWith('.html'))){
     const spec=String(match[1]||'').trim();
     if(!spec || /^(?:https?:|\/\/)/i.test(spec)) continue;
     const target=spec.startsWith('/')
-      ? path.join(root,spec.replace(/^\/+/,'')) 
+      ? path.join(root,spec.replace(/^\/+/,''))
       : path.resolve(path.dirname(file),spec);
     if(fs.existsSync(target)) entries.add(rel(target));
   }
