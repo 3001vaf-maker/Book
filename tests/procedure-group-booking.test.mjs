@@ -24,8 +24,9 @@ const recordSource = readFileSync(new URL('../journal/record.js', import.meta.ur
 assert.match(recordSource, /function\s+groupCapacityForSelectedProcedures/);
 assert.match(recordSource, /catalog\?\.groupBooking\?\.enabled\s*!==\s*true/);
 assert.match(recordSource, /Math\.min\(\.\.\.capacities\)/);
-assert.match(recordSource, /title:\s*groupMode\s*\?\s*'Выбор участников'/);
-assert.match(recordSource, /selectedPeople\.size\s*>=\s*groupCapacity/);
+assert.match(recordSource, /const\s+groupMode\s*=\s*capacity\s*>\s*1/);
+assert.match(recordSource, /selected\.size\s*<\s*capacity/);
+assert.match(recordSource, /Участники:\s*\$\{selected\.size\}\s*\/\s*\$\{capacity\}/);
 assert.match(recordSource, /group:\s*capacity\s*>\s*1\s*\?/);
 assert.doesNotMatch(recordSource, /data-record-group-capacity-save|openGroupCapacity|label:\s*'Количество мест'/);
 
