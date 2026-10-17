@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const recordFlow = readFileSync(new URL('../journal/record.js', import.meta.url), 'utf8');
-const recordEdit = readFileSync(new URL('../journal/record-edit.js', import.meta.url), 'utf8');
 const recordProcedureCorrection = readFileSync(new URL('../journal/record-procedure-correction.js', import.meta.url), 'utf8');
 const recordView = readFileSync(new URL('../journal/record-view.js', import.meta.url), 'utf8');
 const breakView = readFileSync(new URL('../journal/break-view.js', import.meta.url), 'utf8');
@@ -24,12 +23,12 @@ assert.doesNotMatch(recordView, /openTimePickerAction|checkRecordTime|startWorkp
 assert.doesNotMatch(recordView, /getBookingSettings\(\)\.slotStep/);
 assert.doesNotMatch(recordView, /from ['"]\.\.\/core\/day\.js['"]/);
 
-assert.match(recordEdit, /export function openRecordEditFlow/);
-assert.match(recordEdit, /getWorkplaceWorkingDates/);
-assert.match(recordEdit, /timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1/);
-assert.match(recordEdit, /initTimePickers\(host\)/);
-assert.match(recordEdit, /checkTimeAvailability\(\{[\s\S]*excludeId/);
-assert.doesNotMatch(recordEdit, /getBookingSettings\(\)\.slotStep/);
+assert.match(recordFlow, /export function openRecordEditFlow/);
+assert.match(recordFlow, /getWorkplaceWorkingDates/);
+assert.match(recordFlow, /timePicker\(\{[\s\S]*name:\s*'recordEditExactTime'[\s\S]*minuteStep:\s*1/);
+assert.match(recordFlow, /initTimePickers\(host\)/);
+assert.match(recordFlow, /checkTimeAvailability\(\{[\s\S]*excludeId/);
+assert.doesNotMatch(recordFlow, /getBookingSettings\(\)\.slotStep/);
 
 assert.match(recordProcedureCorrection, /checkTimeAvailability/);
 assert.match(recordProcedureCorrection, /excludeId/);
