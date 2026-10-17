@@ -4,6 +4,8 @@ import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } fro
 import { getTimeUsagesForScope } from '../core/time/index.js';
 import { getTimeAvailabilityAt } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
+import { openRecords } from '../records/records.js';
+import { journalRecordActionContext } from './record-action-context.js';
 
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function withFinancialState(usages = []) {
@@ -101,8 +103,16 @@ export function renderJournalDay(root, {
         return;
       }
       if (minuteState.state !== 'free') return;
-      const { openRecordCreation } = await import('./record-creation-x.js');
-      openRecordCreation({ date, workplaceId, from, onCreated: rerender });
+      openRecords({
+        context: 'journal',
+        date,
+        workplaceId,
+        timeHint: from,
+        allowBreak: true,
+        professionalActions: true,
+        actionContext: journalRecordActionContext(),
+        onCreated: rerender,
+      });
     },
   });
 }
