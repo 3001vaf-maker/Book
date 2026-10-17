@@ -23,7 +23,7 @@ import { resolveBookingPublicRoute } from './core/account/index.js';
 import { activateBookDemo, canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
 import { startServerBookingSync } from './online-booking/server-sync.js';
 import { renderGlobalClient } from './online-booking/booking.js';
-import { renderOnlineBookingX as renderOnlineBooking } from './online-booking/booking-x.js';
+import { renderAccess as renderOnlineBooking } from './online-booking/access.js';
 import { startAccountRuntime } from './online-booking/account-runtime.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
